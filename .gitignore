@@ -1,0 +1,27 @@
+# Config with secrets (use config.example.php as template)
+config.php
+
+# Uploaded images (user content, not tracked)
+images/*
+!images/.htaccess
+
+# Cache directory if added later
+cache/
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# PHP
+vendor/
+composer.lock
+*.log
+
+# Environment
+.env
+.env.local
+.env.*.local
