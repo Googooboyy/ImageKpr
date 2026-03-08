@@ -15,6 +15,9 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .dashboard-last10 { margin-top: 1rem; }
 .dashboard-label { font-size: 0.875rem; color: #666; display: block; margin-bottom: 0.5rem; }
 .last10-row { display: flex; gap: 0.5rem; flex-wrap: wrap; min-height: 56px; }
+.last10-thumb:hover { border-color: #999; }
+.last10-expand { position: absolute; bottom: 2px; right: 2px; width: 20px; height: 20px; border: none; background: rgba(255,255,255,0.9); border-radius: 2px; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; }
+.last10-expand:hover { background: #fff; }
 
 .lists-filter { padding: 0.75rem 2rem; display: flex; gap: 0.5rem; align-items: center; border-bottom: 1px solid #eee; }
 #list-filter { padding: 0.25rem 0.5rem; }
@@ -33,7 +36,18 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 @media (min-width: 900px) { .grid { column-count: 3; } }
 @media (min-width: 1200px) { .grid { column-count: 4; } }
 .grid-item { break-inside: avoid; margin-bottom: 1rem; }
-.grid-item img { width: 100%; display: block; border-radius: 4px; }
+.card { cursor: pointer; }
+.card-inner { position: relative; padding: 0.5rem; border: 1px solid #eee; border-radius: 8px; transition: box-shadow 0.2s, border-color 0.2s; }
+.card-inner:hover { border-color: #ccc; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.card-inner:active { box-shadow: 0 0 0 2px #999; }
+.card-img { width: 100%; display: block; border-radius: 4px; min-height: 120px; background: #f0f0f0; }
+.card-info { padding: 0.5rem 0; font-size: 0.875rem; }
+.card-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-meta { color: #666; font-size: 0.75rem; }
+.card-expand { position: absolute; top: 0.5rem; right: 0.5rem; width: 28px; height: 28px; border: none; background: rgba(255,255,255,0.9); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: background 0.2s; }
+.card-expand:hover { background: #fff; }
+.card-expand:active { background: #eee; }
+.empty { color: #666; padding: 2rem; text-align: center; }
 
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
 .modal-content { background: #fff; padding: 1rem; border-radius: 8px; max-width: 90vw; max-height: 90vh; overflow: auto; }
