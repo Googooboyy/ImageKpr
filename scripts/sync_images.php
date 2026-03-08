@@ -57,7 +57,8 @@ foreach (scandir($inboxDir) as $f) {
     $dest = $imagesDir . pathinfo($baseName, PATHINFO_FILENAME) . '-' . $suffix . '.' . pathinfo($baseName, PATHINFO_EXTENSION);
   }
   $baseName = basename($dest);
-  if (rename($path, $dest)) {
+  if (copy($path, $dest)) {
+    @unlink($path);
     $info = @getimagesize($dest);
     $url = rtrim(IMAGES_URL, '/') . '/' . $baseName;
     $st = $pdo->prepare('INSERT INTO images (filename, url, date_uploaded, size_bytes, width, height, tags) VALUES (?, ?, NOW(), ?, ?, ?, ?)');

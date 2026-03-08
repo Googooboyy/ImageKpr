@@ -196,7 +196,13 @@
   }
 
   function copyUrl(url) {
-    navigator.clipboard.writeText(url).then(() => showToast('Copied!')).catch(() => showToast('Copy failed'));
+    if (!url) return;
+    try {
+      const absolute = new URL(url, window.location.origin).href;
+      navigator.clipboard.writeText(absolute).then(() => showToast('Copied!')).catch(() => showToast('Copy failed'));
+    } catch {
+      navigator.clipboard.writeText(url).then(() => showToast('Copied!')).catch(() => showToast('Copy failed'));
+    }
   }
 
   function formatBytes(b) {
@@ -808,19 +814,250 @@
     }).catch(() => {});
   }
 
-  function importInbox() {
-    fetch(API_BASE + '/inbox.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ import_all: true })
-    }).then(r => r.json()).then(data => {
-      if (data.success) {
-        showToast('Imported ' + (data.imported || 0) + ' image(s)');
-        loadInbox();
-        loadStats();
-        refreshGrid(false);
+  function formatBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function showInboxImportModal() {
+    const dialog = document.getElementById('inbox-import-dialog');
+    const listEl = document.getElementById('inbox-import-list');
+    const countEl = document.getElementById('inbox-import-count');
+    const confirmBtn = document.getElementById('inbox-import-confirm');
+    const cancelBtn = document.getElementById('inbox-import-cancel');
+    const bulkTags = document.getElementById('inbox-import-bulk-tags');
+    const bulkFolder = document.getElementById('inbox-import-bulk-folder');
+    const bulkApply = document.getElementById('inbox-import-bulk-apply');
+
+    let pendingItems = [];
+
+    function renderList() {
+      listEl.innerHTML = '';
+      const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
+      bulkFolder.innerHTML = '<option value="">— None —</option>';
+      Object.keys(data).sort().forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        bulkFolder.appendChild(opt);
+      });
+
+      pendingItems.forEach((item, i) => {
+        const row = document.createElement('div');
+        row.className = 'inbox-import-row';
+        row.dataset.index = String(i);
+        const ext = (item.filename || '').split('.').pop().toLowerCase();
+        const baseName = (item.filename || '').replace(/\.[^.]+$/, '') || 'image';
+        const defaultNewName = baseName + (ext ? '.' + ext : '');
+
+        const thumbWrap = document.createElement('div');
+        thumbWrap.className = 'inbox-import-row-thumb';
+        const thumbImg = document.createElement('img');
+        thumbImg.src = API_BASE + '/inbox_preview.php?file=' + encodeURIComponent(item.filename);
+        thumbImg.alt = '';
+        thumbImg.loading = 'lazy';
+        thumbImg.onerror = () => { thumbWrap.classList.add('inbox-import-thumb-failed'); };
+        thumbWrap.appendChild(thumbImg);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'inbox-import-row-name';
+        nameSpan.textContent = item.filename;
+        nameSpan.title = item.filename;
+
+        const sizeSpan = document.createElement('span');
+        sizeSpan.className = 'inbox-import-row-size';
+        sizeSpan.textContent = formatBytes(item.size || 0);
+
+        const renameInput = document.createElement('input');
+        renameInput.type = 'text';
+        renameInput.className = 'inbox-import-row-rename';
+        renameInput.placeholder = 'New name (optional)';
+        renameInput.value = item.newName ?? '';
+
+        const tagsInput = document.createElement('input');
+        tagsInput.type = 'text';
+        tagsInput.className = 'inbox-import-row-tags';
+        tagsInput.placeholder = 'Tags (comma-separated)';
+        tagsInput.value = Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || '');
+
+        const folderSelect = document.createElement('select');
+        folderSelect.className = 'inbox-import-row-folder';
+        folderSelect.innerHTML = '<option value="">— None —</option>';
+        Object.keys(data).sort().forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          if (item.folder === name) opt.selected = true;
+          folderSelect.appendChild(opt);
+        });
+        const newOpt = document.createElement('option');
+        newOpt.value = '__new__';
+        newOpt.textContent = '+ New folder';
+        folderSelect.appendChild(newOpt);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'inbox-import-row-remove';
+        removeBtn.textContent = 'Remove';
+
+        row.appendChild(thumbWrap);
+        row.appendChild(nameSpan);
+        row.appendChild(sizeSpan);
+        row.appendChild(renameInput);
+        row.appendChild(tagsInput);
+        row.appendChild(folderSelect);
+        row.appendChild(removeBtn);
+        listEl.appendChild(row);
+
+        const syncItem = () => {
+          item.newName = renameInput.value.trim() || undefined;
+          item.tags = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
+          item.folder = folderSelect.value && folderSelect.value !== '__new__' ? folderSelect.value : undefined;
+        };
+
+        renameInput.addEventListener('change', syncItem);
+        renameInput.addEventListener('blur', syncItem);
+        tagsInput.addEventListener('change', syncItem);
+        tagsInput.addEventListener('blur', syncItem);
+        folderSelect.addEventListener('change', () => {
+          if (folderSelect.value === '__new__') {
+            addToFolderDialog().then(name => {
+              if (name) {
+                if (!window.ImageKprFolders) return;
+                const d = window.ImageKprFolders.load();
+                if (!d[name]) d[name] = [];
+                window.ImageKprFolders.save(d);
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name;
+                opt.selected = true;
+                folderSelect.insertBefore(opt, folderSelect.lastElementChild);
+                item.folder = name;
+                if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+              }
+              folderSelect.value = item.folder || '';
+            });
+          } else {
+            syncItem();
+          }
+        });
+
+        removeBtn.addEventListener('click', async () => {
+          if (!(await confirmDialog('Remove "' + item.filename + '" from import? The file will be deleted from the inbox.'))) return;
+          fetch(API_BASE + '/inbox.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', files: [item.filename] })
+          }).catch(() => {});
+          pendingItems.splice(i, 1);
+          renderList();
+          updateCount();
+        });
+      });
+
+      updateCount();
+    }
+
+    function updateCount() {
+      const n = pendingItems.length;
+      countEl.textContent = n + ' file' + (n === 1 ? '' : 's') + ' to import';
+      confirmBtn.disabled = n === 0;
+    }
+
+    let escapeHandler = null;
+    function closeModal() {
+      dialog.hidden = true;
+      document.body.style.overflow = '';
+      if (escapeHandler) document.removeEventListener('keydown', escapeHandler);
+      confirmBtn.onclick = null;
+      cancelBtn.onclick = null;
+      bulkApply.onclick = null;
+    }
+
+    fetchJSON(API_BASE + '/inbox.php').then(data => {
+      const pending = data.pending || [];
+      if (pending.length === 0) {
+        showToast('No files in inbox');
+        return;
       }
-    }).catch(() => showToast('Import failed'));
+      pendingItems = pending.map(p => ({ filename: p.filename, size: p.size }));
+
+      bulkTags.value = '';
+      renderList();
+      dialog.hidden = false;
+      document.body.style.overflow = 'hidden';
+
+      bulkApply.onclick = () => {
+        const tags = bulkTags.value.split(',').map(t => t.trim()).filter(Boolean);
+        const folder = bulkFolder.value || null;
+        pendingItems.forEach(item => {
+          if (tags.length) item.tags = [...new Set([...(item.tags || []), ...tags])];
+          if (folder) item.folder = folder;
+        });
+        renderList();
+      };
+
+      confirmBtn.onclick = () => {
+        pendingItems.forEach((item, i) => {
+          const row = listEl.querySelector('[data-index="' + i + '"]');
+          if (row) {
+            const rn = row.querySelector('.inbox-import-row-rename');
+            const tg = row.querySelector('.inbox-import-row-tags');
+            const fd = row.querySelector('.inbox-import-row-folder');
+            if (rn) item.newName = rn.value.trim() || undefined;
+            if (tg) item.tags = tg.value.split(',').map(t => t.trim()).filter(Boolean);
+            if (fd && fd.value && fd.value !== '__new__') item.folder = fd.value;
+          }
+        });
+
+        const items = pendingItems.map(({ filename, newName, tags }) => {
+          const o = { filename };
+          if (newName) o.newName = newName;
+          if (tags && tags.length) o.tags = tags;
+          return o;
+        });
+
+        closeModal();
+        fetch(API_BASE + '/inbox.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items })
+        }).then(r => r.json()).then(data => {
+          if (data.success) {
+            const ids = data.imported_ids || [];
+            const folderMap = {};
+            pendingItems.forEach((item, idx) => {
+              const folder = item.folder;
+              if (folder && ids[idx] !== undefined) {
+                if (!folderMap[folder]) folderMap[folder] = [];
+                folderMap[folder].push(ids[idx]);
+              }
+            });
+            Object.entries(folderMap).forEach(([name, idArr]) => {
+              if (window.ImageKprFolders) {
+                window.ImageKprFolders.addToFolder(name, idArr);
+                if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+              }
+            });
+            showToast('Imported ' + (data.imported || 0) + ' image(s)');
+            loadInbox();
+            loadStats();
+            refreshGrid(false);
+            if (window.ImageKprFolders && window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+          }
+        }).catch(() => showToast('Import failed'));
+      };
+
+      cancelBtn.onclick = closeModal;
+      dialog.onclick = (e) => { if (e.target === dialog) closeModal(); };
+      escapeHandler = (e) => { if (e.key === 'Escape') closeModal(); };
+      document.addEventListener('keydown', escapeHandler);
+    }).catch(() => showToast('Failed to load inbox'));
+  }
+
+  function importInbox() {
+    showInboxImportModal();
   }
 
   function loadStats() {

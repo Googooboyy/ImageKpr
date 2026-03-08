@@ -11,5 +11,5 @@ define('DB_USER', 'db username here');
 define('DB_PASS', 'your password here');
 
 define('IMAGES_DIR', __DIR__ . '/images');
-define('IMAGES_URL', '/images');
+define('IMAGES_URL', 'http://imagekpr.mar.sg/images');  // Use absolute URL for shareable links (e.g. http://imagekpr.mar.sg/images). Relative (e.g. /images) also works; copy will resolve to current origin.
 define('INBOX_DIR', __DIR__ . '/inbox');

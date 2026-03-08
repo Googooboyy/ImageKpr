@@ -27,7 +27,7 @@
   <section class="dashboard">
     <div class="dashboard-inbox" id="dashboard-inbox" hidden>
       <span id="inbox-count">0</span> images in inbox.
-      <button type="button" id="inbox-import-btn">Import all</button>
+      <button type="button" id="inbox-import-btn">Review & import</button>
     </div>
     <div class="dashboard-top-row">
       <div class="dashboard-stats">
@@ -164,6 +164,27 @@
         <span id="upload-confirm-count" class="upload-confirm-count"></span>
         <button type="button" id="upload-confirm-upload">Upload</button>
         <button type="button" id="upload-confirm-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="inbox-import-dialog" class="dialog inbox-import-dialog" hidden aria-modal="true" aria-labelledby="inbox-import-title">
+    <div class="dialog-content inbox-import-content">
+      <h3 id="inbox-import-title">Review inbox import</h3>
+      <p class="inbox-import-hint">Review files, rename, add tags or folder. Remove any you don't want to import.</p>
+      <div class="inbox-import-bulk">
+        <span class="inbox-import-bulk-label">Apply to all:</span>
+        <input type="text" id="inbox-import-bulk-tags" placeholder="Tags (comma-separated)" class="inbox-import-bulk-tags">
+        <select id="inbox-import-bulk-folder" class="inbox-import-bulk-folder" aria-label="Folder for all">
+          <option value="">— None —</option>
+        </select>
+        <button type="button" id="inbox-import-bulk-apply">Apply</button>
+      </div>
+      <div id="inbox-import-list" class="inbox-import-list"></div>
+      <div class="dialog-actions inbox-import-actions">
+        <span id="inbox-import-count" class="inbox-import-count"></span>
+        <button type="button" id="inbox-import-confirm">Import</button>
+        <button type="button" id="inbox-import-cancel">Cancel</button>
       </div>
     </div>
   </div>
