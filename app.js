@@ -205,6 +205,82 @@
     return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
   }
 
+  const MAX_UPLOAD = 3 * 1024 * 1024;
+  const MAX_WIDTH = 1920;
+
+  function resizeIfNeeded(file) {
+    return new Promise((resolve) => {
+      if (file.size <= MAX_UPLOAD && !file.type.match(/image/)) {
+        resolve(file);
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        if (img.width <= MAX_WIDTH) {
+          resolve(file);
+          return;
+        }
+        const canvas = document.createElement('canvas');
+        const r = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = Math.round(img.height * r);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+          resolve(blob ? new File([blob], file.name, { type: file.type }) : file);
+        }, file.type, 0.9);
+      };
+      img.onerror = () => resolve(file);
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  function uploadFiles(files) {
+    const zone = document.getElementById('upload-zone');
+    const prog = document.getElementById('upload-progress');
+    const text = document.getElementById('upload-text');
+    const valid = Array.from(files).filter(f => f.size <= MAX_UPLOAD);
+    const tooBig = Array.from(files).filter(f => f.size > MAX_UPLOAD);
+    if (tooBig.length) showToast(tooBig.length + ' file(s) skipped (max 3MB)');
+    if (valid.length === 0) return;
+    text.hidden = true;
+    prog.hidden = false;
+    prog.innerHTML = '<div class="upload-progress-bar" id="upload-bar"></div>';
+    const bar = document.getElementById('upload-bar');
+    const fd = new FormData();
+    valid.forEach((f, i) => fd.append('file[]', f, f.name));
+    const xhr = new XMLHttpRequest();
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) bar.style.width = (e.loaded / e.total * 100) + '%';
+    };
+    xhr.onload = () => {
+      prog.hidden = true;
+      text.hidden = false;
+      try {
+        const d = JSON.parse(xhr.responseText);
+        if (d.success !== false) {
+          showToast('Uploaded');
+          refreshGrid(false);
+          loadStats();
+        } else showToast(d.error || 'Upload failed');
+      } catch (_) { showToast('Upload failed'); }
+    };
+    xhr.onerror = () => {
+      prog.hidden = true;
+      text.hidden = false;
+      showToast('Upload failed');
+    };
+    xhr.open('POST', API_BASE + '/upload.php');
+    xhr.send(fd);
+  }
+
+  function processAndUpload(files) {
+    const arr = Array.from(files);
+    Promise.all(arr.map(f => resizeIfNeeded(f))).then(resized => {
+      uploadFiles(resized);
+    });
+  }
+
   function loadStats() {
     fetchJSON(API_BASE + '/stats.php').then(data => {
       document.getElementById('stat-total-images').textContent = data.total_images;
@@ -239,6 +315,22 @@
   document.addEventListener('DOMContentLoaded', () => {
     loadStats();
     refreshGrid(false);
+
+    const uploadZone = document.getElementById('upload-zone');
+    const uploadInput = document.getElementById('upload-input');
+    uploadZone.addEventListener('click', () => uploadInput.click());
+    uploadInput.addEventListener('change', () => {
+      if (uploadInput.files.length) processAndUpload(uploadInput.files);
+      uploadInput.value = '';
+    });
+    uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('drag-over');
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      if (files.length) processAndUpload(files);
+    });
 
     document.getElementById('search').addEventListener('input', debounce(() => {
       gridState.search = document.getElementById('search').value.trim();

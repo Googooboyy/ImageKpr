@@ -54,7 +54,9 @@
         <option value="random">Random</option>
       </select>
       <div class="upload-zone" id="upload-zone">
-        <span>Drag & drop or click to upload</span>
+        <input type="file" id="upload-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple hidden>
+        <span id="upload-text">Drag & drop or click to upload</span>
+        <div id="upload-progress" class="upload-progress" hidden></div>
       </div>
     </div>
     <p class="user-hint">Click card to copy URL • Click icon to view full size</p>
