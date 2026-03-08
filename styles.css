@@ -57,6 +57,15 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .modal-content { background: #fff; padding: 1rem; border-radius: 8px; max-width: 90vw; max-height: 90vh; overflow: auto; }
 .modal-content img { max-width: 100%; max-height: 70vh; display: block; }
 .modal-actions { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
-.modal-actions button { padding: 0.5rem 1rem; cursor: pointer; }
+.modal-tags { margin-top: 1rem; }
+.modal-tags label { display: block; font-size: 0.875rem; margin-bottom: 0.25rem; }
+#modal-tag-input { width: 100%; padding: 0.5rem; margin-bottom: 0.5rem; }
+.tag-pills { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.tag-pill { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.2rem 0.5rem; background: #eee; border-radius: 4px; font-size: 0.75rem; }
+.tag-pill button { background: none; border: none; cursor: pointer; padding: 0; font-size: 0.875rem; line-height: 1; }
+.modal-actions { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+.modal-actions button { padding: 0.5rem 1rem; cursor: pointer; transition: background 0.2s; }
+.modal-actions button:hover { background: #eee; }
+.modal-actions button:active { background: #ddd; }
 
 .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; z-index: 1001; }

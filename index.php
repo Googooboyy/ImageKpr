@@ -65,6 +65,11 @@
   <div id="modal" class="modal" hidden aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-content">
       <img id="modal-img" src="" alt="">
+      <div class="modal-tags">
+        <label for="modal-tag-input">Tags:</label>
+        <input type="text" id="modal-tag-input" placeholder="Add tag, press Enter">
+        <div id="modal-tag-pills" class="tag-pills"></div>
+      </div>
       <div class="modal-actions">
         <button type="button" id="modal-copy">Copy URL</button>
         <button type="button" id="modal-download">Download</button>

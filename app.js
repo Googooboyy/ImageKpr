@@ -67,14 +67,57 @@
 
   let currentModalImg = null;
 
+  function renderTagPills(container, tags, onRemove) {
+    container.innerHTML = '';
+    (tags || []).forEach(tag => {
+      const span = document.createElement('span');
+      span.className = 'tag-pill';
+      span.innerHTML = tag + ' <button type="button" aria-label="Remove ' + tag + '">&times;</button>';
+      span.querySelector('button').addEventListener('click', () => onRemove && onRemove(tag));
+      container.appendChild(span);
+    });
+  }
+
   function openModal(img) {
     currentModalImg = img;
     const modal = document.getElementById('modal');
     const imgEl = document.getElementById('modal-img');
+    const pills = document.getElementById('modal-tag-pills');
+    const input = document.getElementById('modal-tag-input');
     imgEl.src = img.url;
     imgEl.alt = img.filename;
+    const tags = Array.isArray(img.tags) ? img.tags : (img.tags ? JSON.parse(img.tags || '[]') : []);
+    const refreshPills = () => renderTagPills(pills, tags, (removed) => {
+      const i = tags.indexOf(removed);
+      if (i >= 0) tags.splice(i, 1);
+      updateImageTags(img.id, tags);
+      refreshPills();
+    });
+    refreshPills();
+    input.value = '';
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        const t = input.value.trim();
+        if (t && !tags.includes(t)) {
+          tags.push(t);
+          updateImageTags(img.id, tags);
+          refreshPills();
+          input.value = '';
+        }
+      }
+    };
     modal.hidden = false;
     document.body.style.overflow = 'hidden';
+  }
+
+  function updateImageTags(id, tags) {
+    fetch(API_BASE + '/tags.php', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, tags })
+    }).then(() => {
+      if (currentModalImg && currentModalImg.id === id) currentModalImg.tags = tags;
+    }).catch(() => showToast('Failed to update tags'));
   }
 
   function closeModal() {
@@ -243,6 +286,22 @@
       a.href = img.src;
       a.download = img.alt || 'image';
       a.click();
+    });
+    document.getElementById('modal-delete').addEventListener('click', () => {
+      if (!currentModalImg) return;
+      if (!confirm('Delete this image?')) return;
+      fetch(API_BASE + '/delete.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentModalImg.id })
+      }).then(r => r.json()).then(data => {
+        if (data.success !== false) {
+          closeModal();
+          refreshGrid(false);
+          loadStats();
+          showToast('Deleted');
+        } else showToast(data.error || 'Delete failed');
+      }).catch(() => showToast('Delete failed'));
     });
   });
 
