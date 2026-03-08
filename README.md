@@ -5,15 +5,17 @@ A minimalistic image repository app for hosting and linking images. Built with L
 ## Features
 
 - **Hero header** with logo + **mini dashboard** (total images, storage used, last 10 thumbnails)
-- **Lists filter** dropdown (Favourites, custom lists) — filter grid by list
-- **Masonry grid** with lazy loading; click card to copy URL, star to add to list, expand icon for full-size modal
+- **Folders filter** dropdown (Favourites, custom folders) — filter grid by folder
+- **Standard grid** with lazy loading; click card to copy URL, star to add to folder, expand icon for full-size modal
 - **Search & sort** (filename, tags, date, size, random) — 1s debounce on search
 - **Drag-and-drop upload** with client-side resize (max 3MB, 1920px width) for lightweight linking
 - **Modal** with Copy URL, Download, Delete, tag edit; visual feedback on hover/click
-- **Bulk actions** (selection mode): Delete, Download ZIP, Edit tags, Add to list, Rename
+- **Bulk actions** (selection mode): Delete, Download ZIP, Edit tags, Add to folder, Rename
 - **Hot folder (inbox)**: Drop images via FTP → Import all from dashboard
-- **Favourites & lists**: localStorage, import/export, manage lists dialog
+- **Favourites & folders**: localStorage, import/export, manage folders dialog
 - Infinite scroll (up to 1000 images), then pagination
+
+> **Note for existing users:** The feature previously named "lists" is now called "folders." Your existing data is migrated automatically on first load (lists = folders). Exported files from earlier versions (`imagekpr-lists.json`) can still be imported; the JSON format is unchanged.
 
 ## Requirements
 
@@ -37,7 +39,7 @@ A minimalistic image repository app for hosting and linking images. Built with L
 ├── index.php
 ├── styles.css
 ├── app.js
-├── lists.js
+├── folders.js
 ├── config.example.php
 ├── database.sql
 ├── .htaccess
@@ -52,7 +54,7 @@ A minimalistic image repository app for hosting and linking images. Built with L
 │   ├── rename_bulk.php
 │   └── inbox.php
 ├── assets/
-│   └── logo.svg
+│   └── imagekpr-logo.png
 ├── images/
 ├── inbox/
 └── scripts/

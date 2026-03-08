@@ -25,7 +25,7 @@ Before each step: implement → self-review → fix errors → **git commit (loc
 | 9. Upload UI | Done | |
 | 10. Bulk actions | Done | |
 | 11. Hot folder | Done | |
-| 12. Favourites & lists | Done | |
+| 12. Favourites & folders | Done | (renamed from lists) |
 | 13. Lazy loading, .htaccess, README | Done | |
 
 ---

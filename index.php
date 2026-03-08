@@ -48,7 +48,7 @@
         <button type="button" id="bulk-delete">Delete</button>
         <button type="button" id="bulk-download">Download ZIP</button>
         <button type="button" id="bulk-tags">Edit tags</button>
-        <button type="button" id="bulk-add-list">Add to list</button>
+        <button type="button" id="bulk-add-folder">Add to folder</button>
         <button type="button" id="bulk-rename">Rename</button>
         <button type="button" id="bulk-clear">Clear</button>
       </div>
@@ -57,11 +57,11 @@
     </div>
   </section>
 
-  <section class="lists-filter">
+  <section class="folders-filter">
     <label>Show:</label>
-    <input type="hidden" id="list-filter" value="" aria-label="Filter by list">
-    <div id="list-pills" class="list-pills"></div>
-    <button type="button" id="manage-lists-btn">Manage lists</button>
+    <input type="hidden" id="folder-filter" value="" aria-label="Filter by folder">
+    <div id="folder-pills" class="folder-pills"></div>
+    <button type="button" id="manage-folders-btn">Manage folders</button>
   </section>
 
   <section class="sort-row" aria-label="Sort order">
@@ -97,12 +97,12 @@
 
   <div id="toast" class="toast" hidden aria-live="polite"></div>
 
-  <div id="manage-lists-dialog" class="dialog" hidden>
+  <div id="manage-folders-dialog" class="dialog" hidden>
     <div class="dialog-content">
-      <h3>Manage lists</h3>
-      <div id="manage-lists-list"></div>
-      <label>New list: <input type="text" id="new-list-name" placeholder="List name"></label>
-      <button type="button" id="manage-create-list">Create</button>
+      <h3>Manage folders</h3>
+      <div id="manage-folders-list"></div>
+      <label>New folder: <input type="text" id="new-folder-name" placeholder="Folder name"></label>
+      <button type="button" id="manage-create-folder">Create</button>
       <div class="dialog-actions">
         <button type="button" id="manage-import">Import</button>
         <button type="button" id="manage-export">Export</button>
@@ -128,12 +128,12 @@
       <h3 id="upload-confirm-title">Confirm upload</h3>
       <p class="upload-confirm-hint">Review the images below. Remove any you don't want before confirming.</p>
       <div id="upload-confirm-grid" class="upload-confirm-grid"></div>
-      <div class="upload-add-to-list">
-        <label for="upload-add-to-list-select" class="upload-add-to-list-label">Add to list (optional):</label>
-        <select id="upload-add-to-list-select" aria-label="Add uploads to list">
+      <div class="upload-add-to-folder">
+        <label for="upload-add-to-folder-select" class="upload-add-to-folder-label">Add to folder (optional):</label>
+        <select id="upload-add-to-folder-select" aria-label="Add uploads to folder">
           <option value="">— None —</option>
         </select>
-        <input type="text" id="upload-add-to-list-new" class="upload-add-to-list-new" placeholder="Or type new list name" autocomplete="off">
+        <input type="text" id="upload-add-to-folder-new" class="upload-add-to-folder-new" placeholder="Or type new folder name" autocomplete="off">
       </div>
       <div class="dialog-actions upload-confirm-actions">
         <span id="upload-confirm-count" class="upload-confirm-count"></span>
@@ -153,14 +153,14 @@
     </div>
   </div>
 
-  <div id="add-to-list-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="add-to-list-title">
+  <div id="add-to-folder-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="add-to-folder-title">
     <div class="dialog-content">
-      <h3 id="add-to-list-title">Add to list</h3>
-      <label for="add-to-list-input" class="dialog-label">List name:</label>
-      <input type="text" id="add-to-list-input" placeholder="e.g. Favourites" autocomplete="off">
+      <h3 id="add-to-folder-title">Add to folder</h3>
+      <label for="add-to-folder-input" class="dialog-label">Folder name:</label>
+      <input type="text" id="add-to-folder-input" placeholder="e.g. Favourites" autocomplete="off">
       <div class="dialog-actions">
-        <button type="button" id="add-to-list-ok">OK</button>
-        <button type="button" id="add-to-list-cancel">Cancel</button>
+        <button type="button" id="add-to-folder-ok">OK</button>
+        <button type="button" id="add-to-folder-cancel">Cancel</button>
       </div>
     </div>
   </div>
@@ -169,7 +169,7 @@
     © 2026 <a href="https://mar.sg" target="_blank" rel="noopener noreferrer">Mar.sg</a>
   </footer>
 
-  <script src="lists.js"></script>
+  <script src="folders.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

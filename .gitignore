@@ -30,3 +30,7 @@ composer.lock
 .env
 .env.local
 .env.*.local
+
+# user folders - redundant
+import-export-folders/*
+import-export-folders

@@ -37,12 +37,12 @@
     });
   }
 
-  function addToListDialog(defaultValue) {
+  function addToFolderDialog(defaultValue) {
     return new Promise((resolve) => {
-      const d = document.getElementById('add-to-list-dialog');
-      const input = document.getElementById('add-to-list-input');
-      const okBtn = document.getElementById('add-to-list-ok');
-      const cancelBtn = document.getElementById('add-to-list-cancel');
+      const d = document.getElementById('add-to-folder-dialog');
+      const input = document.getElementById('add-to-folder-input');
+      const okBtn = document.getElementById('add-to-folder-ok');
+      const cancelBtn = document.getElementById('add-to-folder-cancel');
       input.value = defaultValue || 'Favourites';
       input.select();
       d.hidden = false;
@@ -142,13 +142,13 @@
     const name = truncate(img.filename, 24);
     const size = formatBytes(img.size_bytes || 0);
     const date = formatDate(img.date_uploaded);
-    const defList = window.ImageKprLists ? window.ImageKprLists.getDefaultList() : 'Favourites';
-    const inFav = window.ImageKprLists ? window.ImageKprLists.isInList(defList, img.id) : false;
+    const defFolder = window.ImageKprFolders ? window.ImageKprFolders.getDefaultFolder() : 'Favourites';
+    const inFav = window.ImageKprFolders ? window.ImageKprFolders.isInFolder(defFolder, img.id) : false;
     const starSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="' + (inFav ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg>';
     const cb = '<input type="checkbox" class="card-select" data-id="' + img.id + '" style="display:' + (selectMode ? 'inline-block' : 'none') + '">';
     article.innerHTML =
       '<div class="card-inner">' + cb +
-      '<button type="button" class="card-star' + (inFav ? ' in-list' : '') + '" aria-label="Add to list" data-id="' + img.id + '">' + starSvg + '</button>' +
+      '<button type="button" class="card-star' + (inFav ? ' in-folder' : '') + '" aria-label="Add to folder" data-id="' + img.id + '">' + starSvg + '</button>' +
       '<img class="card-img" data-src="' + (img.url || '') + '" alt="' + (img.filename || 'Image') + '" loading="lazy">' +
       '<div class="card-info">' +
       '<span class="card-name" title="' + (img.filename || '') + '">' + name + '</span>' +
@@ -160,12 +160,12 @@
     const expandBtn = article.querySelector('.card-expand');
     const checkEl = article.querySelector('.card-select');
     const starBtn = article.querySelector('.card-star');
-    if (starBtn && window.ImageKprLists) {
+    if (starBtn && window.ImageKprFolders) {
       starBtn.addEventListener('click', e => {
         e.stopPropagation();
-        window.ImageKprLists.toggleInList(defList, img.id);
-        starBtn.classList.toggle('in-list');
-        starBtn.querySelector('svg').setAttribute('fill', window.ImageKprLists.isInList(defList, img.id) ? 'currentColor' : 'none');
+        window.ImageKprFolders.toggleInFolder(defFolder, img.id);
+        starBtn.classList.toggle('in-folder');
+        starBtn.querySelector('svg').setAttribute('fill', window.ImageKprFolders.isInFolder(defFolder, img.id) ? 'currentColor' : 'none');
       });
     }
     if (checkEl) {
@@ -338,7 +338,7 @@
   }
 
   function refreshGrid(append) {
-    const filterInput = document.getElementById('list-filter');
+    const filterInput = document.getElementById('folder-filter');
     const filterVal = filterInput ? filterInput.value : '';
     if (filterVal === LATEST_FILTER) {
       const ids = getLastBatchIds();
@@ -351,7 +351,7 @@
       }
       return;
     }
-    const ids = (window.ImageKprLists && window.ImageKprLists.getFilterIds && window.ImageKprLists.getFilterIds()) || null;
+    const ids = (window.ImageKprFolders && window.ImageKprFolders.getFilterIds && window.ImageKprFolders.getFilterIds()) || null;
     if (ids && ids.length > 0) {
       loadGridFiltered(ids, append);
       return;
@@ -385,7 +385,7 @@
       } else {
         imgs.forEach(el => { el.src = el.dataset.src || ''; el.removeAttribute('data-src'); });
       }
-    }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No images in this list.</p>'; });
+    }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No images in this folder.</p>'; });
   }
 
   function debounce(fn, ms) {
@@ -432,7 +432,7 @@
     return ids;
   }
 
-  function uploadFiles(files, addToListName) {
+  function uploadFiles(files, addToFolderName) {
     const zone = document.getElementById('upload-zone');
     const prog = document.getElementById('upload-progress');
     const text = document.getElementById('upload-text');
@@ -459,9 +459,9 @@
           showToast('Uploaded');
           const ids = extractUploadedIds(d);
           if (ids.length > 0) setLastBatchIds(ids);
-          if (addToListName && ids.length > 0 && window.ImageKprLists) {
-            window.ImageKprLists.addToList(addToListName, ids);
-            if (window.ImageKprLists.onChange) window.ImageKprLists.onChange();
+          if (addToFolderName && ids.length > 0 && window.ImageKprFolders) {
+            window.ImageKprFolders.addToFolder(addToFolderName, ids);
+            if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
           }
           gridState.page = 1;
           refreshGrid(false);
@@ -479,10 +479,10 @@
     xhr.send(fd);
   }
 
-  function processAndUpload(files, addToListName) {
+  function processAndUpload(files, addToFolderName) {
     const arr = Array.from(files);
     Promise.all(arr.map(f => resizeIfNeeded(f))).then(resized => {
-      uploadFiles(resized, addToListName);
+      uploadFiles(resized, addToFolderName);
     });
   }
 
@@ -498,26 +498,26 @@
     const countEl = document.getElementById('upload-confirm-count');
     const uploadBtn = document.getElementById('upload-confirm-upload');
     const cancelBtn = document.getElementById('upload-confirm-cancel');
-    const listSelect = document.getElementById('upload-add-to-list-select');
-    const listNewInput = document.getElementById('upload-add-to-list-new');
+    const folderSelect = document.getElementById('upload-add-to-folder-select');
+    const folderNewInput = document.getElementById('upload-add-to-folder-new');
 
-    const data = window.ImageKprLists ? window.ImageKprLists.load() : { 'Favourites': [] };
-    listSelect.innerHTML = '<option value="">— None —</option>';
+    const data = window.ImageKprFolders ? window.ImageKprFolders.load() : { 'Favourites': [] };
+    folderSelect.innerHTML = '<option value="">— None —</option>';
     Object.keys(data).sort().forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name + ' (' + (data[name]?.length || 0) + ')';
-      listSelect.appendChild(opt);
+      folderSelect.appendChild(opt);
     });
-    listNewInput.value = '';
+    folderNewInput.value = '';
 
     let pendingFiles = [...valid];
     let objectUrls = [];
 
-    function getAddToListName() {
-      const newName = listNewInput.value.trim();
+    function getAddToFolderName() {
+      const newName = folderNewInput.value.trim();
       if (newName) return newName;
-      const sel = listSelect.value;
+      const sel = folderSelect.value;
       return sel || null;
     }
 
@@ -576,9 +576,9 @@
     document.body.style.overflow = 'hidden';
 
     uploadBtn.onclick = () => {
-      const addToListName = getAddToListName();
+      const addToFolderName = getAddToFolderName();
       closeModal();
-      if (pendingFiles.length > 0) processAndUpload(pendingFiles, addToListName);
+      if (pendingFiles.length > 0) processAndUpload(pendingFiles, addToFolderName);
     };
     cancelBtn.onclick = closeModal;
 
@@ -664,100 +664,118 @@
     });
   }
 
-  function populateListPills(activeValue) {
-    const container = document.getElementById('list-pills');
-    const filterInput = document.getElementById('list-filter');
+  function populateFolderPills(activeValue) {
+    const container = document.getElementById('folder-pills');
+    const filterInput = document.getElementById('folder-filter');
     if (!container || !filterInput) return;
-    const data = window.ImageKprLists ? window.ImageKprLists.load() : { 'Favourites': [] };
+    const data = window.ImageKprFolders ? window.ImageKprFolders.load() : { 'Favourites': [] };
     const cur = activeValue !== undefined ? activeValue : filterInput.value;
     container.innerHTML = '';
 
     const allPill = document.createElement('button');
     allPill.type = 'button';
-    allPill.className = 'list-pill' + (!cur ? ' active' : '');
+    allPill.className = 'folder-pill' + (!cur ? ' active' : '');
     allPill.textContent = 'All';
     allPill.addEventListener('click', () => {
       filterInput.value = '';
       refreshGrid(false);
-      populateListPills('');
+      populateFolderPills('');
     });
     container.appendChild(allPill);
 
     const latestPill = document.createElement('button');
     latestPill.type = 'button';
-    latestPill.className = 'list-pill' + (cur === LATEST_FILTER ? ' active' : '');
+    latestPill.className = 'folder-pill' + (cur === LATEST_FILTER ? ' active' : '');
     latestPill.textContent = 'Last uploaded';
     latestPill.title = 'Show only the last uploaded batch of images';
     latestPill.addEventListener('click', () => {
       filterInput.value = LATEST_FILTER;
       refreshGrid(false);
-      populateListPills(LATEST_FILTER);
+      populateFolderPills(LATEST_FILTER);
     });
     container.appendChild(latestPill);
 
     Object.keys(data).forEach(name => {
       const pill = document.createElement('button');
       pill.type = 'button';
-      pill.className = 'list-pill' + (cur === name ? ' active' : '');
+      pill.className = 'folder-pill' + (cur === name ? ' active' : '');
       pill.textContent = name + ' (' + (data[name]?.length || 0) + ')';
       pill.addEventListener('click', () => {
         filterInput.value = name;
         refreshGrid(false);
-        populateListPills(name);
+        populateFolderPills(name);
       });
       container.appendChild(pill);
     });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    populateListPills();
+    populateFolderPills();
     populateSortPills();
-    if (window.ImageKprLists) window.ImageKprLists.onChange = () => { populateListPills(); refreshGrid(false); };
-    document.getElementById('manage-lists-btn').addEventListener('click', () => {
-      const d = document.getElementById('manage-lists-dialog');
-      const list = document.getElementById('manage-lists-list');
-      const data = window.ImageKprLists ? window.ImageKprLists.load() : {};
-      list.innerHTML = '';
+    if (window.ImageKprFolders) window.ImageKprFolders.onChange = () => { populateFolderPills(); refreshGrid(false); };
+    document.getElementById('manage-folders-btn').addEventListener('click', () => {
+      const d = document.getElementById('manage-folders-dialog');
+      const listEl = document.getElementById('manage-folders-list');
+      const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
+      listEl.innerHTML = '';
       Object.entries(data).forEach(([name, ids]) => {
         const div = document.createElement('div');
         div.innerHTML = '<span>' + name + ' (' + ids.length + ')</span> <button data-name="' + name + '" class="manage-rename">Rename</button> <button data-name="' + name + '" class="manage-delete">Delete</button>';
-        list.appendChild(div);
+        listEl.appendChild(div);
       });
       d.hidden = false;
     });
-    document.getElementById('manage-close').addEventListener('click', () => { document.getElementById('manage-lists-dialog').hidden = true; });
-    document.getElementById('manage-create-list').addEventListener('click', () => {
-      const n = document.getElementById('new-list-name').value.trim();
+    document.getElementById('manage-close').addEventListener('click', () => { document.getElementById('manage-folders-dialog').hidden = true; });
+    document.getElementById('manage-create-folder').addEventListener('click', () => {
+      const n = document.getElementById('new-folder-name').value.trim();
       if (!n) return;
-      const data = window.ImageKprLists ? window.ImageKprLists.load() : {};
+      const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
       data[n] = [];
-      window.ImageKprLists.save(data);
-      populateListPills();
-      document.getElementById('new-list-name').value = '';
-      document.getElementById('manage-lists-dialog').hidden = true;
-      showToast('List "' + n + '" created');
+      window.ImageKprFolders.save(data);
+      populateFolderPills();
+      document.getElementById('new-folder-name').value = '';
+      document.getElementById('manage-folders-dialog').hidden = true;
+      showToast('Folder "' + n + '" created');
     });
-    document.getElementById('manage-lists-list').addEventListener('click', e => {
+    document.getElementById('manage-folders-list').addEventListener('click', async (e) => {
       const name = e.target.dataset.name;
       if (!name) return;
-      const data = window.ImageKprLists.load();
-      if (e.target.classList.contains('manage-delete')) {
+      const data = window.ImageKprFolders.load();
+      if (e.target.classList.contains('manage-rename')) {
+        addToFolderDialog(name).then(newName => {
+          if (!newName || newName === name) return;
+          data[newName] = data[name] || [];
+          delete data[name];
+          window.ImageKprFolders.save(data);
+          populateFolderPills();
+          const listEl = document.getElementById('manage-folders-list');
+          listEl.innerHTML = '';
+          Object.entries(data).forEach(([n, ids]) => {
+            const div = document.createElement('div');
+            div.innerHTML = '<span>' + n + ' (' + ids.length + ')</span> <button data-name="' + n + '" class="manage-rename">Rename</button> <button data-name="' + n + '" class="manage-delete">Delete</button>';
+            listEl.appendChild(div);
+          });
+          showToast('Renamed to "' + newName + '"');
+        });
+      } else if (e.target.classList.contains('manage-delete')) {
+        if (!(await confirmDialog('Delete folder "' + name + '"? Items will be removed from this folder.'))) return;
         delete data[name];
-        window.ImageKprLists.save(data);
-        populateListPills();
-        const list = document.getElementById('manage-lists-list');
-        list.innerHTML = '';
+        window.ImageKprFolders.save(data);
+        populateFolderPills();
+        const listEl = document.getElementById('manage-folders-list');
+        listEl.innerHTML = '';
         Object.entries(data).forEach(([n, ids]) => {
           const div = document.createElement('div');
           div.innerHTML = '<span>' + n + ' (' + ids.length + ')</span> <button data-name="' + n + '" class="manage-rename">Rename</button> <button data-name="' + n + '" class="manage-delete">Delete</button>';
-          list.appendChild(div);
+          listEl.appendChild(div);
         });
+        showToast('Folder deleted');
       }
     });
     document.getElementById('manage-export').addEventListener('click', () => {
       const a = document.createElement('a');
-      a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(window.ImageKprLists.load(), null, 2));
-      a.download = 'imagekpr-lists.json';
+      a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(window.ImageKprFolders.load(), null, 2));
+      a.download = 'imagekpr-folders.json';
       a.click();
     });
     document.getElementById('manage-import').addEventListener('click', () => document.getElementById('manage-import-file').click());
@@ -768,27 +786,31 @@
       r.onload = () => {
         try {
           const imported = JSON.parse(r.result);
-          const data = window.ImageKprLists.load();
+          const data = window.ImageKprFolders.load();
           Object.assign(data, imported);
-          window.ImageKprLists.save(data);
-          populateListPills();
+          window.ImageKprFolders.save(data);
+          populateFolderPills();
           showToast('Imported');
         } catch (_) { showToast('Invalid file'); }
       };
       r.readAsText(f);
       e.target.value = '';
     });
-    window.ImageKprLists.addToList = (ids) => {
-      addToListDialog('Favourites').then(name => {
-        if (name) {
-          const data = window.ImageKprLists.load();
-          if (!data[name]) data[name] = [];
-          ids.forEach(id => { if (!data[name].includes(id)) data[name].push(id); });
-          window.ImageKprLists.save(data);
-          showToast('Added');
-          populateListPills();
-        }
-      });
+    const origAddToFolder = window.ImageKprFolders.addToFolder;
+    window.ImageKprFolders.addToFolder = (folderNameOrIds, idsMaybe) => {
+      if (idsMaybe !== undefined) {
+        /* Two args: (folderName, ids) – direct add from upload, no dialog */
+        origAddToFolder(folderNameOrIds, idsMaybe);
+      } else {
+        /* One arg: (ids) – bulk action, show dialog to pick folder */
+        addToFolderDialog('Favourites').then(name => {
+          if (name) {
+            origAddToFolder(name, folderNameOrIds);
+            showToast('Added');
+            populateFolderPills();
+          }
+        });
+      }
     };
 
     loadStats();
@@ -930,12 +952,12 @@
         if (data.success) { refreshGrid(false); showToast('Tags updated'); }
       }).catch(() => showToast('Failed'));
     });
-    document.getElementById('bulk-add-list').addEventListener('click', () => {
+    document.getElementById('bulk-add-folder').addEventListener('click', () => {
       if (selectedIds.size === 0) return;
-      if (window.ImageKprLists && window.ImageKprLists.addToList) {
-        window.ImageKprLists.addToList(Array.from(selectedIds));
+      if (window.ImageKprFolders && window.ImageKprFolders.addToFolder) {
+        window.ImageKprFolders.addToFolder(Array.from(selectedIds));
       } else {
-        showToast('Manage lists first');
+        showToast('Manage folders first');
       }
     });
 
