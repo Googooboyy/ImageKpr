@@ -797,7 +797,8 @@
     });
   }
 
-  const FOLDER_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>';
+  const FOLDER_IMG_CLOSED = 'assets/folder-closed-icon.png';
+  const FOLDER_IMG_OPEN = 'assets/folder-open-icon.png';
   const CLOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
 
   function populateTagsRow() {
@@ -834,7 +835,7 @@
     const cur = activeValue !== undefined ? activeValue : filterInput.value;
     container.innerHTML = '';
 
-    function addFolderIcon(label, value, title, iconSvg) {
+    function addFolderIcon(label, value, title, iconSvgOrFolder) {
       const wrap = document.createElement('div');
       wrap.className = 'folder-icon-wrap' + (cur === value ? ' active' : '');
       const btnWrap = document.createElement('div');
@@ -846,7 +847,14 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'folder-icon' + (cur === value ? ' active' : '');
-      btn.innerHTML = iconSvg || FOLDER_SVG;
+      if (iconSvgOrFolder === 'folder') {
+        const img = document.createElement('img');
+        img.src = cur === value ? FOLDER_IMG_OPEN : FOLDER_IMG_CLOSED;
+        img.alt = '';
+        btn.appendChild(img);
+      } else {
+        btn.innerHTML = iconSvgOrFolder;
+      }
       btn.setAttribute('aria-label', title || label);
       btnWrap.appendChild(tooltip);
       btnWrap.appendChild(btn);
@@ -869,12 +877,12 @@
       container.appendChild(wrap);
     }
 
-    addFolderIcon('All', '', 'Show all images', FOLDER_SVG);
+    addFolderIcon('All', '', 'Show all images', 'folder');
     addFolderIcon('Last uploaded', LATEST_FILTER, 'Show only the last uploaded batch of images', CLOCK_SVG);
-    addFolderIcon('Uncategorized', UNCATEGORIZED_FILTER, 'Show images not in any folder', FOLDER_SVG);
+    addFolderIcon('Uncategorized', UNCATEGORIZED_FILTER, 'Show images not in any folder', 'folder');
     Object.keys(data).sort().forEach(name => {
       const label = name + ' (' + (data[name]?.length || 0) + ')';
-      addFolderIcon(label, name, label, FOLDER_SVG);
+      addFolderIcon(label, name, label, 'folder');
     });
   }
 
@@ -1143,6 +1151,23 @@
       } else {
         showToast('Manage folders first');
       }
+    });
+    document.getElementById('bulk-remove-folder').addEventListener('click', async () => {
+      if (selectedIds.size === 0) return;
+      if (!(await confirmDialog('Remove ' + selectedIds.size + ' selected image(s) from all folders?'))) return;
+      if (!window.ImageKprFolders || !window.ImageKprFolders.removeFromFolder) return;
+      const data = window.ImageKprFolders.load();
+      const ids = Array.from(selectedIds);
+      ids.forEach(id => {
+        Object.keys(data).forEach(folderName => {
+          const arr = data[folderName] || [];
+          if (arr.some(x => Number(x) === Number(id))) {
+            window.ImageKprFolders.removeFromFolder(folderName, id);
+          }
+        });
+      });
+      if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+      showToast('Removed from folders');
     });
     document.getElementById('add-to-folder-select-cancel').addEventListener('click', () => {
       document.getElementById('add-to-folder-select-dialog').hidden = true;

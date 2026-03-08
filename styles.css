@@ -2,7 +2,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333; }
 
-.hero { padding: 1.12rem 2rem; background: #f5f5f5; }
+.hero { padding: 3px 2rem; background: #f5f5f5; }
 .hero-row { display: flex; gap: 0.84rem; align-items: stretch; width: 100%; }
 .logo { flex-shrink: 0; width: 40%; }
 .logo img { height: auto; max-width: 100%; display: block; }
@@ -10,10 +10,10 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .logo:has(img[style*="display: none"]) .logo-fallback { display: block; }
 .hero .upload-zone { flex: 1; min-width: 0; }
 
-.dashboard { padding: 0.7rem 2rem; background: #fafafa; border-bottom: 1px solid #eee; }
+.dashboard { padding: 3px 2rem; background: #fafafa; border-bottom: 1px solid #eee; }
 .dashboard-inbox { margin-bottom: 0.7rem; padding: 0.35rem; background: #fff3cd; border-radius: 4px; }
 .dashboard-inbox button { margin-left: 0.35rem; padding: 0.2rem 0.5rem; cursor: pointer; font-size: 0.8rem; }
-.dashboard-top-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.7rem; margin-bottom: 0.7rem; }
+.dashboard-top-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.7rem; margin-bottom: 3px; }
 .dashboard-stats { display: flex; gap: 1.4rem; }
 .stat-value { font-size: 0.875rem; font-weight: 600; }
 .stat-label { color: #666; margin-left: 0.2rem; font-size: 0.8rem; }
@@ -78,12 +78,13 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .folder-icon { width: 58px; height: 58px; padding: 0; border: none; border-radius: 6px; background: #f0f0f0; color: #666; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s, color 0.2s, transform 0.15s; }
 .folder-icon:hover { background: #e0e0e0; color: #333; transform: translateY(-1px); }
 .folder-icon.active { background: #333; color: #fff; }
-.folder-icon svg { width: 32px; height: 32px; flex-shrink: 0; }
+.folder-icon svg,
+.folder-icon img { width: 32px; height: 32px; flex-shrink: 0; object-fit: contain; }
 .folder-icon-label { font-size: 0.65rem; color: #666; text-align: center; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2; }
 .folder-icon-wrap.active .folder-icon-label { color: #333; font-weight: 500; }
 
 .sort-row {
-  padding: 0.75rem 2rem;
+  padding: 3px 2rem;
   display: flex;
   gap: 0.5rem;
   align-items: center;
@@ -106,7 +107,7 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .sort-pill:hover { background: #a5d6a7; border-color: #66bb6a; color: #2e7d32; }
 .sort-pill.active { background: #66bb6a; border-color: #4caf50; color: #fff; }
 
-.tags-row { padding: 0.75rem 2rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; background: #fffde7; border-bottom: 1px solid #fff59d; }
+.tags-row { padding: 3px 2rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; background: #fffde7; border-bottom: 1px solid #fff59d; }
 .tags-row label { font-size: 0.875rem; color: #f57f17; font-weight: 500; }
 .tag-filters { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center; }
 .tag-filter-chip { padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.8125rem; border: 1px solid #ffe082; background: #fff9c4; color: #f57f17; cursor: pointer; transition: background 0.2s, border-color 0.2s; }

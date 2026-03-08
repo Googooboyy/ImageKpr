@@ -79,6 +79,7 @@
         <button type="button" id="bulk-download">Download ZIP</button>
         <button type="button" id="bulk-tags">Edit tags</button>
         <button type="button" id="bulk-add-folder">Add to folder</button>
+        <button type="button" id="bulk-remove-folder">Remove from folder</button>
         <button type="button" id="bulk-rename">Rename</button>
         <button type="button" id="bulk-clear">Clear</button>
       </div>
