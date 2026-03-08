@@ -6,9 +6,9 @@
  */
 
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'imagekpr');
-define('DB_USER', 'your_db_user');
-define('DB_PASS', 'your_db_password');
+define('DB_NAME', 'db hostname here');
+define('DB_USER', 'db username here');
+define('DB_PASS', 'your password here');
 
 define('IMAGES_DIR', __DIR__ . '/images');
 define('IMAGES_URL', '/images');

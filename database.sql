@@ -1,8 +1,5 @@
 -- ImageKpr database schema
--- Database: imagekpr
-
-CREATE DATABASE IF NOT EXISTS imagekpr CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE imagekpr;
+-- Import into your existing database (e.g. marsg_imagekpr)
 
 CREATE TABLE IF NOT EXISTS images (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -18,6 +15,5 @@ CREATE TABLE IF NOT EXISTS images (
   INDEX idx_date (date_uploaded),
   INDEX idx_size (size_bytes),
   INDEX idx_filename (filename),
-  INDEX idx_user (user_id),
-  FULLTEXT INDEX idx_tags (tags)
+  INDEX idx_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
