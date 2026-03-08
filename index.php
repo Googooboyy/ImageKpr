@@ -43,6 +43,7 @@
 
   <main class="main-content">
     <div class="toolbar">
+      <label><input type="checkbox" id="select-mode"> Select</label>
       <input type="search" id="search" placeholder="Search..." aria-label="Search images">
       <select id="sort" aria-label="Sort order">
         <option value="date_desc">Date (newest)</option>
@@ -58,6 +59,15 @@
         <span id="upload-text">Drag & drop or click to upload</span>
         <div id="upload-progress" class="upload-progress" hidden></div>
       </div>
+    </div>
+    <div class="bulk-bar" id="bulk-bar" hidden>
+      <span id="bulk-count">0 selected</span>
+      <button type="button" id="bulk-delete">Delete</button>
+      <button type="button" id="bulk-download">Download ZIP</button>
+      <button type="button" id="bulk-tags">Edit tags</button>
+      <button type="button" id="bulk-add-list">Add to list</button>
+      <button type="button" id="bulk-rename">Rename</button>
+      <button type="button" id="bulk-clear">Clear</button>
     </div>
     <p class="user-hint">Click card to copy URL • Click icon to view full size</p>
     <div id="grid" class="grid"></div>
@@ -82,6 +92,17 @@
   </div>
 
   <div id="toast" class="toast" hidden aria-live="polite"></div>
+
+  <div id="rename-dialog" class="dialog" hidden>
+    <div class="dialog-content">
+      <h3>Bulk rename</h3>
+      <label>Base name: <input type="text" id="rename-base" placeholder="e.g. project-alpha"></label>
+      <div class="dialog-actions">
+        <button type="button" id="rename-confirm">Rename</button>
+        <button type="button" id="rename-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

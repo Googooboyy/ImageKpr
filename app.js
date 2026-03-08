@@ -40,6 +40,20 @@
     return str.slice(0, len - 2) + '…';
   }
 
+  let selectedIds = new Set();
+  let selectMode = false;
+
+  function updateBulkBar() {
+    const bar = document.getElementById('bulk-bar');
+    const count = document.getElementById('bulk-count');
+    if (selectedIds.size > 0) {
+      bar.hidden = false;
+      count.textContent = selectedIds.size + ' selected';
+    } else {
+      bar.hidden = true;
+    }
+  }
+
   function renderCard(img) {
     const article = document.createElement('article');
     article.className = 'grid-item card';
@@ -49,8 +63,9 @@
     const name = truncate(img.filename, 24);
     const size = formatBytes(img.size_bytes || 0);
     const date = formatDate(img.date_uploaded);
+    const cb = '<input type="checkbox" class="card-select" data-id="' + img.id + '" style="display:' + (selectMode ? 'inline-block' : 'none') + '">';
     article.innerHTML =
-      '<div class="card-inner">' +
+      '<div class="card-inner">' + cb +
       '<img class="card-img" data-src="' + (img.url || '') + '" alt="' + (img.filename || 'Image') + '" loading="lazy">' +
       '<div class="card-info">' +
       '<span class="card-name" title="' + (img.filename || '') + '">' + name + '</span>' +
@@ -60,7 +75,24 @@
       '</div>';
     const inner = article.querySelector('.card-inner');
     const expandBtn = article.querySelector('.card-expand');
-    inner.addEventListener('click', () => copyUrl(img.url));
+    const cb = article.querySelector('.card-select');
+    if (cb) {
+      cb.addEventListener('click', e => e.stopPropagation());
+      cb.addEventListener('change', () => {
+        if (cb.checked) selectedIds.add(img.id); else selectedIds.delete(img.id);
+        updateBulkBar();
+      });
+      if (selectedIds.has(img.id)) cb.checked = true;
+    }
+    inner.addEventListener('click', (e) => {
+      if (e.target.classList.contains('card-select')) return;
+      if (selectMode) {
+        const c = article.querySelector('.card-select');
+        if (c) { c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
+      } else {
+        copyUrl(img.url);
+      }
+    });
     expandBtn.addEventListener('click', e => { e.stopPropagation(); openModal(img); });
     return article;
   }
@@ -379,6 +411,83 @@
       a.download = img.alt || 'image';
       a.click();
     });
+    document.getElementById('select-mode').addEventListener('change', () => {
+      selectMode = document.getElementById('select-mode').checked;
+      document.querySelectorAll('.card-select').forEach(el => { el.style.display = selectMode ? 'inline-block' : 'none'; });
+      if (!selectMode) { selectedIds.clear(); updateBulkBar(); }
+    });
+
+    document.getElementById('bulk-clear').addEventListener('click', () => {
+      selectedIds.clear();
+      document.querySelectorAll('.card-select:checked').forEach(c => { c.checked = false; });
+      updateBulkBar();
+    });
+    document.getElementById('bulk-delete').addEventListener('click', () => {
+      if (selectedIds.size === 0) return;
+      if (!confirm('Delete ' + selectedIds.size + ' image(s)?')) return;
+      fetch(API_BASE + '/delete_bulk.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) })
+      }).then(r => r.json()).then(data => {
+        if (data.success) {
+          selectedIds.clear();
+          updateBulkBar();
+          refreshGrid(false);
+          loadStats();
+          showToast('Deleted');
+        }
+      }).catch(() => showToast('Delete failed'));
+    });
+    document.getElementById('bulk-download').addEventListener('click', () => {
+      if (selectedIds.size === 0) return;
+      window.open(API_BASE + '/download_bulk.php?ids=' + Array.from(selectedIds).join(','), '_blank');
+    });
+    document.getElementById('bulk-rename').addEventListener('click', () => {
+      if (selectedIds.size === 0) return;
+      document.getElementById('rename-dialog').hidden = false;
+      document.getElementById('rename-base').value = '';
+    });
+    document.getElementById('rename-cancel').addEventListener('click', () => {
+      document.getElementById('rename-dialog').hidden = true;
+    });
+    document.getElementById('rename-confirm').addEventListener('click', () => {
+      const base = document.getElementById('rename-base').value.trim() || 'image';
+      fetch(API_BASE + '/rename_bulk.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds), base })
+      }).then(r => r.json()).then(data => {
+        document.getElementById('rename-dialog').hidden = true;
+        if (data.success) {
+          selectedIds.clear();
+          updateBulkBar();
+          refreshGrid(false);
+          showToast('Renamed');
+        }
+      }).catch(() => showToast('Rename failed'));
+    });
+    document.getElementById('bulk-tags').addEventListener('click', () => {
+      if (selectedIds.size === 0) return;
+      const tag = prompt('Add tag to ' + selectedIds.size + ' image(s):');
+      if (!tag || !tag.trim()) return;
+      fetch(API_BASE + '/tags.php', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds), action: 'add', tag: tag.trim() })
+      }).then(r => r.json()).then(data => {
+        if (data.success) { refreshGrid(false); showToast('Tags updated'); }
+      }).catch(() => showToast('Failed'));
+    });
+    document.getElementById('bulk-add-list').addEventListener('click', () => {
+      if (selectedIds.size === 0) return;
+      if (window.ImageKprLists && window.ImageKprLists.addToList) {
+        window.ImageKprLists.addToList(Array.from(selectedIds));
+      } else {
+        showToast('Manage lists first');
+      }
+    });
+
     document.getElementById('modal-delete').addEventListener('click', () => {
       if (!currentModalImg) return;
       if (!confirm('Delete this image?')) return;
