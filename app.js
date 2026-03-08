@@ -184,10 +184,21 @@
       gridState.total = data.total || 0;
       gridState.page = data.page || 1;
       const imgs = grid.querySelectorAll('img[data-src]');
-      imgs.forEach(el => {
-        el.src = el.dataset.src || '';
-        el.removeAttribute('data-src');
-      });
+      if (typeof IntersectionObserver !== 'undefined') {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const el = entry.target;
+              el.src = el.dataset.src || '';
+              el.removeAttribute('data-src');
+              io.unobserve(el);
+            }
+          });
+        }, { rootMargin: '100px' });
+        imgs.forEach(el => io.observe(el));
+      } else {
+        imgs.forEach(el => { el.src = el.dataset.src || ''; el.removeAttribute('data-src'); });
+      }
       const loaded = grid.querySelectorAll('.grid-item').length;
       if (gridState.total === 0 && !append) {
         grid.innerHTML = '<p class="empty">No images yet. Upload some!</p>';
@@ -241,7 +252,21 @@
       gridState.total = filtered.length;
       document.getElementById('load-more').innerHTML = '';
       const imgs = grid.querySelectorAll('img[data-src]');
-      imgs.forEach(el => { el.src = el.dataset.src || ''; el.removeAttribute('data-src'); });
+      if (typeof IntersectionObserver !== 'undefined') {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const el = entry.target;
+              el.src = el.dataset.src || '';
+              el.removeAttribute('data-src');
+              io.unobserve(el);
+            }
+          });
+        }, { rootMargin: '100px' });
+        imgs.forEach(el => io.observe(el));
+      } else {
+        imgs.forEach(el => { el.src = el.dataset.src || ''; el.removeAttribute('data-src'); });
+      }
     }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No images in this list.</p>'; });
   }
 
