@@ -460,8 +460,13 @@
         delete data[name];
         window.ImageKprLists.save(data);
         populateListFilter();
-        document.getElementById('manage-lists-list').innerHTML = '';
-        document.getElementById('manage-lists-btn').click();
+        const list = document.getElementById('manage-lists-list');
+        list.innerHTML = '';
+        Object.entries(data).forEach(([n, ids]) => {
+          const div = document.createElement('div');
+          div.innerHTML = '<span>' + n + ' (' + ids.length + ')</span> <button data-name="' + n + '" class="manage-rename">Rename</button> <button data-name="' + n + '" class="manage-delete">Delete</button>';
+          list.appendChild(div);
+        });
       }
     });
     document.getElementById('manage-export').addEventListener('click', () => {
