@@ -5,6 +5,11 @@ config.php
 images/*
 !images/.htaccess
 
+# Inbox hot folder (pending files, not tracked)
+inbox/*
+!inbox/.htaccess
+!inbox/.gitkeep
+
 # Cache directory if added later
 cache/
 

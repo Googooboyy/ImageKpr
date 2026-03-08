@@ -1,0 +1,5 @@
+# Prevent PHP execution in uploads directory
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+AddType text/plain .php .phtml .php3 .php4 .php5
