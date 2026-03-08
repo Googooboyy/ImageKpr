@@ -19,6 +19,64 @@
     showToast._t = setTimeout(() => { el.hidden = true; }, 2000);
   }
 
+  function confirmDialog(msg) {
+    return new Promise((resolve) => {
+      const d = document.getElementById('confirm-dialog');
+      const msgEl = document.getElementById('confirm-message');
+      const okBtn = document.getElementById('confirm-ok');
+      const cancelBtn = document.getElementById('confirm-cancel');
+      msgEl.textContent = msg;
+      d.hidden = false;
+      const cleanup = () => {
+        d.hidden = true;
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+      };
+      okBtn.onclick = () => { cleanup(); resolve(true); };
+      cancelBtn.onclick = () => { cleanup(); resolve(false); };
+    });
+  }
+
+  function addToListDialog(defaultValue) {
+    return new Promise((resolve) => {
+      const d = document.getElementById('add-to-list-dialog');
+      const input = document.getElementById('add-to-list-input');
+      const okBtn = document.getElementById('add-to-list-ok');
+      const cancelBtn = document.getElementById('add-to-list-cancel');
+      input.value = defaultValue || 'Favourites';
+      input.select();
+      d.hidden = false;
+      input.focus();
+      document.body.style.overflow = 'hidden';
+      const cleanup = () => {
+        d.hidden = true;
+        document.body.style.overflow = '';
+        input.onkeydown = null;
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        d.onclick = null;
+        document.removeEventListener('keydown', onEscape);
+      };
+      const submit = () => {
+        const v = input.value.trim();
+        cleanup();
+        resolve(v || null);
+      };
+      const cancel = () => {
+        cleanup();
+        resolve(null);
+      };
+      const onEscape = (e) => { if (e.key === 'Escape') cancel(); };
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); submit(); }
+      };
+      okBtn.onclick = submit;
+      cancelBtn.onclick = cancel;
+      d.onclick = (e) => { if (e.target === d) cancel(); };
+      document.addEventListener('keydown', onEscape);
+    });
+  }
+
   function copyUrl(url) {
     navigator.clipboard.writeText(url).then(() => showToast('Copied!')).catch(() => showToast('Copy failed'));
   }
@@ -41,17 +99,38 @@
   }
 
   let selectedIds = new Set();
+  let selectedImages = new Map();
   let selectMode = false;
 
   function updateBulkBar() {
-    const bar = document.getElementById('bulk-bar');
     const count = document.getElementById('bulk-count');
+    const banner = document.getElementById('selection-banner');
     if (selectedIds.size > 0) {
-      bar.hidden = false;
       count.textContent = selectedIds.size + ' selected';
+      updateSelectionBanner();
+      if (banner) banner.hidden = false;
+      document.body.classList.add('selection-active');
     } else {
-      bar.hidden = true;
+      if (banner) banner.hidden = true;
+      document.body.classList.remove('selection-active');
     }
+  }
+
+  function updateSelectionBanner() {
+    const banner = document.getElementById('selection-banner');
+    const row = document.getElementById('selection-row');
+    if (!banner || !row) return;
+    row.innerHTML = '';
+    selectedImages.forEach((data, id) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'selection-thumb';
+      const im = document.createElement('img');
+      im.src = data.url;
+      im.alt = data.filename;
+      wrap.appendChild(im);
+      row.appendChild(wrap);
+    });
+    banner.hidden = false;
   }
 
   function renderCard(img) {
@@ -92,13 +171,24 @@
     if (checkEl) {
       checkEl.addEventListener('click', e => e.stopPropagation());
       checkEl.addEventListener('change', () => {
-        if (checkEl.checked) selectedIds.add(img.id); else selectedIds.delete(img.id);
+        if (checkEl.checked) {
+          selectedIds.add(img.id);
+          selectedImages.set(img.id, { url: img.url, filename: img.filename });
+        } else {
+          selectedIds.delete(img.id);
+          selectedImages.delete(img.id);
+        }
+        inner.classList.toggle('selected', checkEl.checked);
         updateBulkBar();
       });
-      if (selectedIds.has(img.id)) checkEl.checked = true;
+      if (selectedIds.has(img.id)) {
+        checkEl.checked = true;
+        inner.classList.add('selected');
+        selectedImages.set(img.id, { url: img.url, filename: img.filename });
+      }
     }
     inner.addEventListener('click', (e) => {
-      if (e.target.classList.contains('card-select')) return;
+      if (e.target.closest('.card-select') || e.target.closest('.card-star') || e.target.closest('.card-expand')) return;
       if (selectMode) {
         const c = article.querySelector('.card-select');
         if (c) { c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
@@ -170,7 +260,7 @@
     document.body.style.overflow = '';
   }
 
-  let gridState = { page: 1, perPage: 50, sort: 'date_desc', search: '', total: 0, loading: false };
+  let gridState = { page: 1, perPage: 50, sort: 'name_asc', search: '', total: 0, loading: false };
 
   function loadGrid(params, append) {
     const q = new URLSearchParams(params || {});
@@ -232,7 +322,35 @@
     });
   }
 
+  const LATEST_FILTER = '__latest__';
+  const LAST_BATCH_KEY = 'imagekpr_last_batch';
+
+  function getLastBatchIds() {
+    try {
+      const s = localStorage.getItem(LAST_BATCH_KEY);
+      const ids = s ? JSON.parse(s) : [];
+      return Array.isArray(ids) ? ids : [];
+    } catch (_) { return []; }
+  }
+
+  function setLastBatchIds(ids) {
+    try { localStorage.setItem(LAST_BATCH_KEY, JSON.stringify(ids)); } catch (_) {}
+  }
+
   function refreshGrid(append) {
+    const filterInput = document.getElementById('list-filter');
+    const filterVal = filterInput ? filterInput.value : '';
+    if (filterVal === LATEST_FILTER) {
+      const ids = getLastBatchIds();
+      if (ids.length > 0) {
+        loadGridFiltered(ids, append);
+      } else {
+        const grid = document.getElementById('grid');
+        if (!append) grid.innerHTML = '<p class="empty">No last batch — upload to see your most recent batch here.</p>';
+        document.getElementById('load-more').innerHTML = '';
+      }
+      return;
+    }
     const ids = (window.ImageKprLists && window.ImageKprLists.getFilterIds && window.ImageKprLists.getFilterIds()) || null;
     if (ids && ids.length > 0) {
       loadGridFiltered(ids, append);
@@ -244,7 +362,7 @@
   }
 
   function loadGridFiltered(ids, append) {
-    fetchJSON(API_BASE + '/images.php?per_page=1000&sort=date_desc').then(data => {
+    fetchJSON(API_BASE + '/images.php?per_page=1000&sort=' + gridState.sort).then(data => {
       const filtered = (data.images || []).filter(img => ids.includes(Number(img.id)));
       const grid = document.getElementById('grid');
       if (!append) grid.innerHTML = '';
@@ -305,7 +423,16 @@
     });
   }
 
-  function uploadFiles(files) {
+  function extractUploadedIds(d) {
+    const ids = [];
+    if (d.image && d.image.id) ids.push(Number(d.image.id));
+    if (d.results && Array.isArray(d.results)) {
+      d.results.forEach(r => { if (r.image && r.image.id) ids.push(Number(r.image.id)); });
+    }
+    return ids;
+  }
+
+  function uploadFiles(files, addToListName) {
     const zone = document.getElementById('upload-zone');
     const prog = document.getElementById('upload-progress');
     const text = document.getElementById('upload-text');
@@ -330,8 +457,16 @@
         const d = JSON.parse(xhr.responseText);
         if (d.success !== false) {
           showToast('Uploaded');
+          const ids = extractUploadedIds(d);
+          if (ids.length > 0) setLastBatchIds(ids);
+          if (addToListName && ids.length > 0 && window.ImageKprLists) {
+            window.ImageKprLists.addToList(addToListName, ids);
+            if (window.ImageKprLists.onChange) window.ImageKprLists.onChange();
+          }
+          gridState.page = 1;
           refreshGrid(false);
           loadStats();
+          setTimeout(loadStats, 300);
         } else showToast(d.error || 'Upload failed');
       } catch (_) { showToast('Upload failed'); }
     };
@@ -344,11 +479,121 @@
     xhr.send(fd);
   }
 
-  function processAndUpload(files) {
+  function processAndUpload(files, addToListName) {
     const arr = Array.from(files);
     Promise.all(arr.map(f => resizeIfNeeded(f))).then(resized => {
-      uploadFiles(resized);
+      uploadFiles(resized, addToListName);
     });
+  }
+
+  function showUploadConfirmModal(files) {
+    const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+    const tooBig = arr.filter(f => f.size > MAX_UPLOAD);
+    if (tooBig.length) showToast(tooBig.length + ' file(s) skipped (max 3MB)');
+    const valid = arr.filter(f => f.size <= MAX_UPLOAD);
+    if (valid.length === 0) return;
+
+    const dialog = document.getElementById('upload-confirm-dialog');
+    const grid = document.getElementById('upload-confirm-grid');
+    const countEl = document.getElementById('upload-confirm-count');
+    const uploadBtn = document.getElementById('upload-confirm-upload');
+    const cancelBtn = document.getElementById('upload-confirm-cancel');
+    const listSelect = document.getElementById('upload-add-to-list-select');
+    const listNewInput = document.getElementById('upload-add-to-list-new');
+
+    const data = window.ImageKprLists ? window.ImageKprLists.load() : { 'Favourites': [] };
+    listSelect.innerHTML = '<option value="">— None —</option>';
+    Object.keys(data).sort().forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name + ' (' + (data[name]?.length || 0) + ')';
+      listSelect.appendChild(opt);
+    });
+    listNewInput.value = '';
+
+    let pendingFiles = [...valid];
+    let objectUrls = [];
+
+    function getAddToListName() {
+      const newName = listNewInput.value.trim();
+      if (newName) return newName;
+      const sel = listSelect.value;
+      return sel || null;
+    }
+
+    function renderGrid() {
+      objectUrls.forEach(u => URL.revokeObjectURL(u));
+      objectUrls = [];
+      grid.innerHTML = '';
+      pendingFiles.forEach((file, i) => {
+        const wrap = document.createElement('div');
+        wrap.className = 'upload-confirm-thumb';
+        wrap.dataset.index = String(i);
+        const url = URL.createObjectURL(file);
+        objectUrls.push(url);
+        const im = document.createElement('img');
+        im.src = url;
+        im.alt = file.name;
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'upload-confirm-thumb-remove';
+        removeBtn.setAttribute('aria-label', 'Remove ' + file.name);
+        removeBtn.textContent = '×';
+        removeBtn.addEventListener('click', () => {
+          const idx = pendingFiles.indexOf(file);
+          if (idx >= 0) {
+            pendingFiles.splice(idx, 1);
+            renderGrid();
+            updateCount();
+          }
+        });
+        wrap.appendChild(im);
+        wrap.appendChild(removeBtn);
+        grid.appendChild(wrap);
+      });
+    }
+
+    function updateCount() {
+      const n = pendingFiles.length;
+      countEl.textContent = n + ' image' + (n === 1 ? '' : 's') + ' to upload';
+      uploadBtn.disabled = n === 0;
+    }
+
+    let teardown = null;
+
+    function closeModal() {
+      dialog.hidden = true;
+      document.body.style.overflow = '';
+      objectUrls.forEach(u => URL.revokeObjectURL(u));
+      uploadBtn.onclick = null;
+      cancelBtn.onclick = null;
+      if (teardown) { teardown(); teardown = null; }
+    }
+
+    renderGrid();
+    updateCount();
+    dialog.hidden = false;
+    document.body.style.overflow = 'hidden';
+
+    uploadBtn.onclick = () => {
+      const addToListName = getAddToListName();
+      closeModal();
+      if (pendingFiles.length > 0) processAndUpload(pendingFiles, addToListName);
+    };
+    cancelBtn.onclick = closeModal;
+
+    const onBackdrop = (e) => {
+      if (e.target.id === 'upload-confirm-dialog') closeModal();
+    };
+    const onEscape = (e) => {
+      if (e.key === 'Escape') closeModal();
+    };
+    dialog.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onEscape);
+    teardown = () => {
+      dialog.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onEscape);
+    };
   }
 
   function loadInbox() {
@@ -381,55 +626,93 @@
 
   function loadStats() {
     loadInbox();
-    fetchJSON(API_BASE + '/stats.php').then(data => {
+    fetchJSON(API_BASE + '/stats.php?t=' + Date.now()).then(data => {
       document.getElementById('stat-total-images').textContent = data.total_images;
       document.getElementById('stat-total-storage').textContent = data.total_storage_gb + ' GB';
-      const row = document.getElementById('last10-row');
-      row.innerHTML = '';
-      (data.last_10 || []).forEach(img => {
-        const wrap = document.createElement('div');
-        wrap.className = 'last10-thumb';
-        wrap.style.cssText = 'position:relative;width:56px;height:56px;cursor:pointer;overflow:hidden;border-radius:4px;flex-shrink:0;border:1px solid #eee';
-        const im = document.createElement('img');
-        im.src = img.url;
-        im.alt = img.filename;
-        im.style.cssText = 'width:100%;height:100%;object-fit:cover';
-        im.addEventListener('click', e => { e.stopPropagation(); copyUrl(img.url); });
-        const expand = document.createElement('button');
-        expand.type = 'button';
-        expand.className = 'last10-expand';
-        expand.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>';
-        expand.setAttribute('aria-label', 'View full size');
-        expand.addEventListener('click', e => { e.stopPropagation(); openModal(img); });
-        wrap.appendChild(im);
-        wrap.appendChild(expand);
-        row.appendChild(wrap);
-      });
     }).catch(() => {
       document.getElementById('stat-total-images').textContent = '—';
       document.getElementById('stat-total-storage').textContent = '—';
     });
   }
 
-  function populateListFilter() {
-    const sel = document.getElementById('list-filter');
-    if (!sel) return;
-    const data = window.ImageKprLists ? window.ImageKprLists.load() : { 'Favourites': [] };
-    const cur = sel.value;
-    sel.innerHTML = '<option value="">All</option>';
-    Object.keys(data).forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name + ' (' + (data[name]?.length || 0) + ')';
-      sel.appendChild(opt);
+  const SORT_OPTIONS = [
+    { value: 'date_desc', label: 'Date (newest)' },
+    { value: 'date_asc', label: 'Date (oldest)' },
+    { value: 'size_desc', label: 'Size (largest)' },
+    { value: 'size_asc', label: 'Size (smallest)' },
+    { value: 'name_asc', label: 'Name (A–Z)' },
+    { value: 'name_desc', label: 'Name (Z–A)' },
+    { value: 'random', label: 'Random' }
+  ];
+
+  function populateSortPills() {
+    const container = document.getElementById('sort-pills');
+    if (!container) return;
+    container.innerHTML = '';
+    SORT_OPTIONS.forEach(opt => {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'sort-pill' + (gridState.sort === opt.value ? ' active' : '');
+      pill.textContent = opt.label;
+      pill.addEventListener('click', () => {
+        gridState.sort = opt.value;
+        gridState.page = 1;
+        refreshGrid(false);
+        populateSortPills();
+      });
+      container.appendChild(pill);
     });
-    sel.value = cur || '';
+  }
+
+  function populateListPills(activeValue) {
+    const container = document.getElementById('list-pills');
+    const filterInput = document.getElementById('list-filter');
+    if (!container || !filterInput) return;
+    const data = window.ImageKprLists ? window.ImageKprLists.load() : { 'Favourites': [] };
+    const cur = activeValue !== undefined ? activeValue : filterInput.value;
+    container.innerHTML = '';
+
+    const allPill = document.createElement('button');
+    allPill.type = 'button';
+    allPill.className = 'list-pill' + (!cur ? ' active' : '');
+    allPill.textContent = 'All';
+    allPill.addEventListener('click', () => {
+      filterInput.value = '';
+      refreshGrid(false);
+      populateListPills('');
+    });
+    container.appendChild(allPill);
+
+    const latestPill = document.createElement('button');
+    latestPill.type = 'button';
+    latestPill.className = 'list-pill' + (cur === LATEST_FILTER ? ' active' : '');
+    latestPill.textContent = 'Last uploaded';
+    latestPill.title = 'Show only the last uploaded batch of images';
+    latestPill.addEventListener('click', () => {
+      filterInput.value = LATEST_FILTER;
+      refreshGrid(false);
+      populateListPills(LATEST_FILTER);
+    });
+    container.appendChild(latestPill);
+
+    Object.keys(data).forEach(name => {
+      const pill = document.createElement('button');
+      pill.type = 'button';
+      pill.className = 'list-pill' + (cur === name ? ' active' : '');
+      pill.textContent = name + ' (' + (data[name]?.length || 0) + ')';
+      pill.addEventListener('click', () => {
+        filterInput.value = name;
+        refreshGrid(false);
+        populateListPills(name);
+      });
+      container.appendChild(pill);
+    });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    populateListFilter();
-    if (window.ImageKprLists) window.ImageKprLists.onChange = () => { populateListFilter(); refreshGrid(false); };
-    document.getElementById('list-filter').addEventListener('change', () => refreshGrid(false));
+    populateListPills();
+    populateSortPills();
+    if (window.ImageKprLists) window.ImageKprLists.onChange = () => { populateListPills(); refreshGrid(false); };
     document.getElementById('manage-lists-btn').addEventListener('click', () => {
       const d = document.getElementById('manage-lists-dialog');
       const list = document.getElementById('manage-lists-list');
@@ -449,8 +732,10 @@
       const data = window.ImageKprLists ? window.ImageKprLists.load() : {};
       data[n] = [];
       window.ImageKprLists.save(data);
-      populateListFilter();
+      populateListPills();
       document.getElementById('new-list-name').value = '';
+      document.getElementById('manage-lists-dialog').hidden = true;
+      showToast('List "' + n + '" created');
     });
     document.getElementById('manage-lists-list').addEventListener('click', e => {
       const name = e.target.dataset.name;
@@ -459,7 +744,7 @@
       if (e.target.classList.contains('manage-delete')) {
         delete data[name];
         window.ImageKprLists.save(data);
-        populateListFilter();
+        populateListPills();
         const list = document.getElementById('manage-lists-list');
         list.innerHTML = '';
         Object.entries(data).forEach(([n, ids]) => {
@@ -486,7 +771,7 @@
           const data = window.ImageKprLists.load();
           Object.assign(data, imported);
           window.ImageKprLists.save(data);
-          populateListFilter();
+          populateListPills();
           showToast('Imported');
         } catch (_) { showToast('Invalid file'); }
       };
@@ -494,15 +779,16 @@
       e.target.value = '';
     });
     window.ImageKprLists.addToList = (ids) => {
-      const name = prompt('Add to list:', 'Favourites');
-      if (name) {
-        const data = window.ImageKprLists.load();
-        if (!data[name]) data[name] = [];
-        ids.forEach(id => { if (!data[name].includes(id)) data[name].push(id); });
-        window.ImageKprLists.save(data);
-        showToast('Added');
-        populateListFilter();
-      }
+      addToListDialog('Favourites').then(name => {
+        if (name) {
+          const data = window.ImageKprLists.load();
+          if (!data[name]) data[name] = [];
+          ids.forEach(id => { if (!data[name].includes(id)) data[name].push(id); });
+          window.ImageKprLists.save(data);
+          showToast('Added');
+          populateListPills();
+        }
+      });
     };
 
     loadStats();
@@ -512,7 +798,7 @@
     const uploadInput = document.getElementById('upload-input');
     uploadZone.addEventListener('click', () => uploadInput.click());
     uploadInput.addEventListener('change', () => {
-      if (uploadInput.files.length) processAndUpload(uploadInput.files);
+      if (uploadInput.files.length) showUploadConfirmModal(uploadInput.files);
       uploadInput.value = '';
     });
     uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
@@ -521,20 +807,14 @@
       e.preventDefault();
       uploadZone.classList.remove('drag-over');
       const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-      if (files.length) processAndUpload(files);
+      if (files.length) showUploadConfirmModal(files);
     });
 
     document.getElementById('search').addEventListener('input', debounce(() => {
       gridState.search = document.getElementById('search').value.trim();
       gridState.page = 1;
       refreshGrid(false);
-    }, 1000));
-
-    document.getElementById('sort').addEventListener('change', () => {
-      gridState.sort = document.getElementById('sort').value;
-      gridState.page = 1;
-      refreshGrid(false);
-    });
+    }, 500));
 
     const io = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver((entries) => {
       entries.forEach(e => {
@@ -571,20 +851,29 @@
       a.download = img.alt || 'image';
       a.click();
     });
-    document.getElementById('select-mode').addEventListener('change', () => {
-      selectMode = document.getElementById('select-mode').checked;
+    const selectBtn = document.getElementById('select-mode');
+    selectBtn.addEventListener('click', () => {
+      selectMode = !selectMode;
+      selectBtn.classList.toggle('active', selectMode);
+      selectBtn.setAttribute('aria-pressed', String(selectMode));
+      selectBtn.textContent = selectMode ? 'Disable Selection Mode' : 'Enter Selection Mode';
       document.querySelectorAll('.card-select').forEach(el => { el.style.display = selectMode ? 'inline-block' : 'none'; });
-      if (!selectMode) { selectedIds.clear(); updateBulkBar(); }
+      document.querySelectorAll('.card-inner.selected').forEach(el => el.classList.remove('selected'));
+      if (!selectMode) { selectedIds.clear(); selectedImages.clear(); updateBulkBar(); }
+      const hintEl = document.querySelector('.user-hint-text');
+      if (hintEl) hintEl.textContent = selectMode ? 'Click to select' : 'Click card to copy URL • Click icon to view full size';
     });
 
     document.getElementById('bulk-clear').addEventListener('click', () => {
       selectedIds.clear();
+      selectedImages.clear();
       document.querySelectorAll('.card-select:checked').forEach(c => { c.checked = false; });
+      document.querySelectorAll('.card-inner.selected').forEach(el => el.classList.remove('selected'));
       updateBulkBar();
     });
-    document.getElementById('bulk-delete').addEventListener('click', () => {
+    document.getElementById('bulk-delete').addEventListener('click', async () => {
       if (selectedIds.size === 0) return;
-      if (!confirm('Delete ' + selectedIds.size + ' image(s)?')) return;
+      if (!(await confirmDialog('Delete ' + selectedIds.size + ' image(s)?'))) return;
       fetch(API_BASE + '/delete_bulk.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -592,6 +881,7 @@
       }).then(r => r.json()).then(data => {
         if (data.success) {
           selectedIds.clear();
+          selectedImages.clear();
           updateBulkBar();
           refreshGrid(false);
           loadStats();
@@ -621,6 +911,7 @@
         document.getElementById('rename-dialog').hidden = true;
         if (data.success) {
           selectedIds.clear();
+          selectedImages.clear();
           updateBulkBar();
           refreshGrid(false);
           showToast('Renamed');
@@ -650,9 +941,13 @@
 
     document.getElementById('inbox-import-btn').addEventListener('click', importInbox);
 
-    document.getElementById('modal-delete').addEventListener('click', () => {
+    document.getElementById('scroll-to-top').addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    document.getElementById('modal-delete').addEventListener('click', async () => {
       if (!currentModalImg) return;
-      if (!confirm('Delete this image?')) return;
+      if (!(await confirmDialog('Delete this image?'))) return;
       fetch(API_BASE + '/delete.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
