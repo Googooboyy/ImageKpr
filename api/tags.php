@@ -2,6 +2,42 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+  if (!file_exists(__DIR__ . '/../config.php')) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Configuration missing.']);
+    exit;
+  }
+  require_once __DIR__ . '/../config.php';
+  try {
+    $pdo = new PDO(
+      'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
+      DB_USER,
+      DB_PASS,
+      [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+    );
+  } catch (PDOException $e) {
+    echo json_encode(['tags' => []]);
+    exit;
+  }
+  $stmt = $pdo->query('SELECT tags FROM images WHERE tags IS NOT NULL AND tags != "[]"');
+  $allTags = [];
+  while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $tags = json_decode($row['tags'], true);
+    if (is_array($tags)) {
+      foreach ($tags as $t) {
+        if (is_string($t) && trim($t) !== '') {
+          $allTags[trim($t)] = true;
+        }
+      }
+    }
+  }
+  $tags = array_values(array_keys($allTags));
+  sort($tags);
+  echo json_encode(['tags' => $tags]);
+  exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'PATCH') {
   http_response_code(405);
   echo json_encode(['success' => false, 'error' => 'Method not allowed']);
@@ -45,6 +81,7 @@ try {
 $targetIds = $ids ? array_map('intval', $ids) : [$id];
 
 if ($tags !== null) {
+  $tags = array_values(array_unique(array_map('trim', array_filter($tags, 'is_string'))));
   $json = json_encode($tags);
   $stmt = $pdo->prepare('UPDATE images SET tags = ? WHERE id = ?');
   foreach ($targetIds as $tid) {

@@ -37,13 +37,60 @@
     });
   }
 
+  function addToFolderSelectDialog() {
+    return new Promise((resolve) => {
+      const d = document.getElementById('add-to-folder-select-dialog');
+      const selectEl = document.getElementById('add-to-folder-select');
+      const okBtn = document.getElementById('add-to-folder-select-ok');
+      const cancelBtn = document.getElementById('add-to-folder-select-cancel');
+      const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
+      selectEl.innerHTML = '';
+      Object.keys(data).sort().forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name + ' (' + (data[name]?.length || 0) + ')';
+        selectEl.appendChild(opt);
+      });
+      if (Object.keys(data).length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '— No folders —';
+        selectEl.appendChild(opt);
+      }
+      d.hidden = false;
+      document.body.style.overflow = 'hidden';
+      const cleanup = () => {
+        d.hidden = true;
+        document.body.style.overflow = '';
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        d.onclick = null;
+        document.removeEventListener('keydown', onEscape);
+      };
+      const submit = () => {
+        const v = selectEl.value;
+        cleanup();
+        resolve(v || null);
+      };
+      const cancel = () => {
+        cleanup();
+        resolve(null);
+      };
+      const onEscape = (e) => { if (e.key === 'Escape') cancel(); };
+      okBtn.onclick = submit;
+      cancelBtn.onclick = cancel;
+      d.onclick = (e) => { if (e.target === d) cancel(); };
+      document.addEventListener('keydown', onEscape);
+    });
+  }
+
   function addToFolderDialog(defaultValue) {
     return new Promise((resolve) => {
       const d = document.getElementById('add-to-folder-dialog');
       const input = document.getElementById('add-to-folder-input');
       const okBtn = document.getElementById('add-to-folder-ok');
       const cancelBtn = document.getElementById('add-to-folder-cancel');
-      input.value = defaultValue || 'Favourites';
+      input.value = defaultValue || '';
       input.select();
       d.hidden = false;
       input.focus();
@@ -98,6 +145,12 @@
     return str.slice(0, len - 2) + '…';
   }
 
+  function escapeHtml(s) {
+    if (s == null) return '';
+    const t = String(s);
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
   let selectedIds = new Set();
   let selectedImages = new Map();
   let selectMode = false;
@@ -105,9 +158,9 @@
   function updateBulkBar() {
     const count = document.getElementById('bulk-count');
     const banner = document.getElementById('selection-banner');
-    if (selectedIds.size > 0) {
-      count.textContent = selectedIds.size + ' selected';
-      updateSelectionBanner();
+    count.textContent = selectedIds.size + ' selected';
+    updateSelectionBanner();
+    if (selectMode) {
       if (banner) banner.hidden = false;
       document.body.classList.add('selection-active');
     } else {
@@ -142,53 +195,46 @@
     const name = truncate(img.filename, 24);
     const size = formatBytes(img.size_bytes || 0);
     const date = formatDate(img.date_uploaded);
-    const defFolder = window.ImageKprFolders ? window.ImageKprFolders.getDefaultFolder() : 'Favourites';
-    const inFav = window.ImageKprFolders ? window.ImageKprFolders.isInFolder(defFolder, img.id) : false;
-    const starSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="' + (inFav ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg>';
+    const tags = Array.isArray(img.tags) ? img.tags : (img.tags ? (JSON.parse(img.tags || '[]') || []) : []);
+    const tagsHtml = tags.length > 0
+      ? '<div class="card-tags">' + tags.map(t => '<span class="card-tag" title="' + escapeHtml(t || '') + '">' + escapeHtml(t || '') + '</span>').join('') + '</div>'
+      : '';
     const cb = '<input type="checkbox" class="card-select" data-id="' + img.id + '" style="display:' + (selectMode ? 'inline-block' : 'none') + '">';
     article.innerHTML =
       '<div class="card-inner">' + cb +
-      '<button type="button" class="card-star' + (inFav ? ' in-folder' : '') + '" aria-label="Add to folder" data-id="' + img.id + '">' + starSvg + '</button>' +
       '<img class="card-img" data-src="' + (img.url || '') + '" alt="' + (img.filename || 'Image') + '" loading="lazy">' +
       '<div class="card-info">' +
       '<span class="card-name" title="' + (img.filename || '') + '">' + name + '</span>' +
       '<span class="card-meta">' + size + ' • ' + date + '</span>' +
+      tagsHtml +
       '</div>' +
-      '<button type="button" class="card-expand" aria-label="View full size"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>' +
+      '<button type="button" class="card-expand" aria-label="View full size"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>' +
       '</div>';
     const inner = article.querySelector('.card-inner');
     const expandBtn = article.querySelector('.card-expand');
     const checkEl = article.querySelector('.card-select');
-    const starBtn = article.querySelector('.card-star');
-    if (starBtn && window.ImageKprFolders) {
-      starBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        window.ImageKprFolders.toggleInFolder(defFolder, img.id);
-        starBtn.classList.toggle('in-folder');
-        starBtn.querySelector('svg').setAttribute('fill', window.ImageKprFolders.isInFolder(defFolder, img.id) ? 'currentColor' : 'none');
-      });
-    }
     if (checkEl) {
       checkEl.addEventListener('click', e => e.stopPropagation());
       checkEl.addEventListener('change', () => {
+        const id = Number(img.id);
         if (checkEl.checked) {
-          selectedIds.add(img.id);
-          selectedImages.set(img.id, { url: img.url, filename: img.filename });
+          selectedIds.add(id);
+          selectedImages.set(id, { url: img.url, filename: img.filename });
         } else {
-          selectedIds.delete(img.id);
-          selectedImages.delete(img.id);
+          selectedIds.delete(id);
+          selectedImages.delete(id);
         }
         inner.classList.toggle('selected', checkEl.checked);
         updateBulkBar();
       });
-      if (selectedIds.has(img.id)) {
+      if (selectedIds.has(Number(img.id))) {
         checkEl.checked = true;
         inner.classList.add('selected');
-        selectedImages.set(img.id, { url: img.url, filename: img.filename });
+        selectedImages.set(Number(img.id), { url: img.url, filename: img.filename });
       }
     }
     inner.addEventListener('click', (e) => {
-      if (e.target.closest('.card-select') || e.target.closest('.card-star') || e.target.closest('.card-expand')) return;
+      if (e.target.closest('.card-select') || e.target.closest('.card-expand')) return;
       if (selectMode) {
         const c = article.querySelector('.card-select');
         if (c) { c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
@@ -219,8 +265,13 @@
     const imgEl = document.getElementById('modal-img');
     const pills = document.getElementById('modal-tag-pills');
     const input = document.getElementById('modal-tag-input');
+    const filenameInput = document.getElementById('modal-filename');
+    const addTagBtn = document.getElementById('modal-add-tag-btn');
+    const folderSection = document.getElementById('modal-folders-section');
+    const folderPills = document.getElementById('modal-folder-pills');
     imgEl.src = img.url;
     imgEl.alt = img.filename;
+    if (filenameInput) filenameInput.value = img.filename || '';
     const tags = Array.isArray(img.tags) ? img.tags : (img.tags ? JSON.parse(img.tags || '[]') : []);
     const refreshPills = () => renderTagPills(pills, tags, (removed) => {
       const i = tags.indexOf(removed);
@@ -230,17 +281,46 @@
     });
     refreshPills();
     input.value = '';
-    input.onkeydown = (e) => {
-      if (e.key === 'Enter') {
-        const t = input.value.trim();
-        if (t && !tags.includes(t)) {
-          tags.push(t);
-          updateImageTags(img.id, tags);
-          refreshPills();
-          input.value = '';
-        }
+    const addTag = () => {
+      const t = input.value.trim();
+      if (t && !tags.includes(t)) {
+        tags.push(t);
+        updateImageTags(img.id, tags);
+        refreshPills();
+        input.value = '';
       }
     };
+    if (addTagBtn) addTagBtn.onclick = addTag;
+    input.onkeydown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addTag(); }
+    };
+    const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
+    const imgId = Number(img.id);
+    const refreshFolderPills = () => {
+      const d = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
+      const folders = Object.entries(d).filter(([, ids]) => (ids || []).some(id => Number(id) === imgId)).map(([name]) => name);
+      if (!folderSection || !folderPills) return;
+      if (folders.length > 0) {
+        folderSection.hidden = false;
+        folderPills.innerHTML = '';
+        folders.forEach(name => {
+          const span = document.createElement('span');
+          span.className = 'folder-pill';
+          span.innerHTML = escapeHtml(name) + ' <button type="button" aria-label="Remove from ' + escapeHtml(name) + '">&times;</button>';
+          span.querySelector('button').addEventListener('click', () => {
+            window.ImageKprFolders && window.ImageKprFolders.removeFromFolder(name, imgId);
+            refreshFolderPills();
+            if (window.ImageKprFolders && window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+            showToast('Removed from ' + name);
+          });
+          folderPills.appendChild(span);
+        });
+      } else {
+        folderSection.hidden = true;
+        folderPills.innerHTML = '';
+      }
+    };
+    refreshFolderPills();
     modal.hidden = false;
     document.body.style.overflow = 'hidden';
   }
@@ -252,6 +332,7 @@
       body: JSON.stringify({ id, tags })
     }).then(() => {
       if (currentModalImg && currentModalImg.id === id) currentModalImg.tags = tags;
+      populateTagsRow();
     }).catch(() => showToast('Failed to update tags'));
   }
 
@@ -260,7 +341,7 @@
     document.body.style.overflow = '';
   }
 
-  let gridState = { page: 1, perPage: 50, sort: 'name_asc', search: '', total: 0, loading: false };
+  let gridState = { page: 1, perPage: 50, sort: 'date_desc', search: '', tagFilter: '', total: 0, loading: false };
 
   function loadGrid(params, append) {
     const q = new URLSearchParams(params || {});
@@ -323,6 +404,7 @@
   }
 
   const LATEST_FILTER = '__latest__';
+  const UNCATEGORIZED_FILTER = '__uncategorized__';
   const LAST_BATCH_KEY = 'imagekpr_last_batch';
 
   function getLastBatchIds() {
@@ -351,6 +433,10 @@
       }
       return;
     }
+    if (filterVal === UNCATEGORIZED_FILTER) {
+      loadUncategorizedGrid(append);
+      return;
+    }
     const ids = (window.ImageKprFolders && window.ImageKprFolders.getFilterIds && window.ImageKprFolders.getFilterIds()) || null;
     if (ids && ids.length > 0) {
       loadGridFiltered(ids, append);
@@ -358,11 +444,15 @@
     }
     const p = { page: gridState.page, per_page: gridState.perPage, sort: gridState.sort };
     if (gridState.search) p.search = gridState.search;
+    if (gridState.tagFilter) p.tag = gridState.tagFilter;
     loadGrid(p, append);
   }
 
   function loadGridFiltered(ids, append) {
-    fetchJSON(API_BASE + '/images.php?per_page=1000&sort=' + gridState.sort).then(data => {
+    let url = API_BASE + '/images.php?per_page=5000&sort=' + gridState.sort;
+    if (gridState.tagFilter) url += '&tag=' + encodeURIComponent(gridState.tagFilter);
+    if (gridState.search) url += '&search=' + encodeURIComponent(gridState.search);
+    fetchJSON(url).then(data => {
       const filtered = (data.images || []).filter(img => ids.includes(Number(img.id)));
       const grid = document.getElementById('grid');
       if (!append) grid.innerHTML = '';
@@ -386,6 +476,44 @@
         imgs.forEach(el => { el.src = el.dataset.src || ''; el.removeAttribute('data-src'); });
       }
     }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No images in this folder.</p>'; });
+  }
+
+  function loadUncategorizedGrid(append) {
+    const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
+    const idsInFolders = new Set();
+    Object.values(data).forEach(arr => {
+      (arr || []).forEach(id => idsInFolders.add(Number(id)));
+    });
+    let url = API_BASE + '/images.php?per_page=5000&sort=' + gridState.sort;
+    if (gridState.tagFilter) url += '&tag=' + encodeURIComponent(gridState.tagFilter);
+    if (gridState.search) url += '&search=' + encodeURIComponent(gridState.search);
+    fetchJSON(url).then(data => {
+      const filtered = (data.images || []).filter(img => !idsInFolders.has(Number(img.id)));
+      const grid = document.getElementById('grid');
+      if (!append) grid.innerHTML = '';
+      filtered.forEach(img => grid.appendChild(renderCard(img)));
+      gridState.total = filtered.length;
+      document.getElementById('load-more').innerHTML = '';
+      if (!append && filtered.length === 0) {
+        grid.innerHTML = '<p class="empty">No uncategorized images. All images are in at least one folder.</p>';
+      }
+      const imgs = grid.querySelectorAll('img[data-src]');
+      if (typeof IntersectionObserver !== 'undefined') {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const el = entry.target;
+              el.src = el.dataset.src || '';
+              el.removeAttribute('data-src');
+              io.unobserve(el);
+            }
+          });
+        }, { rootMargin: '100px' });
+        imgs.forEach(el => io.observe(el));
+      } else {
+        imgs.forEach(el => { el.src = el.dataset.src || ''; el.removeAttribute('data-src'); });
+      }
+    }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No uncategorized images.</p>'; });
   }
 
   function debounce(fn, ms) {
@@ -501,7 +629,7 @@
     const folderSelect = document.getElementById('upload-add-to-folder-select');
     const folderNewInput = document.getElementById('upload-add-to-folder-new');
 
-    const data = window.ImageKprFolders ? window.ImageKprFolders.load() : { 'Favourites': [] };
+      const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
     folderSelect.innerHTML = '<option value="">— None —</option>';
     Object.keys(data).sort().forEach(name => {
       const opt = document.createElement('option');
@@ -635,8 +763,9 @@
     });
   }
 
+  const DEFAULT_SORT = 'date_desc';
   const SORT_OPTIONS = [
-    { value: 'date_desc', label: 'Date (newest)' },
+    { value: 'date_desc', label: 'Latest' },
     { value: 'date_asc', label: 'Date (oldest)' },
     { value: 'size_desc', label: 'Size (largest)' },
     { value: 'size_asc', label: 'Size (smallest)' },
@@ -655,7 +784,11 @@
       pill.className = 'sort-pill' + (gridState.sort === opt.value ? ' active' : '');
       pill.textContent = opt.label;
       pill.addEventListener('click', () => {
-        gridState.sort = opt.value;
+        if (gridState.sort === opt.value) {
+          gridState.sort = DEFAULT_SORT;
+        } else {
+          gridState.sort = opt.value;
+        }
         gridState.page = 1;
         refreshGrid(false);
         populateSortPills();
@@ -664,55 +797,92 @@
     });
   }
 
-  function populateFolderPills(activeValue) {
-    const container = document.getElementById('folder-pills');
+  const FOLDER_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>';
+  const CLOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+
+  function populateTagsRow() {
+    const container = document.getElementById('tag-filters');
+    if (!container) return;
+    fetchJSON(API_BASE + '/tags.php').then(data => {
+      const tags = data.tags || [];
+      container.innerHTML = '';
+      tags.forEach(tag => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'tag-filter-chip' + (gridState.tagFilter === tag ? ' active' : '');
+        chip.textContent = tag;
+        chip.addEventListener('click', () => {
+          if (gridState.tagFilter === tag) {
+            gridState.tagFilter = '';
+          } else {
+            gridState.tagFilter = tag;
+          }
+          gridState.page = 1;
+          refreshGrid(false);
+          populateTagsRow();
+        });
+        container.appendChild(chip);
+      });
+    }).catch(() => {});
+  }
+
+  function populateFolderIcons(activeValue) {
+    const container = document.getElementById('folder-icons');
     const filterInput = document.getElementById('folder-filter');
     if (!container || !filterInput) return;
-    const data = window.ImageKprFolders ? window.ImageKprFolders.load() : { 'Favourites': [] };
+    const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
     const cur = activeValue !== undefined ? activeValue : filterInput.value;
     container.innerHTML = '';
 
-    const allPill = document.createElement('button');
-    allPill.type = 'button';
-    allPill.className = 'folder-pill' + (!cur ? ' active' : '');
-    allPill.textContent = 'All';
-    allPill.addEventListener('click', () => {
-      filterInput.value = '';
-      refreshGrid(false);
-      populateFolderPills('');
-    });
-    container.appendChild(allPill);
-
-    const latestPill = document.createElement('button');
-    latestPill.type = 'button';
-    latestPill.className = 'folder-pill' + (cur === LATEST_FILTER ? ' active' : '');
-    latestPill.textContent = 'Last uploaded';
-    latestPill.title = 'Show only the last uploaded batch of images';
-    latestPill.addEventListener('click', () => {
-      filterInput.value = LATEST_FILTER;
-      refreshGrid(false);
-      populateFolderPills(LATEST_FILTER);
-    });
-    container.appendChild(latestPill);
-
-    Object.keys(data).forEach(name => {
-      const pill = document.createElement('button');
-      pill.type = 'button';
-      pill.className = 'folder-pill' + (cur === name ? ' active' : '');
-      pill.textContent = name + ' (' + (data[name]?.length || 0) + ')';
-      pill.addEventListener('click', () => {
-        filterInput.value = name;
-        refreshGrid(false);
-        populateFolderPills(name);
+    function addFolderIcon(label, value, title, iconSvg) {
+      const wrap = document.createElement('div');
+      wrap.className = 'folder-icon-wrap' + (cur === value ? ' active' : '');
+      const btnWrap = document.createElement('div');
+      btnWrap.className = 'folder-icon-btn-wrap';
+      const tooltip = document.createElement('span');
+      tooltip.className = 'folder-icon-tooltip';
+      tooltip.textContent = label;
+      tooltip.setAttribute('role', 'tooltip');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'folder-icon' + (cur === value ? ' active' : '');
+      btn.innerHTML = iconSvg || FOLDER_SVG;
+      btn.setAttribute('aria-label', title || label);
+      btnWrap.appendChild(tooltip);
+      btnWrap.appendChild(btn);
+      wrap.appendChild(btnWrap);
+      const labelEl = document.createElement('span');
+      labelEl.className = 'folder-icon-label';
+      labelEl.textContent = truncate(label, 14);
+      wrap.appendChild(labelEl);
+      wrap.addEventListener('click', () => {
+        if (cur === value) {
+          filterInput.value = '';
+          refreshGrid(false);
+          populateFolderIcons('');
+        } else {
+          filterInput.value = value;
+          refreshGrid(false);
+          populateFolderIcons(value);
+        }
       });
-      container.appendChild(pill);
+      container.appendChild(wrap);
+    }
+
+    addFolderIcon('All', '', 'Show all images', FOLDER_SVG);
+    addFolderIcon('Last uploaded', LATEST_FILTER, 'Show only the last uploaded batch of images', CLOCK_SVG);
+    addFolderIcon('Uncategorized', UNCATEGORIZED_FILTER, 'Show images not in any folder', FOLDER_SVG);
+    Object.keys(data).sort().forEach(name => {
+      const label = name + ' (' + (data[name]?.length || 0) + ')';
+      addFolderIcon(label, name, label, FOLDER_SVG);
     });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    populateFolderPills();
+    populateFolderIcons();
     populateSortPills();
-    if (window.ImageKprFolders) window.ImageKprFolders.onChange = () => { populateFolderPills(); refreshGrid(false); };
+    if (window.ImageKprFolders) window.ImageKprFolders.onChange = () => { populateFolderIcons(); refreshGrid(false); };
+    populateTagsRow();
     document.getElementById('manage-folders-btn').addEventListener('click', () => {
       const d = document.getElementById('manage-folders-dialog');
       const listEl = document.getElementById('manage-folders-list');
@@ -732,7 +902,7 @@
       const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
       data[n] = [];
       window.ImageKprFolders.save(data);
-      populateFolderPills();
+      populateFolderIcons();
       document.getElementById('new-folder-name').value = '';
       document.getElementById('manage-folders-dialog').hidden = true;
       showToast('Folder "' + n + '" created');
@@ -747,7 +917,7 @@
           data[newName] = data[name] || [];
           delete data[name];
           window.ImageKprFolders.save(data);
-          populateFolderPills();
+          populateFolderIcons();
           const listEl = document.getElementById('manage-folders-list');
           listEl.innerHTML = '';
           Object.entries(data).forEach(([n, ids]) => {
@@ -761,7 +931,7 @@
         if (!(await confirmDialog('Delete folder "' + name + '"? Items will be removed from this folder.'))) return;
         delete data[name];
         window.ImageKprFolders.save(data);
-        populateFolderPills();
+        populateFolderIcons();
         const listEl = document.getElementById('manage-folders-list');
         listEl.innerHTML = '';
         Object.entries(data).forEach(([n, ids]) => {
@@ -789,7 +959,7 @@
           const data = window.ImageKprFolders.load();
           Object.assign(data, imported);
           window.ImageKprFolders.save(data);
-          populateFolderPills();
+          populateFolderIcons();
           showToast('Imported');
         } catch (_) { showToast('Invalid file'); }
       };
@@ -802,12 +972,12 @@
         /* Two args: (folderName, ids) – direct add from upload, no dialog */
         origAddToFolder(folderNameOrIds, idsMaybe);
       } else {
-        /* One arg: (ids) – bulk action, show dialog to pick folder */
-        addToFolderDialog('Favourites').then(name => {
+        /* One arg: (ids) – bulk action, show select of pre-existing folders */
+        addToFolderSelectDialog().then(name => {
           if (name) {
             origAddToFolder(name, folderNameOrIds);
             showToast('Added');
-            populateFolderPills();
+            populateFolderIcons();
           }
         });
       }
@@ -847,6 +1017,7 @@
             gridState.page++;
             const p = { page: gridState.page, per_page: gridState.perPage, sort: gridState.sort };
             if (gridState.search) p.search = gridState.search;
+            if (gridState.tagFilter) p.tag = gridState.tagFilter;
             loadGrid(p, true);
             gridState.loading = false;
           }
@@ -880,10 +1051,15 @@
       selectBtn.setAttribute('aria-pressed', String(selectMode));
       selectBtn.textContent = selectMode ? 'Disable Selection Mode' : 'Enter Selection Mode';
       document.querySelectorAll('.card-select').forEach(el => { el.style.display = selectMode ? 'inline-block' : 'none'; });
-      document.querySelectorAll('.card-inner.selected').forEach(el => el.classList.remove('selected'));
-      if (!selectMode) { selectedIds.clear(); selectedImages.clear(); updateBulkBar(); }
+      if (!selectMode) {
+        selectedIds.clear();
+        selectedImages.clear();
+        document.querySelectorAll('.card-select:checked').forEach(c => { c.checked = false; });
+        document.querySelectorAll('.card-inner.selected').forEach(el => el.classList.remove('selected'));
+      }
+      updateBulkBar();
       const hintEl = document.querySelector('.user-hint-text');
-      if (hintEl) hintEl.textContent = selectMode ? 'Click to select' : 'Click card to copy URL • Click icon to view full size';
+      if (hintEl) hintEl.innerHTML = selectMode ? 'Click to select' : 'Click card to copy URL • Click <span class="hint-expand-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span> to view full size';
     });
 
     document.getElementById('bulk-clear').addEventListener('click', () => {
@@ -944,12 +1120,20 @@
       if (selectedIds.size === 0) return;
       const tag = prompt('Add tag to ' + selectedIds.size + ' image(s):');
       if (!tag || !tag.trim()) return;
+      const tagVal = tag.trim();
       fetch(API_BASE + '/tags.php', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedIds), action: 'add', tag: tag.trim() })
+        body: JSON.stringify({ ids: Array.from(selectedIds), action: 'add', tag: tagVal })
       }).then(r => r.json()).then(data => {
-        if (data.success) { refreshGrid(false); showToast('Tags updated'); }
+        if (data.success) {
+          gridState.tagFilter = tagVal;
+          gridState.page = 1;
+          populateTagsRow();
+          refreshGrid(false);
+          updateBulkBar();
+          showToast('Tags updated');
+        }
       }).catch(() => showToast('Failed'));
     });
     document.getElementById('bulk-add-folder').addEventListener('click', () => {
@@ -960,6 +1144,77 @@
         showToast('Manage folders first');
       }
     });
+    document.getElementById('add-to-folder-select-cancel').addEventListener('click', () => {
+      document.getElementById('add-to-folder-select-dialog').hidden = true;
+      document.body.style.overflow = '';
+    });
+    document.getElementById('manage-tags-btn').addEventListener('click', () => {
+      const d = document.getElementById('manage-tags-dialog');
+      const listEl = document.getElementById('manage-tags-list');
+      fetchJSON(API_BASE + '/tags.php').then(data => {
+        const tags = data.tags || [];
+        listEl.innerHTML = '';
+        tags.forEach(tag => {
+          const div = document.createElement('div');
+          div.className = 'manage-tag-item';
+          div.innerHTML = '<span>' + escapeHtml(tag) + '</span><button type="button" class="manage-tag-rename" data-tag="' + escapeHtml(tag) + '">Rename</button><button type="button" class="manage-tag-remove" data-tag="' + escapeHtml(tag) + '">Remove from all</button>';
+          listEl.appendChild(div);
+        });
+        d.hidden = false;
+        document.body.style.overflow = 'hidden';
+      }).catch(() => showToast('Failed to load tags'));
+    });
+    document.getElementById('manage-tags-close').addEventListener('click', () => {
+      document.getElementById('manage-tags-dialog').hidden = true;
+      document.body.style.overflow = '';
+    });
+    document.getElementById('manage-tags-list').addEventListener('click', async (e) => {
+      const tag = e.target.dataset.tag;
+      if (!tag) return;
+      if (e.target.classList.contains('manage-tag-rename')) {
+        const newTag = prompt('Rename tag "' + tag + '" to:', tag);
+        if (!newTag || newTag.trim() === tag.trim()) return;
+        fetchJSON(API_BASE + '/images.php?per_page=10000&tag=' + encodeURIComponent(tag)).then(data => {
+          const images = data.images || [];
+          if (images.length === 0) { showToast('No images with this tag'); return; }
+          Promise.all(images.map(img => {
+            const tags = Array.isArray(img.tags) ? img.tags : [];
+            const updated = tags.map(t => t === tag ? newTag.trim() : t);
+            return fetch(API_BASE + '/tags.php', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: img.id, tags: updated })
+            });
+          })).then(() => {
+            showToast('Tag renamed');
+            populateTagsRow();
+            document.getElementById('manage-tags-dialog').hidden = true;
+            document.body.style.overflow = '';
+            refreshGrid(false);
+          }).catch(() => showToast('Failed'));
+        }).catch(() => showToast('Failed'));
+      } else if (e.target.classList.contains('manage-tag-remove')) {
+        if (!(await confirmDialog('Remove tag "' + tag + '" from all images?'))) return;
+        fetchJSON(API_BASE + '/images.php?per_page=10000&tag=' + encodeURIComponent(tag)).then(data => {
+          const images = data.images || [];
+          if (images.length === 0) { showToast('No images with this tag'); return; }
+          const ids = images.map(img => img.id);
+          fetch(API_BASE + '/tags.php', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids, action: 'remove', tag })
+          }).then(r => r.json()).then(d => {
+            if (d.success) {
+              showToast('Tag removed');
+              populateTagsRow();
+              document.getElementById('manage-tags-dialog').hidden = true;
+              document.body.style.overflow = '';
+              refreshGrid(false);
+            } else showToast('Failed');
+          }).catch(() => showToast('Failed'));
+        }).catch(() => showToast('Failed'));
+      }
+    });
 
     document.getElementById('inbox-import-btn').addEventListener('click', importInbox);
 
@@ -967,6 +1222,26 @@
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
+    document.getElementById('modal-rename-btn').addEventListener('click', () => {
+      if (!currentModalImg) return;
+      const filenameInput = document.getElementById('modal-filename');
+      const newName = filenameInput ? filenameInput.value.trim() : '';
+      if (!newName) return;
+      fetch(API_BASE + '/rename.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentModalImg.id, filename: newName })
+      }).then(r => r.json()).then(data => {
+        if (data.success) {
+          currentModalImg.filename = data.filename;
+          currentModalImg.url = data.url;
+          document.getElementById('modal-img').alt = data.filename;
+          if (filenameInput) filenameInput.value = data.filename;
+          refreshGrid(false);
+          showToast('Renamed');
+        } else showToast(data.error || 'Rename failed');
+      }).catch(() => showToast('Rename failed'));
+    });
     document.getElementById('modal-delete').addEventListener('click', async () => {
       if (!currentModalImg) return;
       if (!(await confirmDialog('Delete this image?'))) return;

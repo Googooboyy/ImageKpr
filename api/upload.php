@@ -47,6 +47,12 @@ if (empty($files)) {
   exit;
 }
 
+$replaceNames = [];
+if (!empty($_POST['replace']) && is_array($_POST['replace'])) {
+  $replaceNames = array_map('trim', $_POST['replace']);
+  $replaceNames = array_filter($replaceNames);
+}
+
 try {
   $pdo = new PDO(
     'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
@@ -83,11 +89,18 @@ foreach ($files as $file) {
   $baseName = $stem . '.' . $ext;
   $dir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
   $path = $dir . $baseName;
-  $suffix = 0;
-  while (file_exists($path)) {
-    $suffix++;
-    $baseName = $stem . '-' . $suffix . '.' . $ext;
-    $path = $dir . $baseName;
+  $doReplace = in_array($baseName, $replaceNames);
+  if ($doReplace && file_exists($path)) {
+    @unlink($path);
+    $pdo->prepare('DELETE FROM images WHERE filename = ?')->execute([$baseName]);
+  }
+  if (!$doReplace) {
+    $suffix = 0;
+    while (file_exists($path)) {
+      $suffix++;
+      $baseName = $stem . '-' . $suffix . '.' . $ext;
+      $path = $dir . $baseName;
+    }
   }
   if (!move_uploaded_file($file['tmp_name'], $path)) {
     $uploaded[] = ['success' => false, 'error' => 'Failed to save file'];

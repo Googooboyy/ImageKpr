@@ -15,7 +15,10 @@
       </div>
       <div class="upload-zone" id="upload-zone">
         <input type="file" id="upload-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple hidden>
-        <span id="upload-text">Drag & drop or click to upload</span>
+        <div class="upload-zone-text">
+          <span id="upload-text">Drag & drop or click to upload</span>
+          <span class="upload-zone-hint">Files larger than 3MB will be resized to fit or smaller.</span>
+        </div>
         <div id="upload-progress" class="upload-progress" hidden></div>
       </div>
     </div>
@@ -38,11 +41,38 @@
         </div>
       </div>
       <div class="toolbar">
-        <button type="button" id="select-mode" class="pill-btn" aria-pressed="false">Enter Selection Mode</button>
         <input type="search" id="search" placeholder="Search..." aria-label="Search images">
       </div>
     </div>
-    <div class="dashboard-selection" id="selection-banner" hidden>
+  </section>
+
+  <section class="folders-filter">
+    <input type="hidden" id="folder-filter" value="" aria-label="Filter by folder">
+    <div id="folder-icons" class="folder-icons"></div>
+    <button type="button" id="manage-folders-btn">Manage folders</button>
+  </section>
+
+  <section class="sort-row" aria-label="Sort order">
+    <span class="sort-label">Sort:</span>
+    <div id="sort-pills" class="sort-pills"></div>
+  </section>
+
+  <section class="tags-row">
+    <label>Tags:</label>
+    <div id="tag-filters" class="tag-filters"></div>
+    <button type="button" id="manage-tags-btn">Manage tags</button>
+  </section>
+
+  <main class="main-content">
+    <div class="banner-sticky">
+      <div class="banner-row">
+        <button type="button" id="select-mode" class="select-mode-btn" aria-pressed="false">Enter Selection Mode</button>
+        <div class="user-hint-banner">
+          <span class="user-hint-text">Click card to copy URL • Click <span class="hint-expand-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span> to view full size</span>
+          <button type="button" id="scroll-to-top" class="scroll-to-top-btn" aria-label="Scroll to top" title="Scroll to top">↑ Top</button>
+        </div>
+      </div>
+      <div class="selection-banner-below" id="selection-banner" hidden>
       <div class="bulk-bar" id="bulk-bar">
         <span id="bulk-count">0 selected</span>
         <button type="button" id="bulk-delete">Delete</button>
@@ -54,25 +84,7 @@
       </div>
       <span class="dashboard-label">Selected</span>
       <div class="selection-row" id="selection-row"></div>
-    </div>
-  </section>
-
-  <section class="folders-filter">
-    <label>Show:</label>
-    <input type="hidden" id="folder-filter" value="" aria-label="Filter by folder">
-    <div id="folder-pills" class="folder-pills"></div>
-    <button type="button" id="manage-folders-btn">Manage folders</button>
-  </section>
-
-  <section class="sort-row" aria-label="Sort order">
-    <span class="sort-label">Sort:</span>
-    <div id="sort-pills" class="sort-pills"></div>
-  </section>
-
-  <main class="main-content">
-    <div class="user-hint-banner">
-      <span class="user-hint-text">Click card to copy URL • Click icon to view full size</span>
-      <button type="button" id="scroll-to-top" class="scroll-to-top-btn" aria-label="Scroll to top" title="Scroll to top">↑ Top</button>
+      </div>
     </div>
     <div id="grid" class="grid grid-stock"></div>
     <div id="load-more" class="load-more"></div>
@@ -81,10 +93,22 @@
   <div id="modal" class="modal" hidden aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-content">
       <img id="modal-img" src="" alt="">
+      <div class="modal-rename">
+        <label for="modal-filename">Filename:</label>
+        <input type="text" id="modal-filename" placeholder="Filename">
+        <button type="button" id="modal-rename-btn">Rename</button>
+      </div>
       <div class="modal-tags">
         <label for="modal-tag-input">Tags:</label>
-        <input type="text" id="modal-tag-input" placeholder="Add tag, press Enter">
+        <div class="modal-tag-input-row">
+          <input type="text" id="modal-tag-input" placeholder="Add tag">
+          <button type="button" id="modal-add-tag-btn">Add Tag</button>
+        </div>
         <div id="modal-tag-pills" class="tag-pills"></div>
+      </div>
+      <div class="modal-folders" id="modal-folders-section" hidden>
+        <label>In folders:</label>
+        <div id="modal-folder-pills" class="folder-pills"></div>
       </div>
       <div class="modal-actions">
         <button type="button" id="modal-copy">Copy URL</button>
@@ -157,10 +181,33 @@
     <div class="dialog-content">
       <h3 id="add-to-folder-title">Add to folder</h3>
       <label for="add-to-folder-input" class="dialog-label">Folder name:</label>
-      <input type="text" id="add-to-folder-input" placeholder="e.g. Favourites" autocomplete="off">
+      <input type="text" id="add-to-folder-input" placeholder="e.g. Project Alpha" autocomplete="off">
       <div class="dialog-actions">
         <button type="button" id="add-to-folder-ok">OK</button>
         <button type="button" id="add-to-folder-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="add-to-folder-select-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="add-to-folder-select-title">
+    <div class="dialog-content">
+      <h3 id="add-to-folder-select-title">Add to folder</h3>
+      <label for="add-to-folder-select" class="dialog-label">Select folder:</label>
+      <select id="add-to-folder-select" aria-label="Select folder"></select>
+      <div class="dialog-actions">
+        <button type="button" id="add-to-folder-select-ok">Add</button>
+        <button type="button" id="add-to-folder-select-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="manage-tags-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="manage-tags-title">
+    <div class="dialog-content">
+      <h3 id="manage-tags-title">Manage tags</h3>
+      <p class="dialog-hint">Click a tag to filter images. Use the buttons to rename or remove a tag from all images.</p>
+      <div id="manage-tags-list" class="manage-tags-list"></div>
+      <div class="dialog-actions">
+        <button type="button" id="manage-tags-close">Close</button>
       </div>
     </div>
   </div>

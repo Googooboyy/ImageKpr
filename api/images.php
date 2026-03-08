@@ -12,9 +12,15 @@ require_once __DIR__ . '/../config.php';
 $allowedSort = ['date_desc', 'date_asc', 'size_desc', 'size_asc', 'name_asc', 'name_desc', 'random'];
 $sort = isset($_GET['sort']) && in_array($_GET['sort'], $allowedSort) ? $_GET['sort'] : 'date_desc';
 $page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = min(100, max(1, (int)($_GET['per_page'] ?? 50)));
+$perPage = min(5000, max(1, (int)($_GET['per_page'] ?? 50)));
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $tag = isset($_GET['tag']) ? trim($_GET['tag']) : '';
+$idsParam = isset($_GET['ids']) ? trim($_GET['ids']) : '';
+$ids = [];
+if ($idsParam !== '') {
+    $raw = array_map('intval', array_filter(explode(',', $idsParam)));
+    $ids = array_unique(array_filter($raw));
+}
 
 try {
     $pdo = new PDO(
@@ -43,16 +49,27 @@ if ($tag !== '') {
     $params[':tag_json'] = json_encode($tag);
 }
 
+if (!empty($ids)) {
+    $phs = [];
+    foreach ($ids as $i => $id) {
+        $k = ':ids' . $i;
+        $phs[] = $k;
+        $params[$k] = $id;
+    }
+    $where[] = 'id IN (' . implode(',', $phs) . ')';
+}
+
 $whereClause = implode(' AND ', $where);
 
 $orderBy = match ($sort) {
-    'date_asc' => 'date_uploaded ASC',
+    'date_asc' => 'date_uploaded ASC, id ASC',
+    'date_desc' => 'date_uploaded DESC, id DESC',
     'size_desc' => 'size_bytes DESC',
     'size_asc' => 'size_bytes ASC',
     'name_asc' => 'filename ASC',
     'name_desc' => 'filename DESC',
     'random' => 'RAND()',
-    default => 'date_uploaded DESC',
+    default => 'date_uploaded DESC, id DESC',
 };
 
 $countSql = "SELECT COUNT(*) FROM images WHERE $whereClause";
