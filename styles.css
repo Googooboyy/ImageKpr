@@ -48,6 +48,10 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .card-expand:hover { background: #fff; }
 .card-expand:active { background: #eee; }
 .empty { color: #666; padding: 2rem; text-align: center; }
+.pagination { display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 1rem; }
+.pagination button { padding: 0.5rem 1rem; cursor: pointer; }
+.pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+.loading { padding: 1rem; text-align: center; color: #666; font-size: 0.875rem; }
 
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
 .modal-content { background: #fff; padding: 1rem; border-radius: 8px; max-width: 90vw; max-height: 90vh; overflow: auto; }

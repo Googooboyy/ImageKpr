@@ -82,23 +82,84 @@
     document.body.style.overflow = '';
   }
 
-  function loadGrid(params) {
+  let gridState = { page: 1, perPage: 50, sort: 'date_desc', search: '', total: 0, loading: false };
+
+  function loadGrid(params, append) {
     const q = new URLSearchParams(params || {});
     fetchJSON(API_BASE + '/images.php?' + q).then(data => {
       const grid = document.getElementById('grid');
-      grid.innerHTML = '';
+      const loadMore = document.getElementById('load-more');
+      if (!append) grid.innerHTML = '';
       (data.images || []).forEach(img => {
         grid.appendChild(renderCard(img));
       });
-      // Lazy load images
+      gridState.total = data.total || 0;
+      gridState.page = data.page || 1;
       const imgs = grid.querySelectorAll('img[data-src]');
       imgs.forEach(el => {
         el.src = el.dataset.src || '';
         el.removeAttribute('data-src');
       });
+      const loaded = grid.querySelectorAll('.grid-item').length;
+      if (gridState.total === 0 && !append) {
+        grid.innerHTML = '<p class="empty">No images yet. Upload some!</p>';
+      }
+      if (append) return;
+      if (gridState.total > 1000) {
+        loadMore.innerHTML = '';
+        const p = document.createElement('div');
+        p.className = 'pagination';
+        const prev = document.createElement('button');
+        prev.textContent = 'Previous';
+        prev.disabled = gridState.page <= 1;
+        prev.onclick = () => { gridState.page--; refreshGrid(false); };
+        const next = document.createElement('button');
+        next.textContent = 'Next';
+        next.disabled = loaded >= gridState.total;
+        next.onclick = () => { gridState.page++; refreshGrid(false); };
+        p.appendChild(prev);
+        p.appendChild(document.createTextNode(' Page ' + gridState.page + ' of ' + Math.ceil(gridState.total / gridState.perPage) + ' '));
+        p.appendChild(next);
+        loadMore.appendChild(p);
+      } else if (loaded < gridState.total && loaded < 1000) {
+        loadMore.innerHTML = '<div class="loading">Scroll for more...</div>';
+        loadMore.style.display = '';
+      } else {
+        loadMore.innerHTML = '';
+        loadMore.style.display = 'none';
+      }
     }).catch(() => {
-      document.getElementById('grid').innerHTML = '<p class="empty">No images yet. Upload some!</p>';
+      if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No images yet. Upload some!</p>';
     });
+  }
+
+  function refreshGrid(append) {
+    const ids = (window.ImageKprLists && window.ImageKprLists.getFilterIds && window.ImageKprLists.getFilterIds()) || null;
+    if (ids && ids.length > 0) {
+      loadGridFiltered(ids, append);
+      return;
+    }
+    const p = { page: gridState.page, per_page: gridState.perPage, sort: gridState.sort };
+    if (gridState.search) p.search = gridState.search;
+    loadGrid(p, append);
+  }
+
+  function loadGridFiltered(ids, append) {
+    fetchJSON(API_BASE + '/images.php?per_page=1000&sort=date_desc').then(data => {
+      const filtered = (data.images || []).filter(img => ids.includes(Number(img.id)));
+      const grid = document.getElementById('grid');
+      if (!append) grid.innerHTML = '';
+      filtered.forEach(img => grid.appendChild(renderCard(img)));
+      gridState.total = filtered.length;
+      document.getElementById('load-more').innerHTML = '';
+      const imgs = grid.querySelectorAll('img[data-src]');
+      imgs.forEach(el => { el.src = el.dataset.src || ''; el.removeAttribute('data-src'); });
+    }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No images in this list.</p>'; });
+  }
+
+  function debounce(fn, ms) {
+    let t;
+    return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
   }
 
   function loadStats() {
@@ -134,7 +195,39 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     loadStats();
-    loadGrid({ page: 1, per_page: 50, sort: 'date_desc' });
+    refreshGrid(false);
+
+    document.getElementById('search').addEventListener('input', debounce(() => {
+      gridState.search = document.getElementById('search').value.trim();
+      gridState.page = 1;
+      refreshGrid(false);
+    }, 1000));
+
+    document.getElementById('sort').addEventListener('change', () => {
+      gridState.sort = document.getElementById('sort').value;
+      gridState.page = 1;
+      refreshGrid(false);
+    });
+
+    const io = typeof IntersectionObserver !== 'undefined' ? new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting && !gridState.loading && gridState.total <= 1000) {
+          const loaded = document.querySelectorAll('#grid .grid-item').length;
+          if (loaded < gridState.total) {
+            gridState.loading = true;
+            gridState.page++;
+            const p = { page: gridState.page, per_page: gridState.perPage, sort: gridState.sort };
+            if (gridState.search) p.search = gridState.search;
+            loadGrid(p, true);
+            gridState.loading = false;
+          }
+        }
+      });
+    }, { rootMargin: '200px' }) : null;
+    if (io) {
+      const lm = document.getElementById('load-more');
+      if (lm) io.observe(lm);
+    }
 
     document.getElementById('modal-close').addEventListener('click', closeModal);
     document.getElementById('modal').addEventListener('click', e => {
@@ -153,5 +246,5 @@
     });
   });
 
-  window.ImageKpr = { loadGrid, loadStats, copyUrl, showToast, openModal, closeModal };
+  window.ImageKpr = { loadGrid, loadStats, refreshGrid, copyUrl, showToast, openModal, closeModal };
 })();
