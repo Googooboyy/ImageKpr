@@ -62,14 +62,14 @@ if (!empty($ids)) {
 $whereClause = implode(' AND ', $where);
 
 $orderBy = match ($sort) {
-    'date_asc' => 'date_uploaded ASC, id ASC',
-    'date_desc' => 'date_uploaded DESC, id DESC',
+    'date_asc' => 'id ASC',
+    'date_desc' => 'id DESC',
     'size_desc' => 'size_bytes DESC',
     'size_asc' => 'size_bytes ASC',
     'name_asc' => 'filename ASC',
     'name_desc' => 'filename DESC',
     'random' => 'RAND()',
-    default => 'date_uploaded DESC, id DESC',
+    default => 'id DESC',
 };
 
 $countSql = "SELECT COUNT(*) FROM images WHERE $whereClause";
