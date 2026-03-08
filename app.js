@@ -41,42 +41,113 @@
     return new Promise((resolve) => {
       const d = document.getElementById('add-to-folder-select-dialog');
       const selectEl = document.getElementById('add-to-folder-select');
+      const newInput = document.getElementById('add-to-folder-new');
       const okBtn = document.getElementById('add-to-folder-select-ok');
       const cancelBtn = document.getElementById('add-to-folder-select-cancel');
       const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
-      selectEl.innerHTML = '';
+      selectEl.innerHTML = '<option value="">— Select or type new —</option>';
       Object.keys(data).sort().forEach(name => {
         const opt = document.createElement('option');
         opt.value = name;
         opt.textContent = name + ' (' + (data[name]?.length || 0) + ')';
         selectEl.appendChild(opt);
       });
-      if (Object.keys(data).length === 0) {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = '— No folders —';
-        selectEl.appendChild(opt);
-      }
+      newInput.value = '';
       d.hidden = false;
       document.body.style.overflow = 'hidden';
+      newInput.focus();
       const cleanup = () => {
         d.hidden = true;
         document.body.style.overflow = '';
         okBtn.onclick = null;
         cancelBtn.onclick = null;
+        newInput.onkeydown = null;
         d.onclick = null;
         document.removeEventListener('keydown', onEscape);
       };
+      const getFolderName = () => {
+        const v = newInput.value.trim();
+        if (v) return v;
+        return selectEl.value ? selectEl.value.trim() : null;
+      };
       const submit = () => {
-        const v = selectEl.value;
+        const name = getFolderName();
         cleanup();
-        resolve(v || null);
+        resolve(name);
       };
       const cancel = () => {
         cleanup();
         resolve(null);
       };
       const onEscape = (e) => { if (e.key === 'Escape') cancel(); };
+      newInput.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } };
+      selectEl.addEventListener('change', () => {
+        if (selectEl.value) newInput.value = '';
+      });
+      newInput.addEventListener('input', () => {
+        if (newInput.value.trim()) selectEl.value = '';
+      });
+      okBtn.onclick = submit;
+      cancelBtn.onclick = cancel;
+      d.onclick = (e) => { if (e.target === d) cancel(); };
+      document.addEventListener('keydown', onEscape);
+    });
+  }
+
+  function addTagDialog(imageCount) {
+    return new Promise((resolve) => {
+      const d = document.getElementById('add-tag-dialog');
+      const selectEl = document.getElementById('add-tag-select');
+      const newInput = document.getElementById('add-tag-new');
+      const okBtn = document.getElementById('add-tag-ok');
+      const cancelBtn = document.getElementById('add-tag-cancel');
+      const titleEl = document.getElementById('add-tag-title');
+      if (titleEl) titleEl.textContent = 'Add tag to ' + imageCount + ' image(s)';
+      selectEl.innerHTML = '<option value="">— Select or type new —</option>';
+      newInput.value = '';
+      fetchJSON(API_BASE + '/tags.php').then(data => {
+        const tags = data.tags || [];
+        tags.forEach(tag => {
+          const opt = document.createElement('option');
+          opt.value = tag;
+          opt.textContent = tag;
+          selectEl.appendChild(opt);
+        });
+      }).catch(() => {});
+      d.hidden = false;
+      document.body.style.overflow = 'hidden';
+      newInput.focus();
+      const cleanup = () => {
+        d.hidden = true;
+        document.body.style.overflow = '';
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        newInput.onkeydown = null;
+        d.onclick = null;
+        document.removeEventListener('keydown', onEscape);
+      };
+      const getTag = () => {
+        const v = newInput.value.trim();
+        if (v) return v;
+        return selectEl.value ? selectEl.value.trim() : null;
+      };
+      const submit = () => {
+        const tag = getTag();
+        cleanup();
+        resolve(tag);
+      };
+      const cancel = () => {
+        cleanup();
+        resolve(null);
+      };
+      const onEscape = (e) => { if (e.key === 'Escape') cancel(); };
+      newInput.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); submit(); } };
+      selectEl.addEventListener('change', () => {
+        if (selectEl.value) newInput.value = '';
+      });
+      newInput.addEventListener('input', () => {
+        if (newInput.value.trim()) selectEl.value = '';
+      });
       okBtn.onclick = submit;
       cancelBtn.onclick = cancel;
       d.onclick = (e) => { if (e.target === d) cancel(); };
@@ -1126,16 +1197,15 @@
     });
     document.getElementById('bulk-tags').addEventListener('click', () => {
       if (selectedIds.size === 0) return;
-      const tag = prompt('Add tag to ' + selectedIds.size + ' image(s):');
-      if (!tag || !tag.trim()) return;
-      const tagVal = tag.trim();
-      fetch(API_BASE + '/tags.php', {
+      addTagDialog(selectedIds.size).then(tag => {
+        if (!tag) return;
+        fetch(API_BASE + '/tags.php', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedIds), action: 'add', tag: tagVal })
+        body: JSON.stringify({ ids: Array.from(selectedIds), action: 'add', tag })
       }).then(r => r.json()).then(data => {
         if (data.success) {
-          gridState.tagFilter = tagVal;
+          gridState.tagFilter = tag;
           gridState.page = 1;
           populateTagsRow();
           refreshGrid(false);
@@ -1143,6 +1213,7 @@
           showToast('Tags updated');
         }
       }).catch(() => showToast('Failed'));
+      });
     });
     document.getElementById('bulk-add-folder').addEventListener('click', () => {
       if (selectedIds.size === 0) return;

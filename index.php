@@ -193,11 +193,33 @@
   <div id="add-to-folder-select-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="add-to-folder-select-title">
     <div class="dialog-content">
       <h3 id="add-to-folder-select-title">Add to folder</h3>
-      <label for="add-to-folder-select" class="dialog-label">Select folder:</label>
-      <select id="add-to-folder-select" aria-label="Select folder"></select>
+      <label for="add-to-folder-select" class="dialog-label">Select or add folder:</label>
+      <div class="add-tag-row">
+        <select id="add-to-folder-select" aria-label="Select folder">
+          <option value="">— Select or type new —</option>
+        </select>
+        <input type="text" id="add-to-folder-new" placeholder="Or type new folder name" autocomplete="off" aria-label="New folder name">
+      </div>
       <div class="dialog-actions">
         <button type="button" id="add-to-folder-select-ok">Add</button>
         <button type="button" id="add-to-folder-select-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="add-tag-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="add-tag-title">
+    <div class="dialog-content">
+      <h3 id="add-tag-title">Add tag</h3>
+      <label for="add-tag-select" class="dialog-label">Select or add tag:</label>
+      <div class="add-tag-row">
+        <select id="add-tag-select" aria-label="Select existing tag">
+          <option value="">— Select or type new —</option>
+        </select>
+        <input type="text" id="add-tag-new" placeholder="Or type new tag" autocomplete="off" aria-label="New tag name">
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="add-tag-ok">Add</button>
+        <button type="button" id="add-tag-cancel">Cancel</button>
       </div>
     </div>
   </div>
