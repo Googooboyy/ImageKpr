@@ -63,9 +63,13 @@
     const name = truncate(img.filename, 24);
     const size = formatBytes(img.size_bytes || 0);
     const date = formatDate(img.date_uploaded);
+    const defList = window.ImageKprLists ? window.ImageKprLists.getDefaultList() : 'Favourites';
+    const inFav = window.ImageKprLists ? window.ImageKprLists.isInList(defList, img.id) : false;
+    const starSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="' + (inFav ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2"><polygon points="12 2 15 9 22 9 17 14 19 22 12 18 5 22 7 14 2 9 9 9"/></svg>';
     const cb = '<input type="checkbox" class="card-select" data-id="' + img.id + '" style="display:' + (selectMode ? 'inline-block' : 'none') + '">';
     article.innerHTML =
       '<div class="card-inner">' + cb +
+      '<button type="button" class="card-star' + (inFav ? ' in-list' : '') + '" aria-label="Add to list" data-id="' + img.id + '">' + starSvg + '</button>' +
       '<img class="card-img" data-src="' + (img.url || '') + '" alt="' + (img.filename || 'Image') + '" loading="lazy">' +
       '<div class="card-info">' +
       '<span class="card-name" title="' + (img.filename || '') + '">' + name + '</span>' +
@@ -75,14 +79,23 @@
       '</div>';
     const inner = article.querySelector('.card-inner');
     const expandBtn = article.querySelector('.card-expand');
-    const cb = article.querySelector('.card-select');
-    if (cb) {
-      cb.addEventListener('click', e => e.stopPropagation());
-      cb.addEventListener('change', () => {
-        if (cb.checked) selectedIds.add(img.id); else selectedIds.delete(img.id);
+    const checkEl = article.querySelector('.card-select');
+    const starBtn = article.querySelector('.card-star');
+    if (starBtn && window.ImageKprLists) {
+      starBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        window.ImageKprLists.toggleInList(defList, img.id);
+        starBtn.classList.toggle('in-list');
+        starBtn.querySelector('svg').setAttribute('fill', window.ImageKprLists.isInList(defList, img.id) ? 'currentColor' : 'none');
+      });
+    }
+    if (checkEl) {
+      checkEl.addEventListener('click', e => e.stopPropagation());
+      checkEl.addEventListener('change', () => {
+        if (checkEl.checked) selectedIds.add(img.id); else selectedIds.delete(img.id);
         updateBulkBar();
       });
-      if (selectedIds.has(img.id)) cb.checked = true;
+      if (selectedIds.has(img.id)) checkEl.checked = true;
     }
     inner.addEventListener('click', (e) => {
       if (e.target.classList.contains('card-select')) return;
@@ -373,7 +386,95 @@
     });
   }
 
+  function populateListFilter() {
+    const sel = document.getElementById('list-filter');
+    if (!sel) return;
+    const data = window.ImageKprLists ? window.ImageKprLists.load() : { 'Favourites': [] };
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">All</option>';
+    Object.keys(data).forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name + ' (' + (data[name]?.length || 0) + ')';
+      sel.appendChild(opt);
+    });
+    sel.value = cur || '';
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
+    populateListFilter();
+    if (window.ImageKprLists) window.ImageKprLists.onChange = () => { populateListFilter(); refreshGrid(false); };
+    document.getElementById('list-filter').addEventListener('change', () => refreshGrid(false));
+    document.getElementById('manage-lists-btn').addEventListener('click', () => {
+      const d = document.getElementById('manage-lists-dialog');
+      const list = document.getElementById('manage-lists-list');
+      const data = window.ImageKprLists ? window.ImageKprLists.load() : {};
+      list.innerHTML = '';
+      Object.entries(data).forEach(([name, ids]) => {
+        const div = document.createElement('div');
+        div.innerHTML = '<span>' + name + ' (' + ids.length + ')</span> <button data-name="' + name + '" class="manage-rename">Rename</button> <button data-name="' + name + '" class="manage-delete">Delete</button>';
+        list.appendChild(div);
+      });
+      d.hidden = false;
+    });
+    document.getElementById('manage-close').addEventListener('click', () => { document.getElementById('manage-lists-dialog').hidden = true; });
+    document.getElementById('manage-create-list').addEventListener('click', () => {
+      const n = document.getElementById('new-list-name').value.trim();
+      if (!n) return;
+      const data = window.ImageKprLists ? window.ImageKprLists.load() : {};
+      data[n] = [];
+      window.ImageKprLists.save(data);
+      populateListFilter();
+      document.getElementById('new-list-name').value = '';
+    });
+    document.getElementById('manage-lists-list').addEventListener('click', e => {
+      const name = e.target.dataset.name;
+      if (!name) return;
+      const data = window.ImageKprLists.load();
+      if (e.target.classList.contains('manage-delete')) {
+        delete data[name];
+        window.ImageKprLists.save(data);
+        populateListFilter();
+        document.getElementById('manage-lists-list').innerHTML = '';
+        document.getElementById('manage-lists-btn').click();
+      }
+    });
+    document.getElementById('manage-export').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(window.ImageKprLists.load(), null, 2));
+      a.download = 'imagekpr-lists.json';
+      a.click();
+    });
+    document.getElementById('manage-import').addEventListener('click', () => document.getElementById('manage-import-file').click());
+    document.getElementById('manage-import-file').addEventListener('change', e => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          const imported = JSON.parse(r.result);
+          const data = window.ImageKprLists.load();
+          Object.assign(data, imported);
+          window.ImageKprLists.save(data);
+          populateListFilter();
+          showToast('Imported');
+        } catch (_) { showToast('Invalid file'); }
+      };
+      r.readAsText(f);
+      e.target.value = '';
+    });
+    window.ImageKprLists.addToList = (ids) => {
+      const name = prompt('Add to list:', 'Favourites');
+      if (name) {
+        const data = window.ImageKprLists.load();
+        if (!data[name]) data[name] = [];
+        ids.forEach(id => { if (!data[name].includes(id)) data[name].push(id); });
+        window.ImageKprLists.save(data);
+        showToast('Added');
+        populateListFilter();
+      }
+    };
+
     loadStats();
     refreshGrid(false);
 

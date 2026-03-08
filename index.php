@@ -97,6 +97,21 @@
 
   <div id="toast" class="toast" hidden aria-live="polite"></div>
 
+  <div id="manage-lists-dialog" class="dialog" hidden>
+    <div class="dialog-content">
+      <h3>Manage lists</h3>
+      <div id="manage-lists-list"></div>
+      <label>New list: <input type="text" id="new-list-name" placeholder="List name"></label>
+      <button type="button" id="manage-create-list">Create</button>
+      <div class="dialog-actions">
+        <button type="button" id="manage-import">Import</button>
+        <button type="button" id="manage-export">Export</button>
+        <input type="file" id="manage-import-file" accept=".json" hidden>
+        <button type="button" id="manage-close">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="rename-dialog" class="dialog" hidden>
     <div class="dialog-content">
       <h3>Bulk rename</h3>
@@ -108,6 +123,7 @@
     </div>
   </div>
 
+  <script src="lists.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
