@@ -9,6 +9,8 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .logo:has(img[style*="display: none"]) .logo-fallback { display: block; }
 
 .dashboard { padding: 1rem 2rem; background: #fafafa; border-bottom: 1px solid #eee; }
+.dashboard-inbox { margin-bottom: 1rem; padding: 0.5rem; background: #fff3cd; border-radius: 4px; }
+.dashboard-inbox button { margin-left: 0.5rem; padding: 0.25rem 0.75rem; cursor: pointer; }
 .dashboard-stats { display: flex; gap: 2rem; margin-bottom: 1rem; }
 .stat-value { font-size: 1.25rem; font-weight: 600; }
 .stat-label { color: #666; margin-left: 0.25rem; }

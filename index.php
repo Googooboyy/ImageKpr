@@ -17,6 +17,10 @@
   </header>
 
   <section class="dashboard">
+    <div class="dashboard-inbox" id="dashboard-inbox" hidden>
+      <span id="inbox-count">0</span> images in inbox.
+      <button type="button" id="inbox-import-btn">Import all</button>
+    </div>
     <div class="dashboard-stats">
       <div class="stat">
         <span class="stat-value" id="stat-total-images">—</span>

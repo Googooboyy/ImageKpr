@@ -313,7 +313,36 @@
     });
   }
 
+  function loadInbox() {
+    fetchJSON(API_BASE + '/inbox.php').then(data => {
+      const count = data.count || 0;
+      const box = document.getElementById('dashboard-inbox');
+      if (count > 0) {
+        box.hidden = false;
+        document.getElementById('inbox-count').textContent = count;
+      } else {
+        box.hidden = true;
+      }
+    }).catch(() => {});
+  }
+
+  function importInbox() {
+    fetch(API_BASE + '/inbox.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ import_all: true })
+    }).then(r => r.json()).then(data => {
+      if (data.success) {
+        showToast('Imported ' + (data.imported || 0) + ' image(s)');
+        loadInbox();
+        loadStats();
+        refreshGrid(false);
+      }
+    }).catch(() => showToast('Import failed'));
+  }
+
   function loadStats() {
+    loadInbox();
     fetchJSON(API_BASE + '/stats.php').then(data => {
       document.getElementById('stat-total-images').textContent = data.total_images;
       document.getElementById('stat-total-storage').textContent = data.total_storage_gb + ' GB';
@@ -487,6 +516,8 @@
         showToast('Manage lists first');
       }
     });
+
+    document.getElementById('inbox-import-btn').addEventListener('click', importInbox);
 
     document.getElementById('modal-delete').addEventListener('click', () => {
       if (!currentModalImg) return;
