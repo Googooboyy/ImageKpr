@@ -128,6 +128,7 @@
       <div id="manage-folders-list"></div>
       <label>New folder: <input type="text" id="new-folder-name" placeholder="Folder name"></label>
       <button type="button" id="manage-create-folder">Create</button>
+      <p id="manage-import-success" class="manage-import-success" hidden></p>
       <div class="dialog-actions">
         <button type="button" id="manage-import">Import</button>
         <button type="button" id="manage-export">Export</button>

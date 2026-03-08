@@ -1273,11 +1273,28 @@
         try {
           const imported = JSON.parse(r.result);
           const data = window.ImageKprFolders.load();
+          const count = typeof imported === 'object' && imported !== null ? Object.keys(imported).length : 0;
           Object.assign(data, imported);
           window.ImageKprFolders.save(data);
           populateFolderIcons();
-          showToast('Imported');
-        } catch (_) { showToast('Invalid file'); }
+          const listEl = document.getElementById('manage-folders-list');
+          listEl.innerHTML = '';
+          Object.entries(data).forEach(([name, ids]) => {
+            const div = document.createElement('div');
+            div.innerHTML = '<span>' + name + ' (' + ids.length + ')</span> <button data-name="' + name + '" class="manage-rename">Rename</button> <button data-name="' + name + '" class="manage-delete">Delete</button>';
+            listEl.appendChild(div);
+          });
+          const successEl = document.getElementById('manage-import-success');
+          successEl.textContent = '✓ Imported ' + count + ' folder(s)';
+          successEl.hidden = false;
+          showToast('Imported ' + count + ' folder(s)');
+          setTimeout(() => {
+            successEl.hidden = true;
+            document.getElementById('manage-folders-dialog').hidden = true;
+          }, 1500);
+        } catch (_) {
+          showToast('Invalid file');
+        }
       };
       r.readAsText(f);
       e.target.value = '';
