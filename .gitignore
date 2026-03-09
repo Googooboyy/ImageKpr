@@ -34,3 +34,7 @@ composer.lock
 # user folders - redundant
 import-export-folders/*
 import-export-folders
+
+# tasks folders - for devs
+_tasks/
+_tasks/*
