@@ -62,9 +62,8 @@
         <span id="bulk-count">0 selected</span>
         <button type="button" id="bulk-delete">Delete</button>
         <button type="button" id="bulk-download">Download ZIP</button>
-        <button type="button" id="bulk-tags">Edit tags</button>
-        <button type="button" id="bulk-add-folder">Add to folder</button>
-        <button type="button" id="bulk-remove-folder">Remove from folder</button>
+        <button type="button" id="bulk-tags">Manage Tags</button>
+        <button type="button" id="bulk-folders">Manage Folders</button>
         <button type="button" id="bulk-rename">Rename</button>
         <button type="button" id="bulk-clear">Clear</button>
       </div>
@@ -136,6 +135,56 @@
   </div>
 
   <div id="toast" class="toast" hidden aria-live="polite"></div>
+
+  <div id="bulk-manage-tags-dialog" class="dialog" hidden aria-modal="true">
+    <div class="dialog-content">
+      <h3>Manage tags for selected images</h3>
+      <p class="dialog-hint">Add or remove a tag from all selected images.</p>
+      <div class="bulk-tags-add-row">
+        <label class="dialog-label">Add tag:</label>
+        <div class="add-tag-row">
+          <select id="bulk-tags-add-select" aria-label="Select tag"><option value="">— Select or type new —</option></select>
+          <input type="text" id="bulk-tags-add-new" placeholder="Or type new tag" autocomplete="off">
+          <button type="button" id="bulk-tags-add-btn">Add</button>
+        </div>
+      </div>
+      <div class="bulk-tags-remove-row">
+        <label class="dialog-label">Remove tag:</label>
+        <div class="add-tag-row">
+          <select id="bulk-tags-remove-select" aria-label="Select tag to remove"><option value="">— Select tag —</option></select>
+          <button type="button" id="bulk-tags-remove-btn">Remove</button>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="bulk-tags-dialog-close">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bulk-manage-folders-dialog" class="dialog" hidden aria-modal="true">
+    <div class="dialog-content">
+      <h3>Manage folders for selected images</h3>
+      <p class="dialog-hint">Add or remove selected images from folders.</p>
+      <div class="bulk-folders-add-row">
+        <label class="dialog-label">Add to folder:</label>
+        <div class="add-tag-row">
+          <select id="bulk-folders-add-select" aria-label="Select folder"><option value="">— Select or type new —</option></select>
+          <input type="text" id="bulk-folders-add-new" placeholder="Or type new folder name" autocomplete="off">
+          <button type="button" id="bulk-folders-add-btn">Add</button>
+        </div>
+      </div>
+      <div class="bulk-folders-remove-row">
+        <label class="dialog-label">Remove from folder:</label>
+        <div class="add-tag-row">
+          <select id="bulk-folders-remove-select" aria-label="Select folder"><option value="">— Select folder —</option></select>
+          <button type="button" id="bulk-folders-remove-btn">Remove</button>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button type="button" id="bulk-folders-dialog-close">Done</button>
+      </div>
+    </div>
+  </div>
 
   <div id="manage-folders-dialog" class="dialog" hidden>
     <div class="dialog-content">

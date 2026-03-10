@@ -496,6 +496,165 @@
     document.addEventListener('keydown', onEscape);
   }
 
+  function openBulkManageTagsDialog() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    const d = document.getElementById('bulk-manage-tags-dialog');
+    const addSelect = document.getElementById('bulk-tags-add-select');
+    const addNew = document.getElementById('bulk-tags-add-new');
+    const addBtn = document.getElementById('bulk-tags-add-btn');
+    const removeSelect = document.getElementById('bulk-tags-remove-select');
+    const removeBtn = document.getElementById('bulk-tags-remove-btn');
+    const closeBtn = document.getElementById('bulk-tags-dialog-close');
+
+    function refreshRemoveSelect() {
+      fetchJSON(API_BASE + '/tags.php').then(data => {
+        const tags = data.tags || [];
+        removeSelect.innerHTML = '<option value="">— Select tag —</option>';
+        tags.forEach(tag => {
+          const opt = document.createElement('option');
+          opt.value = tag;
+          opt.textContent = tag;
+          removeSelect.appendChild(opt);
+        });
+      }).catch(() => {});
+    }
+    function doAdd() {
+      const tag = addNew.value.trim() || (addSelect.value ? addSelect.value.trim() : '');
+      if (!tag) return;
+      fetch(API_BASE + '/tags.php', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, action: 'add', tag })
+      }).then(r => r.json()).then(data => {
+        if (data.success) {
+          showToast('Tag added');
+          addNew.value = '';
+          addSelect.value = '';
+          refreshRemoveSelect();
+          populateTagsRow();
+          refreshGrid(false);
+        }
+      }).catch(() => showToast('Failed'));
+    }
+    function doRemove() {
+      const tag = removeSelect.value ? removeSelect.value.trim() : '';
+      if (!tag) return;
+      fetch(API_BASE + '/tags.php', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, action: 'remove', tag })
+      }).then(r => r.json()).then(data => {
+        if (data.success) {
+          showToast('Tag removed');
+          refreshRemoveSelect();
+          populateTagsRow();
+          refreshGrid(false);
+        }
+      }).catch(() => showToast('Failed'));
+    }
+
+    addSelect.innerHTML = '<option value="">— Select or type new —</option>';
+    fetchJSON(API_BASE + '/tags.php').then(data => {
+      (data.tags || []).forEach(tag => {
+        const opt = document.createElement('option');
+        opt.value = tag;
+        opt.textContent = tag;
+        addSelect.appendChild(opt);
+      });
+    }).catch(() => {});
+    addNew.value = '';
+    refreshRemoveSelect();
+    d.hidden = false;
+    document.body.style.overflow = 'hidden';
+    const doCleanup = () => {
+      d.hidden = true;
+      document.body.style.overflow = '';
+      addBtn.onclick = null;
+      removeBtn.onclick = null;
+      closeBtn.onclick = null;
+      d.onclick = null;
+      document.removeEventListener('keydown', onEscape);
+    };
+    const onEscape = (e) => { if (e.key === 'Escape') doCleanup(); };
+    addBtn.onclick = doAdd;
+    removeBtn.onclick = doRemove;
+    closeBtn.onclick = doCleanup;
+    addNew.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } };
+    d.onclick = (e) => { if (e.target === d) doCleanup(); };
+    document.addEventListener('keydown', onEscape);
+  }
+
+  function openBulkManageFoldersDialog() {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!window.ImageKprFolders) return;
+    const d = document.getElementById('bulk-manage-folders-dialog');
+    const addSelect = document.getElementById('bulk-folders-add-select');
+    const addNew = document.getElementById('bulk-folders-add-new');
+    const addBtn = document.getElementById('bulk-folders-add-btn');
+    const removeSelect = document.getElementById('bulk-folders-remove-select');
+    const removeBtn = document.getElementById('bulk-folders-remove-btn');
+    const closeBtn = document.getElementById('bulk-folders-dialog-close');
+
+    function refreshSelects() {
+      const data = window.ImageKprFolders.load();
+      addSelect.innerHTML = '<option value="">— Select or type new —</option>';
+      removeSelect.innerHTML = '<option value="">— Select folder —</option>';
+      Object.keys(data).sort().forEach(name => {
+        const optAdd = document.createElement('option');
+        optAdd.value = name;
+        optAdd.textContent = name + ' (' + (data[name]?.length || 0) + ')';
+        addSelect.appendChild(optAdd);
+        const optRem = document.createElement('option');
+        optRem.value = name;
+        optRem.textContent = name + ' (' + (data[name]?.length || 0) + ')';
+        removeSelect.appendChild(optRem);
+      });
+    }
+    function doAdd() {
+      const name = addNew.value.trim() || (addSelect.value ? addSelect.value.trim() : '');
+      if (!name) return;
+      window.ImageKprFolders.addToFolder(name, ids);
+      if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+      showToast('Added to ' + name);
+      addNew.value = '';
+      addSelect.value = '';
+      refreshSelects();
+      refreshGrid(false);
+    }
+    function doRemove() {
+      const name = removeSelect.value ? removeSelect.value.trim() : '';
+      if (!name) return;
+      ids.forEach(id => window.ImageKprFolders.removeFromFolder(name, id));
+      if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+      showToast('Removed from ' + name);
+      refreshSelects();
+      refreshGrid(false);
+    }
+
+    refreshSelects();
+    addNew.value = '';
+    d.hidden = false;
+    document.body.style.overflow = 'hidden';
+    const doCleanup = () => {
+      d.hidden = true;
+      document.body.style.overflow = '';
+      addBtn.onclick = null;
+      removeBtn.onclick = null;
+      closeBtn.onclick = null;
+      d.onclick = null;
+      document.removeEventListener('keydown', onEscape);
+    };
+    const onEscape = (e) => { if (e.key === 'Escape') doCleanup(); };
+    addBtn.onclick = doAdd;
+    removeBtn.onclick = doRemove;
+    closeBtn.onclick = doCleanup;
+    addNew.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } };
+    d.onclick = (e) => { if (e.target === d) doCleanup(); };
+    document.addEventListener('keydown', onEscape);
+  }
+
   function updateImageTags(id, tags) {
     fetch(API_BASE + '/tags.php', {
       method: 'PATCH',
@@ -1573,48 +1732,11 @@
     });
     document.getElementById('bulk-tags').addEventListener('click', () => {
       if (selectedIds.size === 0) return;
-      addTagDialog(selectedIds.size).then(tag => {
-        if (!tag) return;
-        fetch(API_BASE + '/tags.php', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: Array.from(selectedIds), action: 'add', tag })
-      }).then(r => r.json()).then(data => {
-        if (data.success) {
-          gridState.tagFilter = tag;
-          gridState.page = 1;
-          populateTagsRow();
-          refreshGrid(false);
-          updateBulkBar();
-          showToast('Tags updated');
-        }
-      }).catch(() => showToast('Failed'));
-      });
+      openBulkManageTagsDialog();
     });
-    document.getElementById('bulk-add-folder').addEventListener('click', () => {
+    document.getElementById('bulk-folders').addEventListener('click', () => {
       if (selectedIds.size === 0) return;
-      if (window.ImageKprFolders && window.ImageKprFolders.addToFolder) {
-        window.ImageKprFolders.addToFolder(Array.from(selectedIds));
-      } else {
-        showToast('Manage folders first');
-      }
-    });
-    document.getElementById('bulk-remove-folder').addEventListener('click', async () => {
-      if (selectedIds.size === 0) return;
-      if (!(await confirmDialog('Remove ' + selectedIds.size + ' selected image(s) from all folders?'))) return;
-      if (!window.ImageKprFolders || !window.ImageKprFolders.removeFromFolder) return;
-      const data = window.ImageKprFolders.load();
-      const ids = Array.from(selectedIds);
-      ids.forEach(id => {
-        Object.keys(data).forEach(folderName => {
-          const arr = data[folderName] || [];
-          if (arr.some(x => Number(x) === Number(id))) {
-            window.ImageKprFolders.removeFromFolder(folderName, id);
-          }
-        });
-      });
-      if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
-      showToast('Removed from folders');
+      openBulkManageFoldersDialog();
     });
     document.getElementById('add-to-folder-select-cancel').addEventListener('click', () => {
       document.getElementById('add-to-folder-select-dialog').hidden = true;
