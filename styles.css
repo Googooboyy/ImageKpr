@@ -147,8 +147,8 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .card-meta { color: #666; font-size: 0.75rem; display: block; }
 .card-tags { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.35rem; }
 .card-tag { display: inline-block; padding: 0.1rem 0.4rem; background: #e8e8e8; border-radius: 4px; font-size: 0.7rem; color: #555; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.card-expand { position: absolute; top: 0.5rem; right: 0.5rem; width: 56px; height: 56px; border: none; background: rgba(255,255,255,0.9); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: background 0.2s; }
-.card-expand svg { width: 32px; height: 32px; }
+.card-expand { position: absolute; top: 0.5rem; right: 0.5rem; width: 32px; height: 32px; margin: 0; padding: 0; border: none; background: rgba(255,255,255,0.9); border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: background 0.2s; }
+.card-expand svg, .card-expand .copy-url-icon { width: 29px; height: 29px; margin: 0; padding: 0; object-fit: contain; }
 .card-expand:hover { background: #fff; }
 .card-expand:active { background: #eee; }
 .card-inner.selected { outline: 3px solid #333; outline-offset: 2px; box-shadow: 0 0 0 1px #333; }

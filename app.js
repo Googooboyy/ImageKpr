@@ -290,7 +290,7 @@
       '<span class="card-meta">' + size + ' • ' + date + '</span>' +
       tagsHtml +
       '</div>' +
-      '<button type="button" class="card-expand card-copy-url" aria-label="Copy URL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' +
+      '<button type="button" class="card-expand card-copy-url" aria-label="Copy URL"><img class="copy-url-icon" src="assets/copyurl-passive.png" alt=""></button>' +
       '</div>';
     const inner = article.querySelector('.card-inner');
     const expandBtn = article.querySelector('.card-expand');
@@ -324,7 +324,15 @@
         openModal(img);
       }
     });
-    expandBtn.addEventListener('click', e => { e.stopPropagation(); copyUrl(img.url, true); });
+    expandBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      copyUrl(img.url, true);
+      const icon = expandBtn.querySelector('.copy-url-icon');
+      if (icon) {
+        icon.src = 'assets/copyurl-active.png';
+        setTimeout(() => { icon.src = 'assets/copyurl-passive.png'; }, 2000);
+      }
+    });
     return article;
   }
 
