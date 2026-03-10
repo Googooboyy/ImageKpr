@@ -11,12 +11,13 @@
     });
   }
 
-  function showToast(msg) {
+  function showToast(msg, prominent) {
     const el = document.getElementById('toast');
     el.textContent = msg;
+    el.className = 'toast' + (prominent ? ' toast-prominent' : '');
     el.hidden = false;
     clearTimeout(showToast._t);
-    showToast._t = setTimeout(() => { el.hidden = true; }, 2000);
+    showToast._t = setTimeout(() => { el.hidden = true; }, prominent ? 3500 : 2000);
   }
 
   function confirmDialog(msg) {
@@ -195,13 +196,13 @@
     });
   }
 
-  function copyUrl(url) {
+  function copyUrl(url, prominent) {
     if (!url) return;
     try {
       const absolute = new URL(url, window.location.origin).href;
-      navigator.clipboard.writeText(absolute).then(() => showToast('Copied!')).catch(() => showToast('Copy failed'));
+      navigator.clipboard.writeText(absolute).then(() => showToast(prominent ? 'URL copied to clipboard!' : 'Copied!', prominent)).catch(() => showToast('Copy failed', prominent));
     } catch {
-      navigator.clipboard.writeText(url).then(() => showToast('Copied!')).catch(() => showToast('Copy failed'));
+      navigator.clipboard.writeText(url).then(() => showToast(prominent ? 'URL copied to clipboard!' : 'Copied!', prominent)).catch(() => showToast('Copy failed', prominent));
     }
   }
 
@@ -289,7 +290,7 @@
       '<span class="card-meta">' + size + ' • ' + date + '</span>' +
       tagsHtml +
       '</div>' +
-      '<button type="button" class="card-expand" aria-label="View full size"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>' +
+      '<button type="button" class="card-expand card-copy-url" aria-label="Copy URL"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' +
       '</div>';
     const inner = article.querySelector('.card-inner');
     const expandBtn = article.querySelector('.card-expand');
@@ -320,10 +321,10 @@
         const c = article.querySelector('.card-select');
         if (c) { c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
       } else {
-        copyUrl(img.url);
+        openModal(img);
       }
     });
-    expandBtn.addEventListener('click', e => { e.stopPropagation(); openModal(img); });
+    expandBtn.addEventListener('click', e => { e.stopPropagation(); copyUrl(img.url, true); });
     return article;
   }
 

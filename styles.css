@@ -1,6 +1,6 @@
 /* ImageKpr - minimal styles */
 * { box-sizing: border-box; }
-body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333; }
+body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333; font-size: 0.8em; }
 
 .hero { padding: 3px 2rem; background: #f5f5f5; }
 .hero-row { display: flex; gap: 0.84rem; align-items: stretch; width: 100%; }
@@ -133,13 +133,13 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 /* Grid layout: equal-width columns, full-width adaptive */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 1rem;
 }
 
 .card { cursor: pointer; }
 .card-inner { position: relative; padding: 0.5rem; border: 1px solid #eee; border-radius: 8px; transition: box-shadow 0.2s, border-color 0.2s; }
-.card-inner:hover { border-color: #ccc; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.card-inner:hover { border-color: #ccc; box-shadow: 0 2px 8px rgba(0,0,0,0.08); outline: 5px solid #333; outline-offset: -1px; }
 .card-inner:active { box-shadow: 0 0 0 2px #999; }
 .card-img { width: 100%; display: block; border-radius: 4px; min-height: 120px; background: #f0f0f0; }
 .card-info { padding: 0.5rem 0; font-size: 0.875rem; }
@@ -332,6 +332,7 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .inbox-import-count { font-size: 0.875rem; color: #666; }
 
 .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; z-index: 1001; }
+.toast-prominent { padding: 1rem 2rem; font-size: 1.1rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 
 .credits-footer { text-align: center; padding: 2rem; color: #666; font-size: 0.875rem; border-top: 1px solid #eee; margin-top: 2rem; }
 .credits-footer a { color: #333; text-decoration: none; }
