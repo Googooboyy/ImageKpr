@@ -216,10 +216,10 @@
   <div id="upload-confirm-dialog" class="dialog upload-confirm-dialog" hidden aria-modal="true" aria-labelledby="upload-confirm-title">
     <div class="dialog-content upload-confirm-content">
       <h3 id="upload-confirm-title">Confirm upload</h3>
-      <p class="upload-confirm-hint">Review the images below. Remove any you don't want before confirming.</p>
-      <div id="upload-confirm-grid" class="upload-confirm-grid"></div>
+      <p class="upload-confirm-hint">Review the images below. Use Rename, Manage Tags, Manage Folders per image. Remove any you don't want before confirming.</p>
+      <div id="upload-confirm-grid" class="upload-confirm-grid upload-confirm-list"></div>
       <div class="upload-add-to-folder">
-        <label for="upload-add-to-folder-select" class="upload-add-to-folder-label">Add to folder (optional):</label>
+        <label for="upload-add-to-folder-select" class="upload-add-to-folder-label">Add all to folder (optional):</label>
         <select id="upload-add-to-folder-select" aria-label="Add uploads to folder">
           <option value="">— None —</option>
         </select>
@@ -233,10 +233,35 @@
     </div>
   </div>
 
+  <div id="upload-rename-dialog" class="dialog" hidden aria-modal="true">
+    <div class="dialog-content">
+      <h3>Rename file</h3>
+      <label class="dialog-label">New filename:</label>
+      <input type="text" id="upload-rename-input" placeholder="filename.jpg">
+      <div class="dialog-actions">
+        <button type="button" id="upload-rename-ok">OK</button>
+        <button type="button" id="upload-rename-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="inbox-rename-dialog" class="dialog" hidden aria-modal="true">
+    <div class="dialog-content">
+      <h3>Rename file</h3>
+      <label class="dialog-label">Current: <span id="inbox-rename-current"></span></label>
+      <label class="dialog-label">New filename:</label>
+      <input type="text" id="inbox-rename-input" placeholder="filename.jpg">
+      <div class="dialog-actions">
+        <button type="button" id="inbox-rename-ok">OK</button>
+        <button type="button" id="inbox-rename-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="inbox-import-dialog" class="dialog inbox-import-dialog" hidden aria-modal="true" aria-labelledby="inbox-import-title">
     <div class="dialog-content inbox-import-content">
       <h3 id="inbox-import-title">Review inbox import</h3>
-      <p class="inbox-import-hint">Review files, rename, add tags or folder. Remove any you don't want to import.</p>
+      <p class="inbox-import-hint">Review files. Use Rename, Manage Tags, Manage Folders per file. Skip any for later – they stay in inbox.</p>
       <div class="inbox-import-bulk">
         <span class="inbox-import-bulk-label">Apply to all:</span>
         <input type="text" id="inbox-import-bulk-tags" placeholder="Tags (comma-separated)" class="inbox-import-bulk-tags">

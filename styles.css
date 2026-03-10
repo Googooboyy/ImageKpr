@@ -215,21 +215,33 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .modal-actions button:hover { background: #eee; }
 .modal-actions button:active { background: #ddd; }
 
-/* Upload confirmation modal - dynamic grid for 2-3 or 20-30 images */
-.upload-confirm-dialog .upload-confirm-content { max-width: min(90vw, 800px); max-height: 85vh; display: flex; flex-direction: column; }
+/* Upload confirmation modal */
+.upload-confirm-dialog .upload-confirm-content { max-width: min(90vw, 900px); max-height: 85vh; display: flex; flex-direction: column; }
 .upload-confirm-hint { margin: 0 0 1rem; font-size: 0.875rem; color: #666; }
-.upload-confirm-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+.upload-confirm-grid.upload-confirm-list {
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
   max-height: 50vh;
   overflow-y: auto;
   padding: 0.5rem 0;
   margin-bottom: 1rem;
 }
+.upload-confirm-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  background: #fafafa;
+}
 .upload-confirm-thumb {
   position: relative;
-  aspect-ratio: 1;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
   border-radius: 6px;
   overflow: hidden;
   border: 2px solid #eee;
@@ -237,7 +249,7 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 }
 .upload-confirm-thumb:hover { border-color: #ccc; }
 .upload-confirm-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.upload-confirm-thumb-remove {
+.upload-confirm-thumb-remove, .upload-remove-x {
   position: absolute;
   top: 4px;
   right: 4px;
@@ -245,7 +257,6 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
   height: 22px;
   border: none;
   border-radius: 50%;
-  background: rgba(0,0,0,0.6);
   color: #fff;
   font-size: 1rem;
   line-height: 1;
@@ -256,7 +267,12 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
   padding: 0;
   transition: background 0.2s;
 }
-.upload-confirm-thumb-remove:hover { background: #c00; }
+.upload-confirm-thumb-remove { background: rgba(0,0,0,0.6); }
+.upload-confirm-thumb-remove:hover, .upload-remove-x:hover { background: #c00; }
+.upload-remove-x { background: #c00; }
+.upload-confirm-name { flex: 1; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; }
+.upload-confirm-btn { padding: 0.25rem 0.5rem; font-size: 0.75rem; border: 1px solid #ccc; background: #fff; border-radius: 4px; cursor: pointer; }
+.upload-confirm-btn:hover { background: #f0f0f0; }
 .add-tag-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
 .add-tag-row select { padding: 0.35rem 0.5rem; min-width: 140px; }
 .add-tag-row input { padding: 0.35rem 0.5rem; min-width: 160px; flex: 1; }
@@ -301,6 +317,7 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 }
 .inbox-import-row:last-child { border-bottom: none; }
 .inbox-import-row-thumb {
+  position: relative;
   flex-shrink: 0;
   width: 48px;
   height: 48px;
@@ -311,6 +328,25 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
   align-items: center;
   justify-content: center;
 }
+.inbox-import-row-thumb .inbox-remove-x {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: #c00;
+  color: #fff;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.inbox-import-row-thumb .inbox-remove-x:hover { background: #a00; }
 .inbox-import-row-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .inbox-import-row-thumb.inbox-import-thumb-failed { background: #ddd; }
 .inbox-import-row-thumb.inbox-import-thumb-failed img { display: none; }

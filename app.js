@@ -912,20 +912,19 @@
     return ids;
   }
 
-  function uploadFiles(files, addToFolderName) {
-    const zone = document.getElementById('upload-zone');
+  function uploadFiles(items, addToFolderName) {
     const prog = document.getElementById('upload-progress');
     const text = document.getElementById('upload-text');
-    const valid = Array.from(files).filter(f => f.size <= MAX_UPLOAD);
-    const tooBig = Array.from(files).filter(f => f.size > MAX_UPLOAD);
+    const validItems = items.filter(it => it.file.size <= MAX_UPLOAD);
+    const tooBig = items.filter(it => it.file.size > MAX_UPLOAD);
     if (tooBig.length) showToast(tooBig.length + ' file(s) skipped (max 3MB)');
-    if (valid.length === 0) return;
+    if (validItems.length === 0) return;
     text.hidden = true;
     prog.hidden = false;
     prog.innerHTML = '<div class="upload-progress-bar" id="upload-bar"></div>';
     const bar = document.getElementById('upload-bar');
     const fd = new FormData();
-    valid.forEach((f, i) => fd.append('file[]', f, f.name));
+    validItems.forEach((it, i) => fd.append('file[]', it.file, it.newName || it.file.name));
     const xhr = new XMLHttpRequest();
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) bar.style.width = (e.loaded / e.total * 100) + '%';
@@ -943,6 +942,20 @@
             window.ImageKprFolders.addToFolder(addToFolderName, ids);
             if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
           }
+          validItems.forEach((it, idx) => {
+            const id = ids[idx];
+            if (id && it.tags && it.tags.length > 0) {
+              fetch(API_BASE + '/tags.php', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, tags: it.tags })
+              }).catch(() => {});
+            }
+            if (id && it.folder && window.ImageKprFolders) {
+              window.ImageKprFolders.addToFolder(it.folder, [id]);
+            }
+          });
+          if (window.ImageKprFolders && window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
           gridState.page = 1;
           refreshGrid(false);
           loadStats();
@@ -959,10 +972,10 @@
     xhr.send(fd);
   }
 
-  function processAndUpload(files, addToFolderName) {
-    const arr = Array.from(files);
-    Promise.all(arr.map(f => resizeIfNeeded(f))).then(resized => {
-      uploadFiles(resized, addToFolderName);
+  function processAndUpload(items, addToFolderName) {
+    Promise.all(items.map(it => resizeIfNeeded(it.file))).then(resized => {
+      const updated = items.map((it, i) => ({ ...it, file: resized[i] || it.file }));
+      uploadFiles(updated, addToFolderName);
     });
   }
 
@@ -981,60 +994,184 @@
     const folderSelect = document.getElementById('upload-add-to-folder-select');
     const folderNewInput = document.getElementById('upload-add-to-folder-new');
 
-      const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
-    folderSelect.innerHTML = '<option value="">— None —</option>';
-    Object.keys(data).sort().forEach(name => {
-      const opt = document.createElement('option');
-      opt.value = name;
-      opt.textContent = name + ' (' + (data[name]?.length || 0) + ')';
-      folderSelect.appendChild(opt);
-    });
-    folderNewInput.value = '';
-
-    let pendingFiles = [...valid];
+    let pendingItems = valid.map(f => ({ file: f, newName: '', tags: [], folder: null }));
     let objectUrls = [];
+
+    function refreshFolderSelect() {
+      const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
+      folderSelect.innerHTML = '<option value="">— None —</option>';
+      Object.keys(data).sort().forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name + ' (' + (data[name]?.length || 0) + ')';
+        folderSelect.appendChild(opt);
+      });
+    }
+    refreshFolderSelect();
+    folderNewInput.value = '';
 
     function getAddToFolderName() {
       const newName = folderNewInput.value.trim();
       if (newName) return newName;
-      const sel = folderSelect.value;
-      return sel || null;
+      return folderSelect.value || null;
+    }
+
+    function openUploadRenameModal(item) {
+      const d = document.getElementById('upload-rename-dialog');
+      const input = document.getElementById('upload-rename-input');
+      const okBtn = document.getElementById('upload-rename-ok');
+      const cancelBtn = document.getElementById('upload-rename-cancel');
+      input.value = item.newName || item.file.name;
+      input.select();
+      d.hidden = false;
+      document.body.style.overflow = 'hidden';
+      const doCleanup = () => {
+        d.hidden = true;
+        document.body.style.overflow = '';
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        d.onclick = null;
+        document.removeEventListener('keydown', onEscape);
+      };
+      const onEscape = (e) => { if (e.key === 'Escape') doCleanup(); };
+      okBtn.onclick = () => {
+        const v = input.value.trim();
+        if (v) item.newName = v;
+        doCleanup();
+        renderGrid();
+      };
+      cancelBtn.onclick = doCleanup;
+      d.onclick = (e) => { if (e.target === d) doCleanup(); };
+      document.addEventListener('keydown', onEscape);
+    }
+
+    function openUploadManageTags(item) {
+      const d = document.getElementById('manage-tags-image-dialog');
+      const pills = document.getElementById('manage-tags-image-pills');
+      const addSelect = document.getElementById('manage-tags-image-select');
+      const addNew = document.getElementById('manage-tags-image-new');
+      const addBtn = document.getElementById('manage-tags-image-add');
+      const closeBtn = document.getElementById('manage-tags-image-close');
+      document.getElementById('manage-tags-image-title').textContent = 'Manage tags for: ' + (item.newName || item.file.name);
+      pills.innerHTML = '';
+      (item.tags || []).forEach(tag => {
+        const span = document.createElement('span');
+        span.className = 'tag-pill';
+        span.innerHTML = escapeHtml(tag) + ' <button type="button" aria-label="Remove ' + escapeHtml(tag) + '">&times;</button>';
+        span.querySelector('button').addEventListener('click', () => {
+          item.tags = item.tags.filter(t => t !== tag);
+          openUploadManageTags(item);
+        });
+        pills.appendChild(span);
+      });
+      addSelect.innerHTML = '<option value="">— Select or type new —</option>';
+      fetchJSON(API_BASE + '/tags.php').then(data => {
+        (data.tags || []).forEach(tag => {
+          const opt = document.createElement('option');
+          opt.value = tag;
+          opt.textContent = tag;
+          addSelect.appendChild(opt);
+        });
+      }).catch(() => {});
+      addNew.value = '';
+      d.hidden = false;
+      document.body.style.overflow = 'hidden';
+      const doCleanup = () => {
+        d.hidden = true;
+        document.body.style.overflow = '';
+        addBtn.onclick = null;
+        closeBtn.onclick = null;
+        d.onclick = null;
+        document.removeEventListener('keydown', onEscape);
+      };
+      const onEscape = (e) => { if (e.key === 'Escape') doCleanup(); };
+      addBtn.onclick = () => {
+        const tag = addNew.value.trim() || (addSelect.value ? addSelect.value.trim() : '');
+        if (tag && !item.tags.includes(tag)) {
+          item.tags.push(tag);
+          addNew.value = '';
+          addSelect.value = '';
+          showToast('Tag added');
+          openUploadManageTags(item);
+        }
+      };
+      closeBtn.onclick = doCleanup;
+      d.onclick = (e) => { if (e.target === d) doCleanup(); };
+      document.addEventListener('keydown', onEscape);
+    }
+
+    function openUploadManageFolders(item) {
+      addToFolderSelectDialog().then(name => {
+        if (name && window.ImageKprFolders) {
+          const d = window.ImageKprFolders.load();
+          if (!d[name]) d[name] = [];
+          window.ImageKprFolders.save(d);
+          item.folder = name;
+          showToast('Will add to ' + name);
+          renderGrid();
+        }
+      });
     }
 
     function renderGrid() {
       objectUrls.forEach(u => URL.revokeObjectURL(u));
       objectUrls = [];
       grid.innerHTML = '';
-      pendingFiles.forEach((file, i) => {
-        const wrap = document.createElement('div');
-        wrap.className = 'upload-confirm-thumb';
-        wrap.dataset.index = String(i);
-        const url = URL.createObjectURL(file);
+      pendingItems.forEach((item, i) => {
+        const row = document.createElement('div');
+        row.className = 'upload-confirm-row';
+        row.dataset.index = String(i);
+        const url = URL.createObjectURL(item.file);
         objectUrls.push(url);
+        const thumbWrap = document.createElement('div');
+        thumbWrap.className = 'upload-confirm-thumb';
         const im = document.createElement('img');
         im.src = url;
-        im.alt = file.name;
+        im.alt = item.file.name;
+        thumbWrap.appendChild(im);
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
-        removeBtn.className = 'upload-confirm-thumb-remove';
-        removeBtn.setAttribute('aria-label', 'Remove ' + file.name);
+        removeBtn.className = 'upload-confirm-thumb-remove upload-remove-x';
+        removeBtn.setAttribute('aria-label', 'Remove image');
+        removeBtn.title = 'Remove image';
         removeBtn.textContent = '×';
-        removeBtn.addEventListener('click', () => {
-          const idx = pendingFiles.indexOf(file);
-          if (idx >= 0) {
-            pendingFiles.splice(idx, 1);
-            renderGrid();
-            updateCount();
-          }
+        thumbWrap.appendChild(removeBtn);
+        row.appendChild(thumbWrap);
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'upload-confirm-name';
+        nameSpan.textContent = item.newName || item.file.name;
+        row.appendChild(nameSpan);
+        const renameBtn = document.createElement('button');
+        renameBtn.type = 'button';
+        renameBtn.className = 'upload-confirm-btn';
+        renameBtn.textContent = 'Rename';
+        renameBtn.onclick = () => openUploadRenameModal(item);
+        row.appendChild(renameBtn);
+        const tagsBtn = document.createElement('button');
+        tagsBtn.type = 'button';
+        tagsBtn.className = 'upload-confirm-btn';
+        tagsBtn.textContent = 'Manage Tags';
+        tagsBtn.onclick = () => openUploadManageTags(item);
+        row.appendChild(tagsBtn);
+        const foldersBtn = document.createElement('button');
+        foldersBtn.type = 'button';
+        foldersBtn.className = 'upload-confirm-btn';
+        foldersBtn.textContent = 'Manage Folders';
+        foldersBtn.onclick = () => openUploadManageFolders(item);
+        row.appendChild(foldersBtn);
+        removeBtn.addEventListener('click', async () => {
+          if (!(await confirmDialog('Remove from upload? File will not be uploaded. You can add it again later.'))) return;
+          const idx = pendingItems.indexOf(item);
+          if (idx >= 0) pendingItems.splice(idx, 1);
+          renderGrid();
+          updateCount();
         });
-        wrap.appendChild(im);
-        wrap.appendChild(removeBtn);
-        grid.appendChild(wrap);
+        grid.appendChild(row);
       });
     }
 
     function updateCount() {
-      const n = pendingFiles.length;
+      const n = pendingItems.length;
       countEl.textContent = n + ' image' + (n === 1 ? '' : 's') + ' to upload';
       uploadBtn.disabled = n === 0;
     }
@@ -1058,7 +1195,7 @@
     uploadBtn.onclick = () => {
       const addToFolderName = getAddToFolderName();
       closeModal();
-      if (pendingFiles.length > 0) processAndUpload(pendingFiles, addToFolderName);
+      if (pendingItems.length > 0) processAndUpload(pendingItems, addToFolderName);
     };
     cancelBtn.onclick = closeModal;
 
@@ -1107,6 +1244,109 @@
 
     let pendingItems = [];
 
+    function openInboxRenameModal(item) {
+      const d = document.getElementById('inbox-rename-dialog');
+      const currentEl = document.getElementById('inbox-rename-current');
+      const input = document.getElementById('inbox-rename-input');
+      const okBtn = document.getElementById('inbox-rename-ok');
+      const cancelBtn = document.getElementById('inbox-rename-cancel');
+      currentEl.textContent = item.filename;
+      input.value = item.newName ?? item.filename;
+      input.select();
+      d.hidden = false;
+      document.body.style.overflow = 'hidden';
+      const doCleanup = () => {
+        d.hidden = true;
+        document.body.style.overflow = '';
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        d.onclick = null;
+        document.removeEventListener('keydown', onEscape);
+      };
+      const onEscape = (e) => { if (e.key === 'Escape') doCleanup(); };
+      okBtn.onclick = () => {
+        const v = input.value.trim();
+        if (v) item.newName = v;
+        doCleanup();
+        renderList();
+      };
+      cancelBtn.onclick = doCleanup;
+      d.onclick = (e) => { if (e.target === d) doCleanup(); };
+      document.addEventListener('keydown', onEscape);
+    }
+
+    function openInboxManageTags(item) {
+      if (!item.tags) item.tags = [];
+      const d = document.getElementById('manage-tags-image-dialog');
+      const pills = document.getElementById('manage-tags-image-pills');
+      const addSelect = document.getElementById('manage-tags-image-select');
+      const addNew = document.getElementById('manage-tags-image-new');
+      const addBtn = document.getElementById('manage-tags-image-add');
+      const closeBtn = document.getElementById('manage-tags-image-close');
+      document.getElementById('manage-tags-image-title').textContent = 'Manage tags for: ' + item.filename;
+      pills.innerHTML = '';
+      (item.tags || []).forEach(tag => {
+        const span = document.createElement('span');
+        span.className = 'tag-pill';
+        span.innerHTML = escapeHtml(tag) + ' <button type="button" aria-label="Remove ' + escapeHtml(tag) + '">&times;</button>';
+        span.querySelector('button').addEventListener('click', () => {
+          item.tags = item.tags.filter(t => t !== tag);
+          openInboxManageTags(item);
+        });
+        pills.appendChild(span);
+      });
+      const removeRow = document.getElementById('bulk-tags-remove-row');
+      if (removeRow) removeRow.style.display = 'none';
+      addSelect.innerHTML = '<option value="">— Select or type new —</option>';
+      fetchJSON(API_BASE + '/tags.php').then(data => {
+        (data.tags || []).forEach(tag => {
+          const opt = document.createElement('option');
+          opt.value = tag;
+          opt.textContent = tag;
+          addSelect.appendChild(opt);
+        });
+      }).catch(() => {});
+      addNew.value = '';
+      d.hidden = false;
+      document.body.style.overflow = 'hidden';
+      const doCleanup = () => {
+        d.hidden = true;
+        document.body.style.overflow = '';
+        const removeRow = document.getElementById('bulk-tags-remove-row');
+        if (removeRow) removeRow.style.display = '';
+        addBtn.onclick = null;
+        closeBtn.onclick = null;
+        d.onclick = null;
+        document.removeEventListener('keydown', onEscape);
+      };
+      const onEscape = (e) => { if (e.key === 'Escape') doCleanup(); };
+      addBtn.onclick = () => {
+        const tag = addNew.value.trim() || (addSelect.value ? addSelect.value.trim() : '');
+        if (tag && !item.tags.includes(tag)) {
+          item.tags.push(tag);
+          addNew.value = '';
+          addSelect.value = '';
+          openInboxManageTags(item);
+        }
+      };
+      closeBtn.onclick = doCleanup;
+      d.onclick = (e) => { if (e.target === d) doCleanup(); };
+      document.addEventListener('keydown', onEscape);
+    }
+
+    function openInboxManageFolders(item) {
+      addToFolderSelectDialog().then(name => {
+        if (name && window.ImageKprFolders) {
+          const d = window.ImageKprFolders.load();
+          if (!d[name]) d[name] = [];
+          window.ImageKprFolders.save(d);
+          item.folder = name;
+          showToast('Will add to ' + name);
+          renderList();
+        }
+      });
+    }
+
     function renderList() {
       listEl.innerHTML = '';
       const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
@@ -1122,9 +1362,6 @@
         const row = document.createElement('div');
         row.className = 'inbox-import-row';
         row.dataset.index = String(i);
-        const ext = (item.filename || '').split('.').pop().toLowerCase();
-        const baseName = (item.filename || '').replace(/\.[^.]+$/, '') || 'image';
-        const defaultNewName = baseName + (ext ? '.' + ext : '');
 
         const thumbWrap = document.createElement('div');
         thumbWrap.className = 'inbox-import-row-thumb';
@@ -1135,97 +1372,53 @@
         thumbImg.onerror = () => { thumbWrap.classList.add('inbox-import-thumb-failed'); };
         thumbWrap.appendChild(thumbImg);
 
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'inbox-import-row-remove inbox-remove-x';
+        removeBtn.setAttribute('aria-label', 'Remove image');
+        removeBtn.title = 'Remove image';
+        removeBtn.textContent = '×';
+        thumbWrap.appendChild(removeBtn);
+
         const nameSpan = document.createElement('span');
         nameSpan.className = 'inbox-import-row-name';
-        nameSpan.textContent = item.filename;
-        nameSpan.title = item.filename;
+        nameSpan.textContent = item.newName || item.filename;
+        nameSpan.title = item.newName || item.filename;
 
         const sizeSpan = document.createElement('span');
         sizeSpan.className = 'inbox-import-row-size';
         sizeSpan.textContent = formatBytes(item.size || 0);
 
-        const renameInput = document.createElement('input');
-        renameInput.type = 'text';
-        renameInput.className = 'inbox-import-row-rename';
-        renameInput.placeholder = 'New name (optional)';
-        renameInput.value = item.newName ?? '';
+        const renameBtn = document.createElement('button');
+        renameBtn.type = 'button';
+        renameBtn.className = 'upload-confirm-btn';
+        renameBtn.textContent = 'Rename';
+        renameBtn.onclick = () => openInboxRenameModal(item);
 
-        const tagsInput = document.createElement('input');
-        tagsInput.type = 'text';
-        tagsInput.className = 'inbox-import-row-tags';
-        tagsInput.placeholder = 'Tags (comma-separated)';
-        tagsInput.value = Array.isArray(item.tags) ? item.tags.join(', ') : (item.tags || '');
+        const tagsBtn = document.createElement('button');
+        tagsBtn.type = 'button';
+        tagsBtn.className = 'upload-confirm-btn';
+        tagsBtn.textContent = 'Manage Tags';
+        tagsBtn.onclick = () => openInboxManageTags(item);
 
-        const folderSelect = document.createElement('select');
-        folderSelect.className = 'inbox-import-row-folder';
-        folderSelect.innerHTML = '<option value="">— None —</option>';
-        Object.keys(data).sort().forEach(name => {
-          const opt = document.createElement('option');
-          opt.value = name;
-          opt.textContent = name;
-          if (item.folder === name) opt.selected = true;
-          folderSelect.appendChild(opt);
-        });
-        const newOpt = document.createElement('option');
-        newOpt.value = '__new__';
-        newOpt.textContent = '+ New folder';
-        folderSelect.appendChild(newOpt);
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'inbox-import-row-remove';
-        removeBtn.textContent = 'Remove';
+        const foldersBtn = document.createElement('button');
+        foldersBtn.type = 'button';
+        foldersBtn.className = 'upload-confirm-btn';
+        foldersBtn.textContent = 'Manage Folders';
+        foldersBtn.onclick = () => openInboxManageFolders(item);
 
         row.appendChild(thumbWrap);
         row.appendChild(nameSpan);
         row.appendChild(sizeSpan);
-        row.appendChild(renameInput);
-        row.appendChild(tagsInput);
-        row.appendChild(folderSelect);
-        row.appendChild(removeBtn);
+        row.appendChild(renameBtn);
+        row.appendChild(tagsBtn);
+        row.appendChild(foldersBtn);
         listEl.appendChild(row);
 
-        const syncItem = () => {
-          item.newName = renameInput.value.trim() || undefined;
-          item.tags = tagsInput.value.split(',').map(t => t.trim()).filter(Boolean);
-          item.folder = folderSelect.value && folderSelect.value !== '__new__' ? folderSelect.value : undefined;
-        };
-
-        renameInput.addEventListener('change', syncItem);
-        renameInput.addEventListener('blur', syncItem);
-        tagsInput.addEventListener('change', syncItem);
-        tagsInput.addEventListener('blur', syncItem);
-        folderSelect.addEventListener('change', () => {
-          if (folderSelect.value === '__new__') {
-            addToFolderDialog().then(name => {
-              if (name) {
-                if (!window.ImageKprFolders) return;
-                const d = window.ImageKprFolders.load();
-                if (!d[name]) d[name] = [];
-                window.ImageKprFolders.save(d);
-                const opt = document.createElement('option');
-                opt.value = name;
-                opt.textContent = name;
-                opt.selected = true;
-                folderSelect.insertBefore(opt, folderSelect.lastElementChild);
-                item.folder = name;
-                if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
-              }
-              folderSelect.value = item.folder || '';
-            });
-          } else {
-            syncItem();
-          }
-        });
-
         removeBtn.addEventListener('click', async () => {
-          if (!(await confirmDialog('Remove "' + item.filename + '" from import? The file will be deleted from the inbox.'))) return;
-          fetch(API_BASE + '/inbox.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'delete', files: [item.filename] })
-          }).catch(() => {});
-          pendingItems.splice(i, 1);
+          if (!(await confirmDialog('Skip for now? File will stay in inbox for later review. It will not be imported.'))) return;
+          const idx = pendingItems.indexOf(item);
+          if (idx >= 0) pendingItems.splice(idx, 1);
           renderList();
           updateCount();
         });
@@ -1274,19 +1467,7 @@
       };
 
       confirmBtn.onclick = () => {
-        pendingItems.forEach((item, i) => {
-          const row = listEl.querySelector('[data-index="' + i + '"]');
-          if (row) {
-            const rn = row.querySelector('.inbox-import-row-rename');
-            const tg = row.querySelector('.inbox-import-row-tags');
-            const fd = row.querySelector('.inbox-import-row-folder');
-            if (rn) item.newName = rn.value.trim() || undefined;
-            if (tg) item.tags = tg.value.split(',').map(t => t.trim()).filter(Boolean);
-            if (fd && fd.value && fd.value !== '__new__') item.folder = fd.value;
-          }
-        });
-
-        const items = pendingItems.map(({ filename, newName, tags }) => {
+        const items = pendingItems.map(({ filename, newName, tags, folder }) => {
           const o = { filename };
           if (newName) o.newName = newName;
           if (tags && tags.length) o.tags = tags;
