@@ -77,30 +77,60 @@
   </main>
 
   <div id="modal" class="modal" hidden aria-modal="true" aria-labelledby="modal-title">
-    <div class="modal-content">
-      <img id="modal-img" src="" alt="">
+    <div class="modal-content" id="modal-content">
+      <div class="modal-img-wrap">
+        <img id="modal-img" src="" alt="">
+      </div>
+      <div class="modal-side">
+        <div class="modal-actions">
+          <button type="button" id="modal-copy">Copy URL</button>
+          <button type="button" id="modal-download">Download</button>
+          <button type="button" id="modal-delete">Delete</button>
+          <button type="button" id="modal-manage-tags">Manage Tags</button>
+          <button type="button" id="modal-manage-folders">Manage Folders</button>
+          <button type="button" id="modal-close">Close</button>
+        </div>
+      </div>
       <div class="modal-rename">
         <label for="modal-filename">Filename:</label>
         <input type="text" id="modal-filename" placeholder="Filename">
         <button type="button" id="modal-rename-btn">Rename</button>
       </div>
-      <div class="modal-tags">
-        <label for="modal-tag-input">Tags:</label>
-        <div class="modal-tag-input-row">
-          <input type="text" id="modal-tag-input" placeholder="Add tag">
-          <button type="button" id="modal-add-tag-btn">Add Tag</button>
-        </div>
-        <div id="modal-tag-pills" class="tag-pills"></div>
+    </div>
+  </div>
+
+  <div id="manage-tags-image-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="manage-tags-image-title">
+    <div class="dialog-content">
+      <h3 id="manage-tags-image-title">Manage tags</h3>
+      <div id="manage-tags-image-pills" class="tag-pills" style="margin-bottom:1rem;"></div>
+      <label class="dialog-label">Add tag:</label>
+      <div class="add-tag-row">
+        <select id="manage-tags-image-select" aria-label="Select existing tag">
+          <option value="">— Select or type new —</option>
+        </select>
+        <input type="text" id="manage-tags-image-new" placeholder="Or type new tag" autocomplete="off" aria-label="New tag name">
       </div>
-      <div class="modal-folders" id="modal-folders-section" hidden>
-        <label>In folders:</label>
-        <div id="modal-folder-pills" class="folder-pills"></div>
+      <div class="dialog-actions" style="margin-top:1rem;">
+        <button type="button" id="manage-tags-image-add">Add</button>
+        <button type="button" id="manage-tags-image-close">Done</button>
       </div>
-      <div class="modal-actions">
-        <button type="button" id="modal-copy">Copy URL</button>
-        <button type="button" id="modal-download">Download</button>
-        <button type="button" id="modal-delete">Delete</button>
-        <button type="button" id="modal-close">Close</button>
+    </div>
+  </div>
+
+  <div id="manage-folders-image-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="manage-folders-image-title">
+    <div class="dialog-content">
+      <h3 id="manage-folders-image-title">Manage folders</h3>
+      <div id="manage-folders-image-pills" class="folder-pills" style="margin-bottom:1rem;"></div>
+      <label class="dialog-label">Add to folder:</label>
+      <div class="add-tag-row">
+        <select id="manage-folders-image-select" aria-label="Select folder">
+          <option value="">— Select or type new —</option>
+        </select>
+        <input type="text" id="manage-folders-image-new" placeholder="Or type new folder name" autocomplete="off" aria-label="New folder name">
+      </div>
+      <div class="dialog-actions" style="margin-top:1rem;">
+        <button type="button" id="manage-folders-image-add">Add</button>
+        <button type="button" id="manage-folders-image-close">Done</button>
       </div>
     </div>
   </div>

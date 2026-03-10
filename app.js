@@ -345,66 +345,155 @@
     currentModalImg = img;
     const modal = document.getElementById('modal');
     const imgEl = document.getElementById('modal-img');
-    const pills = document.getElementById('modal-tag-pills');
-    const input = document.getElementById('modal-tag-input');
+    const content = document.getElementById('modal-content');
     const filenameInput = document.getElementById('modal-filename');
-    const addTagBtn = document.getElementById('modal-add-tag-btn');
-    const folderSection = document.getElementById('modal-folders-section');
-    const folderPills = document.getElementById('modal-folder-pills');
     imgEl.src = img.url;
     imgEl.alt = img.filename;
     if (filenameInput) filenameInput.value = img.filename || '';
-    const tags = Array.isArray(img.tags) ? img.tags : (img.tags ? JSON.parse(img.tags || '[]') : []);
-    const refreshPills = () => renderTagPills(pills, tags, (removed) => {
-      const i = tags.indexOf(removed);
-      if (i >= 0) tags.splice(i, 1);
-      updateImageTags(img.id, tags);
-      refreshPills();
-    });
-    refreshPills();
-    input.value = '';
-    const addTag = () => {
-      const t = input.value.trim();
+    imgEl.onload = () => {
+      const w = imgEl.naturalWidth || imgEl.width;
+      const h = imgEl.naturalHeight || imgEl.height;
+      content.classList.toggle('modal-content-wide', w > h);
+      content.classList.toggle('modal-content-tall', h >= w);
+    };
+    if (imgEl.complete) imgEl.onload();
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function openManageTagsImageDialog() {
+    if (!currentModalImg) return;
+    const img = currentModalImg;
+    const tags = Array.isArray(img.tags) ? [...img.tags] : (img.tags ? [...(JSON.parse(img.tags || '[]') || [])] : []);
+    const d = document.getElementById('manage-tags-image-dialog');
+    const pills = document.getElementById('manage-tags-image-pills');
+    const selectEl = document.getElementById('manage-tags-image-select');
+    const newInput = document.getElementById('manage-tags-image-new');
+    const addBtn = document.getElementById('manage-tags-image-add');
+    const closeBtn = document.getElementById('manage-tags-image-close');
+
+    function refresh() {
+      renderTagPills(pills, tags, (removed) => {
+        const i = tags.indexOf(removed);
+        if (i >= 0) tags.splice(i, 1);
+        updateImageTags(img.id, tags);
+        refresh();
+      });
+    }
+    function addTag() {
+      const t = newInput.value.trim() || (selectEl.value ? selectEl.value.trim() : '');
       if (t && !tags.includes(t)) {
         tags.push(t);
         updateImageTags(img.id, tags);
-        refreshPills();
-        input.value = '';
+        refresh();
+        newInput.value = '';
+        selectEl.value = '';
       }
-    };
-    if (addTagBtn) addTagBtn.onclick = addTag;
-    input.onkeydown = (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); addTag(); }
-    };
-    const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
-    const imgId = Number(img.id);
-    const refreshFolderPills = () => {
-      const d = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
-      const folders = Object.entries(d).filter(([, ids]) => (ids || []).some(id => Number(id) === imgId)).map(([name]) => name);
-      if (!folderSection || !folderPills) return;
-      if (folders.length > 0) {
-        folderSection.hidden = false;
-        folderPills.innerHTML = '';
-        folders.forEach(name => {
-          const span = document.createElement('span');
-          span.className = 'folder-pill';
-          span.innerHTML = escapeHtml(name) + ' <button type="button" aria-label="Remove from ' + escapeHtml(name) + '">&times;</button>';
-          span.querySelector('button').addEventListener('click', () => {
-            window.ImageKprFolders && window.ImageKprFolders.removeFromFolder(name, imgId);
-            refreshFolderPills();
-            if (window.ImageKprFolders && window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
-            showToast('Removed from ' + name);
-          });
-          folderPills.appendChild(span);
-        });
-      } else {
-        folderSection.hidden = true;
-        folderPills.innerHTML = '';
-      }
-    };
-    refreshFolderPills();
-    modal.hidden = false;
+    }
+
+    selectEl.innerHTML = '<option value="">— Select or type new —</option>';
+    fetchJSON(API_BASE + '/tags.php').then(data => {
+      (data.tags || []).forEach(tag => {
+        const opt = document.createElement('option');
+        opt.value = tag;
+        opt.textContent = tag;
+        selectEl.appendChild(opt);
+      });
+    }).catch(() => {});
+    newInput.value = '';
+    refresh();
+    d.hidden = false;
     document.body.style.overflow = 'hidden';
+    const doCleanup = () => {
+      d.hidden = true;
+      document.body.style.overflow = '';
+      addBtn.onclick = null;
+      closeBtn.onclick = null;
+      d.onclick = null;
+      document.removeEventListener('keydown', onEscape);
+    };
+    const onEscape = (e) => { if (e.key === 'Escape') doCleanup(); };
+    addBtn.onclick = addTag;
+    closeBtn.onclick = doCleanup;
+    newInput.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } };
+    d.onclick = (e) => { if (e.target === d) doCleanup(); };
+    document.addEventListener('keydown', onEscape);
+  }
+
+  function openManageFoldersImageDialog() {
+    if (!currentModalImg) return;
+    const img = currentModalImg;
+    const imgId = Number(img.id);
+    const d = document.getElementById('manage-folders-image-dialog');
+    const pills = document.getElementById('manage-folders-image-pills');
+    const selectEl = document.getElementById('manage-folders-image-select');
+    const newInput = document.getElementById('manage-folders-image-new');
+    const addBtn = document.getElementById('manage-folders-image-add');
+    const closeBtn = document.getElementById('manage-folders-image-close');
+
+    function refresh() {
+      const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
+      const folders = Object.entries(data).filter(([, ids]) => (ids || []).some(id => Number(id) === imgId)).map(([name]) => name);
+      pills.innerHTML = '';
+      folders.forEach(name => {
+        const span = document.createElement('span');
+        span.className = 'folder-pill';
+        span.innerHTML = escapeHtml(name) + ' <button type="button" aria-label="Remove from ' + escapeHtml(name) + '">&times;</button>';
+        span.querySelector('button').addEventListener('click', () => {
+          window.ImageKprFolders && window.ImageKprFolders.removeFromFolder(name, imgId);
+          if (window.ImageKprFolders && window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+          showToast('Removed from ' + name);
+          refresh();
+        });
+        pills.appendChild(span);
+      });
+    }
+    function addToFolder() {
+      const name = newInput.value.trim() || (selectEl.value ? selectEl.value.trim() : '');
+      if (name && window.ImageKprFolders) {
+        window.ImageKprFolders.addToFolder(name, [imgId]);
+        if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+        showToast('Added to ' + name);
+        refresh();
+        selectEl.innerHTML = '<option value="">— Select or type new —</option>';
+        const data = window.ImageKprFolders.load();
+        Object.keys(data).sort().forEach(n => {
+          const opt = document.createElement('option');
+          opt.value = n;
+          opt.textContent = n + ' (' + (data[n]?.length || 0) + ')';
+          selectEl.appendChild(opt);
+        });
+        newInput.value = '';
+        selectEl.value = '';
+      }
+    }
+
+    const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
+    selectEl.innerHTML = '<option value="">— Select or type new —</option>';
+    Object.keys(data).sort().forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name + ' (' + (data[name]?.length || 0) + ')';
+      selectEl.appendChild(opt);
+    });
+    newInput.value = '';
+    refresh();
+    d.hidden = false;
+    document.body.style.overflow = 'hidden';
+    const onEscape = (e) => { if (e.key === 'Escape') doCleanup(); };
+    const doCleanup = () => {
+      d.hidden = true;
+      document.body.style.overflow = '';
+      addBtn.onclick = null;
+      closeBtn.onclick = null;
+      d.onclick = null;
+      document.removeEventListener('keydown', onEscape);
+    };
+    addBtn.onclick = addToFolder;
+    closeBtn.onclick = doCleanup;
+    newInput.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addToFolder(); } };
+    d.onclick = (e) => { if (e.target === d) doCleanup(); };
+    document.addEventListener('keydown', onEscape);
   }
 
   function updateImageTags(id, tags) {
@@ -415,6 +504,22 @@
     }).then(() => {
       if (currentModalImg && currentModalImg.id === id) currentModalImg.tags = tags;
       populateTagsRow();
+      const card = document.querySelector('.grid-item.card[data-id="' + id + '"]');
+      if (card) {
+        let container = card.querySelector('.card-tags');
+        const tagsHtml = tags.map(t => '<span class="card-tag" title="' + escapeHtml(t || '') + '">' + escapeHtml(t || '') + '</span>').join('');
+        if (container) {
+          container.innerHTML = tagsHtml;
+        } else if (tags.length > 0) {
+          const info = card.querySelector('.card-info');
+          if (info) {
+            const div = document.createElement('div');
+            div.className = 'card-tags';
+            div.innerHTML = tagsHtml;
+            info.appendChild(div);
+          }
+        }
+      }
     }).catch(() => showToast('Failed to update tags'));
   }
 
@@ -1398,8 +1503,10 @@
     });
     document.getElementById('modal-copy').addEventListener('click', () => {
       const url = document.getElementById('modal-img').src;
-      if (url) copyUrl(url);
+      if (url) copyUrl(url, true);
     });
+    document.getElementById('modal-manage-tags').addEventListener('click', openManageTagsImageDialog);
+    document.getElementById('modal-manage-folders').addEventListener('click', openManageFoldersImageDialog);
     document.getElementById('modal-download').addEventListener('click', () => {
       const img = document.getElementById('modal-img');
       const a = document.createElement('a');

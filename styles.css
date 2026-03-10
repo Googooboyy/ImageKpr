@@ -190,17 +190,20 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .loading { padding: 1rem; text-align: center; color: #666; font-size: 0.875rem; }
 
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.modal-content { background: #fff; padding: 1rem; border-radius: 8px; max-width: 90vw; max-height: 90vh; overflow: auto; }
+.modal-content { background: #fff; padding: 1rem; border-radius: 8px; max-width: 90vw; max-height: 90vh; overflow: auto; display: flex; flex-direction: column; }
+.modal-content.modal-content-tall { flex-direction: row; flex-wrap: wrap; }
+.modal-content.modal-content-tall .modal-img-wrap { flex: 0 0 auto; max-width: 70%; }
+.modal-content.modal-content-tall .modal-side { flex: 1; min-width: 140px; display: flex; align-items: flex-start; }
+.modal-content.modal-content-tall .modal-actions { flex-direction: column; margin-top: 0; }
+.modal-content.modal-content-wide .modal-img-wrap { order: 1; }
+.modal-content.modal-content-wide .modal-side { order: 2; width: 100%; }
+.modal-content.modal-content-wide .modal-rename { order: 3; }
+.modal-img-wrap { margin-bottom: 1rem; }
 .modal-content img { max-width: 100%; max-height: 70vh; display: block; }
-.modal-actions { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
-.modal-tags { margin-top: 1rem; }
-.modal-tags label { display: block; font-size: 0.875rem; margin-bottom: 0.25rem; }
-.modal-tag-input-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
-.modal-tag-input-row input { flex: 1; min-width: 0; padding: 0.5rem; }
-.modal-tag-input-row button { flex-shrink: 0; padding: 0.5rem 1rem; }
+.modal-side .modal-actions { margin-top: 0; }
+.modal-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.modal-rename { margin-top: 1rem; width: 100%; }
 .tag-pills { display: flex; flex-wrap: wrap; gap: 0.25rem; }
-.modal-folders { margin-top: 1rem; }
-.modal-folders label { display: block; font-size: 0.875rem; margin-bottom: 0.25rem; color: #666; }
 .folder-pills { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .folder-pill { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.2rem 0.5rem; background: #e3f2fd; border: 1px solid #90caf9; border-radius: 4px; font-size: 0.75rem; color: #1565c0; }
 .folder-pill button { background: none; border: none; cursor: pointer; padding: 0; font-size: 0.875rem; line-height: 1; color: inherit; opacity: 0.8; }
