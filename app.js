@@ -230,18 +230,22 @@
 
   let selectedIds = new Set();
   let selectedImages = new Map();
-  let selectMode = false;
+  function getSelectMode() { return selectedIds.size > 0; }
 
   function updateBulkBar() {
+    const selectMode = getSelectMode();
     const count = document.getElementById('bulk-count');
     const banner = document.getElementById('selection-banner');
+    const hintRow = document.getElementById('hint-banner-row');
     count.textContent = selectedIds.size + ' selected';
     updateSelectionBanner();
     if (selectMode) {
       if (banner) banner.hidden = false;
+      if (hintRow) hintRow.hidden = true;
       document.body.classList.add('selection-active');
     } else {
       if (banner) banner.hidden = true;
+      if (hintRow) hintRow.hidden = false;
       document.body.classList.remove('selection-active');
     }
   }
@@ -276,7 +280,7 @@
     const tagsHtml = tags.length > 0
       ? '<div class="card-tags">' + tags.map(t => '<span class="card-tag" title="' + escapeHtml(t || '') + '">' + escapeHtml(t || '') + '</span>').join('') + '</div>'
       : '';
-    const cb = '<input type="checkbox" class="card-select" data-id="' + img.id + '" style="display:' + (selectMode ? 'inline-block' : 'none') + '">';
+    const cb = '<input type="checkbox" class="card-select" data-id="' + img.id + '">';
     article.innerHTML =
       '<div class="card-inner">' + cb +
       '<img class="card-img" data-src="' + (img.url || '') + '" alt="' + (img.filename || 'Image') + '" loading="lazy">' +
@@ -312,7 +316,7 @@
     }
     inner.addEventListener('click', (e) => {
       if (e.target.closest('.card-select') || e.target.closest('.card-expand')) return;
-      if (selectMode) {
+      if (getSelectMode()) {
         const c = article.querySelector('.card-select');
         if (c) { c.checked = !c.checked; c.dispatchEvent(new Event('change')); }
       } else {
@@ -1402,30 +1406,13 @@
       a.download = img.alt || 'image';
       a.click();
     });
-    const selectBtn = document.getElementById('select-mode');
-    selectBtn.addEventListener('click', () => {
-      selectMode = !selectMode;
-      selectBtn.classList.toggle('active', selectMode);
-      selectBtn.setAttribute('aria-pressed', String(selectMode));
-      selectBtn.textContent = selectMode ? 'Disable Selection Mode' : 'Enter Selection Mode';
-      document.querySelectorAll('.card-select').forEach(el => { el.style.display = selectMode ? 'inline-block' : 'none'; });
-      if (!selectMode) {
-        selectedIds.clear();
-        selectedImages.clear();
-        document.querySelectorAll('.card-select:checked').forEach(c => { c.checked = false; });
-        document.querySelectorAll('.card-inner.selected').forEach(el => el.classList.remove('selected'));
-      }
-      updateBulkBar();
-      const hintEl = document.querySelector('.user-hint-text');
-      if (hintEl) hintEl.innerHTML = selectMode ? 'Click to select' : 'Click card to copy URL • Click <span class="hint-expand-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span> to view full size';
-    });
-
     document.getElementById('bulk-clear').addEventListener('click', () => {
       selectedIds.clear();
       selectedImages.clear();
       document.querySelectorAll('.card-select:checked').forEach(c => { c.checked = false; });
       document.querySelectorAll('.card-inner.selected').forEach(el => el.classList.remove('selected'));
       updateBulkBar();
+      updateHintBanner();
     });
     document.getElementById('bulk-delete').addEventListener('click', async () => {
       if (selectedIds.size === 0) return;
@@ -1439,6 +1426,7 @@
           selectedIds.clear();
           selectedImages.clear();
           updateBulkBar();
+          updateHintBanner();
           refreshGrid(false);
           loadStats();
           showToast('Deleted');
@@ -1469,6 +1457,7 @@
           selectedIds.clear();
           selectedImages.clear();
           updateBulkBar();
+          updateHintBanner();
           refreshGrid(false);
           showToast('Renamed');
         }

@@ -50,8 +50,7 @@
 
   <main class="main-content">
     <div class="banner-sticky">
-      <div class="banner-row">
-        <button type="button" id="select-mode" class="select-mode-btn" aria-pressed="false">Enter Selection Mode</button>
+      <div class="banner-row" id="hint-banner-row">
         <div class="user-hint-banner">
           <span class="user-hint-text" id="user-hint-text">Loading…</span>
           <input type="search" id="search" placeholder="Search..." aria-label="Search images">

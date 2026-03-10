@@ -23,10 +23,6 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 /* Sticky banner: grey hint bar + selection banner when active */
 .banner-sticky { position: sticky; top: 0; z-index: 100; margin: 0 -2rem 1rem -2rem; background: #c8c8c8; border-bottom: 1px solid #aaa; }
 .banner-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 2rem; }
-.select-mode-btn { flex-shrink: 0; padding: 0.32rem 0.96rem; font-size: 0.8rem; font-weight: 600; border: 2px solid #1565c0; background: #fff; color: #1565c0; border-radius: 999px; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
-.select-mode-btn:hover { background: #e3f2fd; border-color: #1565c0; color: #0d47a1; }
-.select-mode-btn.active { background: #1976d2; border-color: #1565c0; color: #fff; }
-.select-mode-btn.active:hover { background: #1565c0; border-color: #1565c0; }
 .user-hint-banner { flex: 1; display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 0 1rem; font-size: 0.875rem; color: #666; }
 .hint-expand-icon { display: inline-flex; vertical-align: middle; }
 .dashboard-label { font-size: 0.875rem; color: #666; display: block; margin-bottom: 0.5rem; }
