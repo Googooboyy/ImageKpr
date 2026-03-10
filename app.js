@@ -475,8 +475,10 @@
         loadMore.innerHTML = '';
         loadMore.style.display = 'none';
       }
+      updateHintBanner();
     }).catch(() => {
       if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No images yet. Upload some!</p>';
+      updateHintBanner();
     });
   }
 
@@ -507,6 +509,8 @@
         const grid = document.getElementById('grid');
         if (!append) grid.innerHTML = '<p class="empty">No last batch — upload to see your most recent batch here.</p>';
         document.getElementById('load-more').innerHTML = '';
+        gridState.total = 0;
+        updateHintBanner();
       }
       return;
     }
@@ -552,7 +556,8 @@
       } else {
         imgs.forEach(el => { el.src = el.dataset.src || ''; el.removeAttribute('data-src'); });
       }
-    }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No images in this folder.</p>'; });
+      updateHintBanner();
+    }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No images in this folder.</p>'; updateHintBanner(); });
   }
 
   function loadUncategorizedGrid(append) {
@@ -590,7 +595,8 @@
       } else {
         imgs.forEach(el => { el.src = el.dataset.src || ''; el.removeAttribute('data-src'); });
       }
-    }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No uncategorized images.</p>'; });
+      updateHintBanner();
+    }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No uncategorized images.</p>'; updateHintBanner(); });
   }
 
   function debounce(fn, ms) {
@@ -1060,14 +1066,33 @@
     showInboxImportModal();
   }
 
+  let cachedStats = { total_images: '—', total_storage_gb: '—' };
+
+  function updateHintBanner() {
+    const hintEl = document.getElementById('user-hint-text');
+    if (!hintEl) return;
+    if (selectedIds.size > 0) return; /* Phase 2: selection banner overrides */
+    const filterInput = document.getElementById('folder-filter');
+    const filterVal = filterInput ? filterInput.value : '';
+    let folderLabel = 'all';
+    if (filterVal === LATEST_FILTER) folderLabel = 'Last uploaded';
+    else if (filterVal === UNCATEGORIZED_FILTER) folderLabel = 'Uncategorized';
+    else if (filterVal) folderLabel = filterVal;
+    const tagLabel = gridState.tagFilter ? "tags '" + gridState.tagFilter + "'" : 'no tags selected';
+    const storageLabel = cachedStats.total_storage_gb + ' GB';
+    hintEl.textContent = "Showing '" + gridState.total + "' images from '" + folderLabel + "' | " + storageLabel + " storage used | with " + tagLabel;
+  }
+
   function loadStats() {
     loadInbox();
     fetchJSON(API_BASE + '/stats.php?t=' + Date.now()).then(data => {
-      document.getElementById('stat-total-images').textContent = data.total_images;
-      document.getElementById('stat-total-storage').textContent = data.total_storage_gb + ' GB';
+      cachedStats.total_images = data.total_images;
+      cachedStats.total_storage_gb = data.total_storage_gb;
+      updateHintBanner();
     }).catch(() => {
-      document.getElementById('stat-total-images').textContent = '—';
-      document.getElementById('stat-total-storage').textContent = '—';
+      cachedStats.total_images = '—';
+      cachedStats.total_storage_gb = '—';
+      updateHintBanner();
     });
   }
 

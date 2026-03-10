@@ -29,21 +29,6 @@
       <span id="inbox-count">0</span> images in inbox.
       <button type="button" id="inbox-import-btn">Review & import</button>
     </div>
-    <div class="dashboard-top-row">
-      <div class="dashboard-stats">
-        <div class="stat">
-          <span class="stat-value" id="stat-total-images">—</span>
-          <span class="stat-label">Images</span>
-        </div>
-        <div class="stat">
-          <span class="stat-value" id="stat-total-storage">—</span>
-          <span class="stat-label">Storage</span>
-        </div>
-      </div>
-      <div class="toolbar">
-        <input type="search" id="search" placeholder="Search..." aria-label="Search images">
-      </div>
-    </div>
   </section>
 
   <section class="folders-filter">
@@ -68,7 +53,8 @@
       <div class="banner-row">
         <button type="button" id="select-mode" class="select-mode-btn" aria-pressed="false">Enter Selection Mode</button>
         <div class="user-hint-banner">
-          <span class="user-hint-text">Click card to copy URL • Click <span class="hint-expand-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></span> to view full size</span>
+          <span class="user-hint-text" id="user-hint-text">Loading…</span>
+          <input type="search" id="search" placeholder="Search..." aria-label="Search images">
           <button type="button" id="scroll-to-top" class="scroll-to-top-btn" aria-label="Scroll to top" title="Scroll to top">↑ Top</button>
         </div>
       </div>
