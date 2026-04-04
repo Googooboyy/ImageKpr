@@ -1,19 +1,14 @@
 <?php
+require_once __DIR__ . '/../inc/auth.php';
+imagekpr_require_api_user();
+$uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   http_response_code(405);
   echo json_encode(['success' => false, 'error' => 'Method not allowed']);
   exit;
 }
-
-if (!file_exists(__DIR__ . '/../config.php')) {
-  http_response_code(500);
-  echo json_encode(['success' => false, 'error' => 'Configuration missing.']);
-  exit;
-}
-require_once __DIR__ . '/../config.php';
 
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 $ids = isset($input['ids']) ? $input['ids'] : [];
@@ -27,6 +22,12 @@ if (empty($ids)) {
   echo json_encode(['success' => false, 'error' => 'No ids provided']);
   exit;
 }
+if (imagekpr_bulk_ids_too_many($ids)) {
+  http_response_code(400);
+  echo json_encode(['success' => false, 'error' => 'Too many ids (max ' . MAX_BULK_IMAGE_IDS . ')']);
+  exit;
+}
+$ids = imagekpr_cap_bulk_ids($ids);
 
 function sanitize($s) {
   $s = preg_replace('/[^a-zA-Z0-9._-]/', '_', $s);
@@ -34,12 +35,7 @@ function sanitize($s) {
 }
 
 try {
-  $pdo = new PDO(
-    'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
-    DB_USER,
-    DB_PASS,
-    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-  );
+  $pdo = imagekpr_pdo();
 } catch (PDOException $e) {
   echo json_encode(['success' => false, 'error' => 'Database connection failed']);
   exit;
@@ -49,8 +45,10 @@ $dir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
 $baseUrl = rtrim(IMAGES_URL, '/') . '/';
 $results = [];
 $placeholders = implode(',', array_fill(0, count($ids), '?'));
-$stmt = $pdo->prepare("SELECT id, filename, url FROM images WHERE id IN ($placeholders)");
-$stmt->execute($ids);
+$params = array_merge($ids, [$uid]);
+$sql = "SELECT id, filename, url FROM images WHERE id IN ($placeholders) AND user_id = ?";
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
 $byId = [];
 while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) $byId[$r['id']] = $r;
 $rows = [];
@@ -80,8 +78,8 @@ foreach ($rows as $row) {
   $oldPath = $dir . $oldFn;
   if (file_exists($oldPath) && @rename($oldPath, $newPath)) {
     $newUrl = $baseUrl . $newFn;
-    $up = $pdo->prepare('UPDATE images SET filename = ?, url = ? WHERE id = ?');
-    $up->execute([$newFn, $newUrl, $row['id']]);
+    $up = $pdo->prepare('UPDATE images SET filename = ?, url = ? WHERE id = ? AND user_id = ?');
+    $up->execute([$newFn, $newUrl, $row['id'], $uid]);
     $results[] = ['id' => $row['id'], 'old_filename' => $oldFn, 'new_filename' => $newFn];
   }
 }

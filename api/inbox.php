@@ -1,35 +1,27 @@
 <?php
+require_once __DIR__ . '/../inc/auth.php';
+imagekpr_require_api_user();
+$uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-
-if (!file_exists(__DIR__ . '/../config.php')) {
-  http_response_code(500);
-  echo json_encode(['error' => 'Configuration missing.']);
-  exit;
-}
-require_once __DIR__ . '/../config.php';
 
 $exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 $inboxDir = rtrim(INBOX_DIR, '/\\') . DIRECTORY_SEPARATOR;
+$inboxReal = is_dir($inboxDir) ? realpath($inboxDir) : false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
   $pending = [];
-  if (!is_dir($inboxDir)) {
+  if (!$inboxReal) {
     echo json_encode(['pending' => [], 'count' => 0]);
     exit;
   }
   try {
-    $pdo = new PDO(
-      'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
-      DB_USER,
-      DB_PASS,
-      [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
+    $pdo = imagekpr_pdo();
   } catch (PDOException $e) {
     echo json_encode(['pending' => [], 'count' => 0]);
     exit;
   }
-  $stmt = $pdo->query('SELECT filename FROM images');
+  $stmt = $pdo->prepare('SELECT filename FROM images WHERE user_id = ?');
+  $stmt->execute([$uid]);
   $inDb = [];
   while ($r = $stmt->fetch(PDO::FETCH_COLUMN)) $inDb[$r] = true;
   foreach (scandir($inboxDir) as $f) {
@@ -54,8 +46,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $deleted = 0;
     foreach ($toDelete as $f) {
       if (!is_string($f)) continue;
-      $path = $inboxDir . basename($f);
-      if (is_file($path) && realpath(dirname($path)) === realpath($inboxDir)) {
+      $base = basename($f);
+      $path = $inboxDir . $base;
+      if (is_file($path) && realpath(dirname($path)) === $inboxReal) {
         if (@unlink($path)) $deleted++;
       }
     }
@@ -68,12 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $items = isset($input['items']) && is_array($input['items']) ? $input['items'] : [];
 
   try {
-    $pdo = new PDO(
-      'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
-      DB_USER,
-      DB_PASS,
-      [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-    );
+    $pdo = imagekpr_pdo();
   } catch (PDOException $e) {
     echo json_encode(['success' => false, 'error' => 'Database connection failed']);
     exit;
@@ -83,19 +71,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $maxSize = 3 * 1024 * 1024;
   $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-  if (!is_dir($inboxDir)) {
+  if (!$inboxReal) {
     echo json_encode(['success' => true, 'imported' => 0, 'imported_ids' => []]);
     exit;
   }
 
-  $stmt = $pdo->query('SELECT filename FROM images');
+  $stmt = $pdo->prepare('SELECT filename FROM images WHERE user_id = ?');
+  $stmt->execute([$uid]);
   $inDb = [];
   while ($r = $stmt->fetch(PDO::FETCH_COLUMN)) $inDb[$r] = true;
 
   $toImport = [];
   if (!empty($items)) {
     foreach ($items as $it) {
-      $f = isset($it['filename']) ? $it['filename'] : (is_string($it) ? $it : null);
+      $raw = isset($it['filename']) ? $it['filename'] : (is_string($it) ? $it : null);
+      $f = is_string($raw) ? basename($raw) : null;
       if ($f && !isset($inDb[$f])) $toImport[] = $it;
     }
   } elseif ($importAll) {
@@ -106,23 +96,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
   } else {
     foreach ($files as $f) {
-      if (is_string($f) && !isset($inDb[$f])) $toImport[] = ['filename' => $f];
+      if (!is_string($f)) continue;
+      $fb = basename($f);
+      if ($fb && !isset($inDb[$fb])) $toImport[] = ['filename' => $fb];
     }
   }
 
   $imported = 0;
   $importedIds = [];
   foreach ($toImport as $it) {
-    $f = is_array($it) ? ($it['filename'] ?? '') : $it;
-    if (!is_string($f) || $f === '') continue;
+    $raw = is_array($it) ? ($it['filename'] ?? '') : $it;
+    if (!is_string($raw) || $raw === '') continue;
+    $f = basename($raw);
     $path = $inboxDir . $f;
-    if (!is_file($path)) continue;
-    $mime = @finfo_file(finfo_open(FILEINFO_MIME_TYPE), $path);
+    if (!is_file($path) || realpath(dirname($path)) !== $inboxReal) continue;
+    $fi = finfo_open(FILEINFO_MIME_TYPE);
+    $mime = $fi ? finfo_file($fi, $path) : '';
+    if ($fi) finfo_close($fi);
     if (!in_array($mime, $allowedMimes)) continue;
     if (filesize($path) > $maxSize) continue;
 
     $customName = (is_array($it) && !empty($it['newName'])) ? trim($it['newName']) : null;
-    $baseName = $customName ? preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($customName)) : preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($f));
+    $baseName = $customName ? preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($customName)) : preg_replace('/[^a-zA-Z0-9._-]/', '_', $f);
     if ($baseName === '' || pathinfo($baseName, PATHINFO_EXTENSION) === '') {
       $baseName = pathinfo($baseName, PATHINFO_FILENAME) ?: 'image';
       $baseName .= '.' . strtolower(pathinfo($f, PATHINFO_EXTENSION));
@@ -144,10 +139,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $info = @getimagesize($dest);
     $url = rtrim(IMAGES_URL, '/') . '/' . $baseName;
-    $stmt = $pdo->prepare('INSERT INTO images (filename, url, date_uploaded, size_bytes, width, height, tags) VALUES (?, ?, NOW(), ?, ?, ?, ?)');
-    $stmt->execute([$baseName, $url, filesize($dest), $info[0] ?? null, $info[1] ?? null, $tagsJson]);
+    $stmt = $pdo->prepare('INSERT INTO images (filename, url, date_uploaded, size_bytes, width, height, tags, user_id) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?)');
+    $stmt->execute([$baseName, $url, filesize($dest), $info[0] ?? null, $info[1] ?? null, $tagsJson, $uid]);
     $importedIds[] = (int) $pdo->lastInsertId();
     $imported++;
   }
   echo json_encode(['success' => true, 'imported' => $imported, 'imported_ids' => $importedIds]);
+  exit;
 }
+
+http_response_code(405);
+echo json_encode(['error' => 'Method not allowed']);

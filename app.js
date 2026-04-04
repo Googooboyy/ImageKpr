@@ -4,10 +4,28 @@
 
   const API_BASE = 'api';
 
+  function redirectToLogin() {
+    window.location.href = 'login.php';
+  }
+
   function fetchJSON(url) {
-    return fetch(url).then(r => {
+    return fetch(url, { credentials: 'same-origin' }).then(r => {
+      if (r.status === 401) {
+        redirectToLogin();
+        throw new Error('Unauthorized');
+      }
       if (!r.ok) throw new Error(r.statusText);
       return r.json();
+    });
+  }
+
+  function apiFetch(url, opts) {
+    return fetch(url, Object.assign({ credentials: 'same-origin' }, opts)).then(r => {
+      if (r.status === 401) {
+        redirectToLogin();
+        throw new Error('Unauthorized');
+      }
+      return r;
     });
   }
 
@@ -530,7 +548,7 @@
     function doAdd() {
       const tag = addNew.value.trim() || (addSelect.value ? addSelect.value.trim() : '');
       if (!tag) return;
-      fetch(API_BASE + '/tags.php', {
+      apiFetch(API_BASE + '/tags.php', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids, action: 'add', tag })
@@ -548,7 +566,7 @@
     function doRemove() {
       const tag = removeSelect.value ? removeSelect.value.trim() : '';
       if (!tag) return;
-      fetch(API_BASE + '/tags.php', {
+      apiFetch(API_BASE + '/tags.php', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids, action: 'remove', tag })
@@ -664,7 +682,7 @@
   }
 
   function updateImageTags(id, tags) {
-    fetch(API_BASE + '/tags.php', {
+    apiFetch(API_BASE + '/tags.php', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, tags })
@@ -934,12 +952,17 @@
     const fd = new FormData();
     validItems.forEach((it, i) => fd.append('file[]', it.file, it.newName || it.file.name));
     const xhr = new XMLHttpRequest();
+    xhr.withCredentials = true;
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) bar.style.width = (e.loaded / e.total * 100) + '%';
     };
     xhr.onload = () => {
       prog.hidden = true;
       text.hidden = false;
+      if (xhr.status === 401) {
+        redirectToLogin();
+        return;
+      }
       try {
         const d = JSON.parse(xhr.responseText);
         if (d.success !== false) {
@@ -953,7 +976,7 @@
           validItems.forEach((it, idx) => {
             const id = ids[idx];
             if (id && it.tags && it.tags.length > 0) {
-              fetch(API_BASE + '/tags.php', {
+              apiFetch(API_BASE + '/tags.php', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id, tags: it.tags })
@@ -1483,7 +1506,7 @@
         });
 
         closeModal();
-        fetch(API_BASE + '/inbox.php', {
+        apiFetch(API_BASE + '/inbox.php', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ items })
@@ -1873,7 +1896,7 @@
     document.getElementById('bulk-delete').addEventListener('click', async () => {
       if (selectedIds.size === 0) return;
       if (!(await confirmDialog('Delete ' + selectedIds.size + ' image(s)?'))) return;
-      fetch(API_BASE + '/delete_bulk.php', {
+      apiFetch(API_BASE + '/delete_bulk.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: Array.from(selectedIds) })
@@ -1903,7 +1926,7 @@
     });
     document.getElementById('rename-confirm').addEventListener('click', () => {
       const base = document.getElementById('rename-base').value.trim() || 'image';
-      fetch(API_BASE + '/rename_bulk.php', {
+      apiFetch(API_BASE + '/rename_bulk.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: Array.from(selectedIds), base })
@@ -1963,7 +1986,7 @@
           Promise.all(images.map(img => {
             const tags = Array.isArray(img.tags) ? img.tags : [];
             const updated = tags.map(t => t === tag ? newTag.trim() : t);
-            return fetch(API_BASE + '/tags.php', {
+            return apiFetch(API_BASE + '/tags.php', {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ id: img.id, tags: updated })
@@ -1982,7 +2005,7 @@
           const images = data.images || [];
           if (images.length === 0) { showToast('No images with this tag'); return; }
           const ids = images.map(img => img.id);
-          fetch(API_BASE + '/tags.php', {
+          apiFetch(API_BASE + '/tags.php', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ids, action: 'remove', tag })
@@ -2010,7 +2033,7 @@
       const filenameInput = document.getElementById('modal-filename');
       const newName = filenameInput ? filenameInput.value.trim() : '';
       if (!newName) return;
-      fetch(API_BASE + '/rename.php', {
+      apiFetch(API_BASE + '/rename.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: currentModalImg.id, filename: newName })
@@ -2028,7 +2051,7 @@
     document.getElementById('modal-delete').addEventListener('click', async () => {
       if (!currentModalImg) return;
       if (!(await confirmDialog('Delete this image?'))) return;
-      fetch(API_BASE + '/delete.php', {
+      apiFetch(API_BASE + '/delete.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: currentModalImg.id })

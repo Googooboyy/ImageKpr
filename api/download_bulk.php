@@ -1,16 +1,12 @@
 <?php
-header('Access-Control-Allow-Origin: *');
+require_once __DIR__ . '/../inc/auth.php';
+imagekpr_require_api_user();
+$uid = imagekpr_user_id();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'POST') {
   http_response_code(405);
   exit;
 }
-
-if (!file_exists(__DIR__ . '/../config.php')) {
-  http_response_code(500);
-  exit;
-}
-require_once __DIR__ . '/../config.php';
 
 $ids = [];
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -25,22 +21,23 @@ if (empty($ids)) {
   http_response_code(400);
   exit;
 }
+if (imagekpr_bulk_ids_too_many($ids)) {
+  http_response_code(400);
+  exit;
+}
+$ids = imagekpr_cap_bulk_ids($ids);
 
 try {
-  $pdo = new PDO(
-    'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
-    DB_USER,
-    DB_PASS,
-    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-  );
+  $pdo = imagekpr_pdo();
 } catch (PDOException $e) {
   http_response_code(500);
   exit;
 }
 
 $placeholders = implode(',', array_fill(0, count($ids), '?'));
-$stmt = $pdo->prepare("SELECT id, filename FROM images WHERE id IN ($placeholders)");
-$stmt->execute($ids);
+$params = array_merge($ids, [$uid]);
+$stmt = $pdo->prepare("SELECT id, filename FROM images WHERE id IN ($placeholders) AND user_id = ?");
+$stmt->execute($params);
 
 $dir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
 $zip = new ZipArchive();
@@ -56,6 +53,7 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
 $zip->close();
 
 $name = 'imagekpr-export-' . date('Ymd') . '.zip';
+header('X-Content-Type-Options: nosniff');
 header('Content-Type: application/zip');
 header('Content-Disposition: attachment; filename="' . $name . '"');
 header('Content-Length: ' . filesize($tmp));

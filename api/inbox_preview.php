@@ -1,13 +1,8 @@
 <?php
-/**
- * Serves inbox images for thumbnail preview.
- * GET ?file=filename.jpg - streams the file with appropriate Content-Type.
- */
-if (!file_exists(__DIR__ . '/../config.php')) {
-  http_response_code(500);
-  exit;
-}
-require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../inc/auth.php';
+imagekpr_require_api_user();
+header('X-Content-Type-Options: nosniff');
+
 
 $exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 $mimes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp'];

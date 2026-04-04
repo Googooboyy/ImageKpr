@@ -1,6 +1,8 @@
 <?php
+require_once __DIR__ . '/../inc/auth.php';
+imagekpr_require_api_user();
+$uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   http_response_code(405);
@@ -8,14 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   exit;
 }
 
-if (!file_exists(__DIR__ . '/../config.php')) {
-  http_response_code(500);
-  echo json_encode(['success' => false, 'error' => 'Configuration missing. Copy config.example.php to config.php.']);
-  exit;
-}
-require_once __DIR__ . '/../config.php';
-
-const MAX_SIZE = 3 * 1024 * 1024; // 3MB
+const MAX_SIZE = 3 * 1024 * 1024;
 const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 function sanitizeFilename($name) {
@@ -28,7 +23,13 @@ function sanitizeFilename($name) {
 $files = [];
 if (isset($_FILES['file'])) {
   if (is_array($_FILES['file']['name'])) {
-    for ($i = 0; $i < count($_FILES['file']['name']); $i++) {
+    $n = count($_FILES['file']['name']);
+    if ($n > MAX_FILES_PER_UPLOAD_POST) {
+      http_response_code(400);
+      echo json_encode(['success' => false, 'error' => 'Too many files (max ' . MAX_FILES_PER_UPLOAD_POST . ')']);
+      exit;
+    }
+    for ($i = 0; $i < $n; $i++) {
       $files[] = [
         'name' => $_FILES['file']['name'][$i],
         'type' => $_FILES['file']['type'][$i],
@@ -54,12 +55,7 @@ if (!empty($_POST['replace']) && is_array($_POST['replace'])) {
 }
 
 try {
-  $pdo = new PDO(
-    'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
-    DB_USER,
-    DB_PASS,
-    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-  );
+  $pdo = imagekpr_pdo();
 } catch (PDOException $e) {
   echo json_encode(['success' => false, 'error' => 'Database connection failed']);
   exit;
@@ -92,7 +88,7 @@ foreach ($files as $file) {
   $doReplace = in_array($baseName, $replaceNames);
   if ($doReplace && file_exists($path)) {
     @unlink($path);
-    $pdo->prepare('DELETE FROM images WHERE filename = ?')->execute([$baseName]);
+    $pdo->prepare('DELETE FROM images WHERE filename = ? AND user_id = ?')->execute([$baseName, $uid]);
   }
   if (!$doReplace) {
     $suffix = 0;
@@ -113,8 +109,8 @@ foreach ($files as $file) {
   $url = rtrim(IMAGES_URL, '/') . '/' . $baseName;
   $date = date('Y-m-d H:i:s');
   $tagsJson = json_encode([]);
-  $stmt = $pdo->prepare('INSERT INTO images (filename, url, date_uploaded, size_bytes, width, height, tags) VALUES (?, ?, ?, ?, ?, ?, ?)');
-  $stmt->execute([$baseName, $url, $date, $size, $width, $height, $tagsJson]);
+  $stmt = $pdo->prepare('INSERT INTO images (filename, url, date_uploaded, size_bytes, width, height, tags, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+  $stmt->execute([$baseName, $url, $date, $size, $width, $height, $tagsJson, $uid]);
   $id = (int) $pdo->lastInsertId();
   $uploaded[] = [
     'success' => true,

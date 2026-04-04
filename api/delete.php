@@ -1,6 +1,8 @@
 <?php
+require_once __DIR__ . '/../inc/auth.php';
+imagekpr_require_api_user();
+$uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
 
 if (!in_array($_SERVER['REQUEST_METHOD'], ['POST', 'DELETE'])) {
   http_response_code(405);
@@ -8,16 +10,12 @@ if (!in_array($_SERVER['REQUEST_METHOD'], ['POST', 'DELETE'])) {
   exit;
 }
 
-if (!file_exists(__DIR__ . '/../config.php')) {
-  http_response_code(500);
-  echo json_encode(['success' => false, 'error' => 'Configuration missing.']);
-  exit;
-}
-require_once __DIR__ . '/../config.php';
-
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 $id = isset($input['id']) ? (int) $input['id'] : null;
-$filename = isset($input['filename']) ? trim($input['filename']) : null;
+$filename = isset($input['filename']) ? trim((string) $input['filename']) : null;
+if ($filename !== null && $filename !== '') {
+  $filename = basename($filename);
+}
 
 if (!$id && !$filename) {
   echo json_encode(['success' => false, 'error' => 'Missing id or filename']);
@@ -25,30 +23,25 @@ if (!$id && !$filename) {
 }
 
 try {
-  $pdo = new PDO(
-    'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
-    DB_USER,
-    DB_PASS,
-    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-  );
+  $pdo = imagekpr_pdo();
 } catch (PDOException $e) {
   echo json_encode(['success' => false, 'error' => 'Database connection failed']);
   exit;
 }
 
 if ($id) {
-  $stmt = $pdo->prepare('SELECT filename FROM images WHERE id = ?');
-  $stmt->execute([$id]);
+  $stmt = $pdo->prepare('SELECT filename FROM images WHERE id = ? AND user_id = ?');
+  $stmt->execute([$id, $uid]);
   $row = $stmt->fetch(PDO::FETCH_ASSOC);
   $filename = $row['filename'] ?? null;
 } else {
-  $stmt = $pdo->prepare('SELECT id FROM images WHERE filename = ?');
-  $stmt->execute([$filename]);
+  $stmt = $pdo->prepare('SELECT id FROM images WHERE filename = ? AND user_id = ?');
+  $stmt->execute([$filename, $uid]);
   $row = $stmt->fetch(PDO::FETCH_ASSOC);
   $id = $row['id'] ?? null;
 }
 
-if (!$filename) {
+if (!$filename || !$id) {
   echo json_encode(['success' => false, 'error' => 'Image not found']);
   exit;
 }
@@ -59,7 +52,7 @@ if (file_exists($path) && !@unlink($path)) {
   exit;
 }
 
-$stmt = $pdo->prepare('DELETE FROM images WHERE id = ?');
-$stmt->execute([$id]);
+$stmt = $pdo->prepare('DELETE FROM images WHERE id = ? AND user_id = ?');
+$stmt->execute([$id, $uid]);
 
 echo json_encode(['success' => true]);

@@ -1,5 +1,4 @@
--- ImageKpr database schema
--- Import into your existing database (e.g. marsg_imagekpr)
+-- Phase 7: users, allowlist (run once on existing DB)
 
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -21,20 +20,4 @@ CREATE TABLE IF NOT EXISTS email_allowlist (
   UNIQUE KEY uq_allowlist_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS images (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  filename VARCHAR(255) NOT NULL,
-  url VARCHAR(512) NOT NULL,
-  date_uploaded DATETIME NOT NULL,
-  size_bytes INT UNSIGNED NOT NULL,
-  width INT UNSIGNED,
-  height INT UNSIGNED,
-  tags JSON,
-  user_id INT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_date (date_uploaded),
-  INDEX idx_size (size_bytes),
-  INDEX idx_filename (filename),
-  INDEX idx_user (user_id),
-  UNIQUE KEY uq_user_filename (user_id, filename)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Optional: assign existing images to the first user you create (after first OAuth login), e.g. SET @u := (SELECT id FROM users ORDER BY id ASC LIMIT 1); UPDATE images SET user_id = @u WHERE user_id IS NULL;

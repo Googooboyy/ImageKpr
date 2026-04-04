@@ -3,12 +3,7 @@
   Require all denied
 </Files>
 
-# CORS (optional, for cross-origin requests)
-<IfModule mod_headers.c>
-  Header set Access-Control-Allow-Origin "*"
-  Header set Access-Control-Allow-Methods "GET, POST, PATCH, DELETE, OPTIONS"
-  Header set Access-Control-Allow-Headers "Content-Type"
-</IfModule>
+# Same-origin app uses cookie sessions; avoid wildcard CORS. Re-enable narrowly if you embed APIs on another origin.
 
 # Caching for images
 <FilesMatch "\.(jpg|jpeg|png|gif|webp)$">

@@ -1,19 +1,14 @@
 <?php
+require_once __DIR__ . '/../inc/auth.php';
+imagekpr_require_api_user();
+$uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   http_response_code(405);
   echo json_encode(['success' => false, 'error' => 'Method not allowed']);
   exit;
 }
-
-if (!file_exists(__DIR__ . '/../config.php')) {
-  http_response_code(500);
-  echo json_encode(['success' => false, 'error' => 'Configuration missing.']);
-  exit;
-}
-require_once __DIR__ . '/../config.php';
 
 $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
 $id = isset($input['id']) ? (int) $input['id'] : 0;
@@ -30,12 +25,7 @@ function sanitize($s) {
 }
 
 try {
-  $pdo = new PDO(
-    'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
-    DB_USER,
-    DB_PASS,
-    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
-  );
+  $pdo = imagekpr_pdo();
 } catch (PDOException $e) {
   echo json_encode(['success' => false, 'error' => 'Database connection failed']);
   exit;
@@ -44,8 +34,8 @@ try {
 $dir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
 $baseUrl = rtrim(IMAGES_URL, '/') . '/';
 
-$stmt = $pdo->prepare('SELECT id, filename, url FROM images WHERE id = ?');
-$stmt->execute([$id]);
+$stmt = $pdo->prepare('SELECT id, filename, url FROM images WHERE id = ? AND user_id = ?');
+$stmt->execute([$id, $uid]);
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$row) {
   echo json_encode(['success' => false, 'error' => 'Image not found']);
@@ -74,8 +64,8 @@ if (file_exists($newPath) && $newPath !== $oldPath) {
 
 if (@rename($oldPath, $newPath)) {
   $newUrl = $baseUrl . $newFn;
-  $up = $pdo->prepare('UPDATE images SET filename = ?, url = ? WHERE id = ?');
-  $up->execute([$newFn, $newUrl, $id]);
+  $up = $pdo->prepare('UPDATE images SET filename = ?, url = ? WHERE id = ? AND user_id = ?');
+  $up->execute([$newFn, $newUrl, $id, $uid]);
   echo json_encode([
     'success' => true,
     'id' => $id,
