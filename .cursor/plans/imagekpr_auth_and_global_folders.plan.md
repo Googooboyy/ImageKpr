@@ -1,51 +1,109 @@
 ---
 name: ImageKpr Auth and Global Folders
-overview: Phases 7 and 8 from the main UI overhaul plan - Simple Auth (database-based) and Global Folders. To be implemented after Phases 1-6.
+overview: Phases 7-9 — Google OAuth, email allowlist, gated app; admin quotas and purge; API-backed global folders; security guardrails including bulk request caps (ids, filenames, uploads per POST).
 todos: []
 isProject: false
 ---
 
-# ImageKpr Auth and Global Folders (Phases 7 & 8)
+# ImageKpr Auth, Admin, and Global Folders (Phases 7-9)
 
-**Prerequisites:** Phases 1-6 of the UI/UX overhaul must be completed first.
-
----
-
-## Phase 7: Simple Auth (Database-Based)
-
-Auth enables each user (family/friend) to have their own images and folders. Implement before global folders so both share user scoping.
-
-1. **Users table** — Add to [database.sql](database.sql): `CREATE TABLE users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(64) NOT NULL UNIQUE, password_hash VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);`
-2. **Session setup** — Ensure `session_start()` runs (e.g. in config or a bootstrap file included by all pages).
-3. **login.php** — Simple login form; on POST, verify username/password with `password_verify()`, set `$_SESSION['user_id']` and `$_SESSION['username']`, redirect to index.
-4. **register.php** — Self-registration form; insert into users with `password_hash()`. Redirect to login on success.
-5. **logout.php** — `session_destroy()`, redirect to login.
-6. **inc/auth.php** — Check `$_SESSION['user_id']`; if empty, send 401 or redirect to login. All API scripts `require` this at top.
-7. **Scope APIs by user_id** — Add `WHERE user_id = :uid` to: images.php, tags.php, stats.php, upload.php, inbox.php, delete.php, delete_bulk.php, rename.php, rename_bulk.php, download_bulk.php.
-8. **Upload sets user_id** — In upload.php and inbox import, set `user_id = $_SESSION['user_id']` on INSERT.
-9. **Migrate orphan images** — One-time: `UPDATE images SET user_id = 1 WHERE user_id IS NULL` (run after first user created). Or: first user to log in gets ownership; script assigns orphans to them.
-10. **Frontend auth handling** — On 401 from API, redirect to login.php. Add "Logged in as X" + logout link in header or banner.
-11. **Protect index.php** — If no session, redirect to login (or show login form inline). Ensure index.php requires auth before rendering app.
-
-**Order**: Create users table → login/register/logout pages → inc/auth.php → add require to each API → scope queries → migrate orphans → frontend redirect + logout link.
+**Prerequisites:** Phases 1-6 of the UI/UX overhaul are completed and stable.
 
 ---
 
-## Phase 8: Global Folders (Backend + Migration)
+## Phase 7: Authentication
 
-Depends on Phase 7; folders are scoped by user_id.
+**Goals**
 
-1. **Folder qty fix** — In [folders.js](folders.js) `removeFromFolder`, use `Number(x) !== Number(id)` (fixes localStorage behavior until migration).
-2. **DB schema** — `folders` (id, user_id, name, created_at), `folder_images` (folder_id, image_id). Both with appropriate indexes.
-3. **api/folders.php** — GET (list folders with counts for current user), POST (create folder), PATCH (add/remove images), DELETE (delete folder). All filtered by `$_SESSION['user_id']`.
-4. **folders.js refactor** — Replace localStorage with API calls. Keep same API surface (`load`, `save`, `addToFolder`, `removeFromFolder`, etc.) so app.js needs minimal changes.
-5. **Migration path** — On first load after deploy: if localStorage has folder data and user is logged in, offer "Import my folders" or auto-POST to folders API. Alternatively: export/import JSON as manual step.
+- **Inbox:** If the user is **not** logged in, they **do not see** inbox UI or data. [api/inbox.php](api/inbox.php), [api/inbox_preview.php](api/inbox_preview.php), and any inbox-related UI in [index.php](index.php) / [app.js](app.js) only run behind a valid session. Unauthenticated users get **401** from APIs and never load the full app shell (so no inbox strip/modal).
+- **Full image URLs:** **No login** required for **direct GET** to published gallery files (paths stored in `images.url` / static `images/` tree). Link secrecy = access control for those bytes.
+- **Everything else in the main app** (grid, upload, folders strip, stats, tags, etc.): **login required** — same as today’s plan: [login.php](login.php), Google OAuth (`auth/google/start.php`, `callback.php`, `logout.php`), [index.php](index.php) gated, [inc/auth.php](inc/auth.php), all listed JSON APIs scoped by `user_id`, [app.js](app.js) redirects to `login.php` on 401.
+- **Email allowlist (gating):** After Google returns a verified identity in `**auth/google/callback.php`**, normalize the Google **email** (lowercase) and check it against the **allowlist** (see Phase 8). If **not** on the list: **do not** create a session, **do not** upsert a `users` row (or upsert a stub only if you want audit — default: no account). Redirect to [login.php](login.php) with a clear query or flash message, e.g. “Your account is not authorized to use this app.” **Bootstrap:** e.g. `ADMIN_GOOGLE_SUB` (or `BOOTSTRAP_ALLOWLIST_EMAILS` in config) may sign in once to open the admin UI and seed the allowlist, or ship a migration that inserts initial allowed emails.
+
+**Implementation summary**
+
+1. Google Cloud OAuth client; secrets in `config.php`.
+2. DB: `users` (OAuth fields) + `images.user_id`; `**email_allowlist`** table (Phase 8 schema, enforced in Phase 7 callback).
+3. Session after callback: **only if** email is allowlisted; then `user_id`, etc.
+4. **Optional stricter revocation:** On each authenticated request, re-check allowlist (or re-check periodically); if email was removed from the list, destroy session and treat as logged out. Simpler MVP: check **only at OAuth callback** (user stays logged in until session expires if removed mid-session).
+5. Require session on **all** app APIs including **inbox**; **do not** wrap static gallery file URLs in session checks.
+6. Server-side: unauthenticated visitors never receive HTML that includes inbox markup + scripts that fetch inbox (prefer **redirect to login** from `index.php`).
+
+**Migration:** One-time assignment for rows with NULL `user_id` (choose policy A or B as before).
+
+**Deploy order (Phase 7):** DB migration → OAuth config → `login.php` + auth endpoints → `inc/auth.php` + gate `index.php` → protect all APIs (inbox + rest) → `app.js` 401 handling.
 
 ---
 
-## Files to Create/Modify
+## Phase 8: Admin page
 
-- **New**: `login.php`, `register.php`, `logout.php`
-- **New**: `inc/auth.php`
-- **New**: `api/folders.php` (Phase 8)
-- **Modify**: [database.sql](database.sql), [index.php](index.php), all [api/*.php](api/), [folders.js](folders.js)
+**Goals**
+
+- **User limits:** Per-user storage quota (e.g. GB), optional global default in config. Enforced on **upload** and **inbox** paths using `SUM(images.size_bytes)` for that `user_id` (or cached column if needed later).
+- **Remove / purge:**
+  - **Delete user** (account row): define whether this **cascades** (delete their images from disk + DB, folder rows, memberships) or **blocks** until data is purged — document chosen behavior in implementation.
+  - **Purge user’s images:** Delete DB rows + files on disk for that `user_id` only.
+  - **Purge user’s folders:** Delete `folder_images` + `folders` for that `user_id` (images may remain unassigned or deleted per product rule — default: **delete folders and memberships only**, keep images unless admin chooses full image purge).
+
+**Implementation summary**
+
+1. **Schema:** `users.is_admin` (or `role`), `users.storage_quota_bytes` (nullable → default from config).
+2. **Bootstrap admin:** e.g. `ADMIN_GOOGLE_SUB` in config matching Google `sub`, or one-time DB flag.
+3. **Admin surface:** e.g. `admin/index.php` (and small `admin/admin.js` or server-rendered forms). **Every** admin API (e.g. `api/admin_users.php`, `api/admin_purge.php`) must verify `is_admin` on the server.
+4. **UX:** Table of users (email, name, used bytes, quota, last login); edit quota; destructive actions with **confirmation** (typed phrase or second step) and clear labels (“Delete all images for this user”).
+5. **Security:** CSRF tokens on state-changing admin actions, rate limiting, audit log optional but recommended for purges.
+
+**Depends on:** Phase 7 (sessions, `user_id`, OAuth identity).
+
+---
+
+## Phase 9: Global folders
+
+**Goals**
+
+- **No longer using JSON** for folder persistence: remove **localStorage**-backed folder map from [folders.js](folders.js); folders and memberships live in **MySQL** only.
+- **No import/export necessary:** Remove UX and code paths that **export** folders to JSON or **import** from JSON / “migrate from localStorage” prompts — first load after deploy uses **empty API state** or whatever is already in DB for that user.
+
+**Implementation summary**
+
+1. **Schema:** `folders` (`id`, `user_id`, `name`, …), `folder_images` (`folder_id`, `image_id`, …), unique constraints per user where needed.
+2. **API:** [api/folders.php](api/folders.php) — GET list + counts, POST create, PATCH add/remove membership, DELETE folder; all filtered by session `user_id`.
+3. **Frontend:** Refactor [folders.js](folders.js) to call the API; keep public function names stable for [app.js](app.js) callers where possible.
+4. **Remove:** localStorage read/write for folders, any “Export folders” / “Import folders” / “Migrate local folders” modals or buttons.
+
+**Depends on:** Phase 7 (authenticated `user_id`). Phase 8 is independent unless you want admin to “purge folders” via the same DB tables (Phase 8 can ship before or after Phase 9; if after, admin purge already targets real tables).
+
+---
+
+## What Is Required
+
+- Google Cloud OAuth app, HTTPS in production, PHP session hardening.
+- MySQL migrations for `users`, `images.user_id`, folder tables, admin/quota columns.
+- Clear rules for **purge** and **delete user** (cascade vs manual steps).
+
+---
+
+## Limits and Tradeoffs
+
+- **Direct gallery URLs** remain **public-by-link** (Phase 7).
+- **Any Google account** can sign up unless you add an allowlist later.
+- **Admin powers** are destructive; protect routes and confirm dangerous actions.
+- **Phase 9** abandons local folder JSON; users who relied only on localStorage lose that mapping unless you run a **one-time** migration script separately (you said import/export not necessary — so default is **no** migration prompt).
+
+---
+
+## Suggested Future Hardening (Optional)
+
+- Email allowlist for invite-only signup.
+- Login rate limiting; audit log for admin purges.
+- CSRF on all state-changing endpoints (including main app, not only admin).
+
+---
+
+## Files to Create / Modify (high level)
+
+**Phase 7:** [login.php](login.php), `auth/google/start.php`, `auth/google/callback.php`, `auth/logout.php`, [inc/auth.php](inc/auth.php), [database.sql](database.sql), [index.php](index.php), protected [api/*.php](api/) including [api/inbox.php](api/inbox.php) and [api/inbox_preview.php](api/inbox_preview.php), [app.js](app.js).
+
+**Phase 8:** `admin/`*, `api/admin_*.php` (or equivalent), [database.sql](database.sql) (`is_admin`, `storage_quota_bytes`), [api/upload.php](api/upload.php) + inbox upload paths for quota checks.
+
+**Phase 9:** [api/folders.php](api/folders.php), [database.sql](database.sql) (folder tables), [folders.js](folders.js), [app.js](app.js) / [index.php](index.php) only if folder UI wiring changes.

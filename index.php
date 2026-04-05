@@ -89,7 +89,13 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
   <div id="modal" class="modal" hidden aria-modal="true" aria-labelledby="modal-title">
     <div class="modal-content" id="modal-content">
       <div class="modal-img-wrap">
+        <button type="button" id="modal-prev" class="modal-nav-btn modal-nav-prev" aria-label="Previous image" hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
         <img id="modal-img" src="" alt="">
+        <button type="button" id="modal-next" class="modal-nav-btn modal-nav-next" aria-label="Next image" hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
       </div>
       <div class="modal-side">
         <div class="modal-actions">
