@@ -65,20 +65,26 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <div class="user-hint-banner">
           <span class="user-hint-text" id="user-hint-text">Loading…</span>
           <input type="search" id="search" placeholder="Search..." aria-label="Search images">
+          <button type="button" id="bulk-select-all" class="select-all-visible-btn" title="Select every image currently shown below (folder, tag, and search filters apply; scroll to load more rows, then click again to include them)">Select all</button>
           <button type="button" id="scroll-to-top" class="scroll-to-top-btn" aria-label="Scroll to top" title="Scroll to top">↑ Top</button>
         </div>
       </div>
       <div class="selection-banner-below" id="selection-banner" hidden>
       <div class="bulk-bar" id="bulk-bar">
         <span id="bulk-count">0 selected</span>
+        <button type="button" id="bulk-select-all-bar" title="Add every image currently shown in the grid to this selection (same filters; scroll to load more first if needed)">Select all</button>
         <button type="button" id="bulk-delete" class="ikpr-btn-delete">Delete</button>
         <button type="button" id="bulk-download">Download ZIP</button>
+        <button type="button" id="bulk-slideshow">Slideshow</button>
         <button type="button" id="bulk-tags" class="ikpr-btn-tags">Apply/Manage Tags</button>
         <button type="button" id="bulk-folders" class="ikpr-btn-folders">Apply/Manage Folders</button>
         <button type="button" id="bulk-rename">Rename</button>
         <button type="button" id="bulk-clear">Clear</button>
       </div>
-      <span class="dashboard-label">Selected</span>
+      <div class="selection-selected-header">
+        <span class="dashboard-label dashboard-label-selected">Selected <span class="dashboard-label-hint">— drag thumbnails to set slideshow order</span></span>
+        <label class="selection-thumbs-large-label"><input type="checkbox" id="selection-thumbs-large" aria-label="Use 100 pixel thumbnails for selection strip"> Bigger thumbnails (100px)</label>
+      </div>
       <div class="selection-row" id="selection-row"></div>
       </div>
     </div>
@@ -149,6 +155,52 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <button type="button" id="manage-folders-image-add" class="ikpr-btn-folders">Add</button>
         <button type="button" id="manage-folders-image-close" class="ikpr-btn-folders">Done</button>
       </div>
+    </div>
+  </div>
+
+  <div id="slideshow-settings-wrap" class="slideshow-settings-wrap" hidden>
+    <div class="slideshow-settings-backdrop" id="slideshow-settings-backdrop" aria-hidden="true"></div>
+    <aside class="slideshow-settings-panel" id="slideshow-settings-panel" role="dialog" aria-modal="true" aria-labelledby="slideshow-settings-title">
+      <h3 id="slideshow-settings-title">Slideshow</h3>
+      <p class="slideshow-settings-lead">Plays selected images in the order shown under Selected (drag thumbnails there to reorder). Missing from the grid still works if they stay selected.</p>
+      <fieldset class="slideshow-fieldset">
+        <legend>Advance</legend>
+        <label class="slideshow-radio"><input type="radio" name="slideshow-advance" id="slideshow-advance-manual" value="manual" checked> Manual — Space for next, arrow keys to move</label>
+        <label class="slideshow-radio"><input type="radio" name="slideshow-advance" id="slideshow-advance-auto" value="auto"> Auto</label>
+        <div class="slideshow-duration-row" id="slideshow-duration-row">
+          <label for="slideshow-duration">Seconds per slide</label>
+          <input type="number" id="slideshow-duration" min="1" max="600" value="5" step="1" class="slideshow-duration-input">
+        </div>
+      </fieldset>
+      <label class="slideshow-check"><input type="checkbox" id="slideshow-autoloop" checked> Loop (return to first after last)</label>
+      <fieldset class="slideshow-fieldset">
+        <legend>Transition</legend>
+        <label class="slideshow-radio"><input type="radio" name="slideshow-transition" id="slideshow-trans-diffuse" value="diffuse" checked> Diffuse (crossfade)</label>
+        <label class="slideshow-radio"><input type="radio" name="slideshow-transition" id="slideshow-trans-fly" value="fly"> Fly in</label>
+      </fieldset>
+      <fieldset class="slideshow-fieldset">
+        <legend>Letterbox (around image)</legend>
+        <p class="slideshow-fieldset-note">Images keep their proportions; empty areas use this colour.</p>
+        <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-black" value="black" checked> Black</label>
+        <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-white" value="white"> White</label>
+        <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-red" value="red"> Red</label>
+        <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-green" value="green"> Green</label>
+        <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-blue" value="blue"> Blue</label>
+      </fieldset>
+      <p class="slideshow-settings-hint">Exit: click outside the picture, the × button, or press Esc.</p>
+      <div class="slideshow-settings-actions">
+        <button type="button" id="slideshow-start" class="slideshow-btn-primary">Start slideshow</button>
+        <button type="button" id="slideshow-settings-cancel">Cancel</button>
+      </div>
+    </aside>
+  </div>
+
+  <div id="slideshow-player" class="slideshow-player" hidden aria-hidden="true">
+    <button type="button" class="slideshow-exit" id="slideshow-exit-btn" aria-label="Exit slideshow">×</button>
+    <div class="slideshow-counter" id="slideshow-counter" aria-live="polite"></div>
+    <div class="slideshow-stage">
+      <div class="slideshow-player-bg" id="slideshow-player-bg" aria-hidden="true"></div>
+      <img id="slideshow-img" class="slideshow-img" src="" alt="">
     </div>
   </div>
 
