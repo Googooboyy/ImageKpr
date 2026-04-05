@@ -20,4 +20,4 @@ CREATE TABLE IF NOT EXISTS email_allowlist (
   UNIQUE KEY uq_allowlist_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Optional: assign existing images to the first user you create (after first OAuth login), e.g. SET @u := (SELECT id FROM users ORDER BY id ASC LIMIT 1); UPDATE images SET user_id = @u WHERE user_id IS NULL;
+-- Legacy images need user_id set or they will not appear after login. See phase7_backfill_images_user_id.sql.

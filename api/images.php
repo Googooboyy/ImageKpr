@@ -3,6 +3,7 @@ require_once __DIR__ . '/../inc/auth.php';
 imagekpr_require_api_user();
 $uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
+header('X-ImageKpr-User-Id: ' . (int) $uid);
 
 $allowedSort = ['date_desc', 'date_asc', 'size_desc', 'size_asc', 'name_asc', 'name_desc', 'random'];
 $sort = isset($_GET['sort']) && in_array($_GET['sort'], $allowedSort) ? $_GET['sort'] : 'date_desc';
@@ -30,8 +31,14 @@ try {
   exit;
 }
 
-$where = ['user_id = :uid'];
-$params = [':uid' => $uid];
+imagekpr_ensure_config();
+$uidInt = (int) $uid;
+$userScope = '(user_id = ' . $uidInt . ')';
+if (defined('IMAGEKPR_SHARE_NULL_USER_ROWS') && IMAGEKPR_SHARE_NULL_USER_ROWS) {
+  $userScope = '(user_id = ' . $uidInt . ' OR user_id IS NULL)';
+}
+$where = [$userScope];
+$params = [];
 
 if ($search !== '') {
   $where[] = '(filename LIKE :search OR tags LIKE :search_tags)';
@@ -56,34 +63,60 @@ if (!empty($ids)) {
 
 $whereClause = implode(' AND ', $where);
 
-$orderBy = match ($sort) {
-  'date_asc' => 'id ASC',
-  'date_desc' => 'id DESC',
-  'size_desc' => 'size_bytes DESC',
-  'size_asc' => 'size_bytes ASC',
-  'name_asc' => 'filename ASC',
-  'name_desc' => 'filename DESC',
-  'random' => 'RAND()',
-  default => 'id DESC',
-};
+switch ($sort) {
+  case 'date_asc':
+    $orderBy = 'id ASC';
+    break;
+  case 'size_desc':
+    $orderBy = 'size_bytes DESC';
+    break;
+  case 'size_asc':
+    $orderBy = 'size_bytes ASC';
+    break;
+  case 'name_asc':
+    $orderBy = 'filename ASC';
+    break;
+  case 'name_desc':
+    $orderBy = 'filename DESC';
+    break;
+  case 'random':
+    $orderBy = 'RAND()';
+    break;
+  case 'date_desc':
+  default:
+    $orderBy = 'id DESC';
+    break;
+}
 
 $countSql = "SELECT COUNT(*) FROM images WHERE $whereClause";
 $stmt = $pdo->prepare($countSql);
-$stmt->execute($params);
+foreach ($params as $k => $v) {
+  if (preg_match('/^:ids\d+$/', $k)) {
+    $stmt->bindValue($k, $v, PDO::PARAM_INT);
+  } else {
+    $stmt->bindValue($k, $v, PDO::PARAM_STR);
+  }
+}
+$stmt->execute();
 $total = (int) $stmt->fetchColumn();
 
 $offset = ($page - 1) * $perPage;
+// Integers only (already validated); avoid bound LIMIT/OFFSET — breaks some MySQL PDO native prepares.
+$lim = (int) $perPage;
+$off = (int) $offset;
 $sql = "SELECT id, filename, url, date_uploaded, size_bytes, width, height, tags
         FROM images
         WHERE $whereClause
         ORDER BY $orderBy
-        LIMIT :limit OFFSET :offset";
+        LIMIT $lim OFFSET $off";
 $stmt = $pdo->prepare($sql);
 foreach ($params as $k => $v) {
-  $stmt->bindValue($k, $v);
+  if (preg_match('/^:ids\d+$/', $k)) {
+    $stmt->bindValue($k, $v, PDO::PARAM_INT);
+  } else {
+    $stmt->bindValue($k, $v, PDO::PARAM_STR);
+  }
 }
-$stmt->bindValue(':limit', $perPage, PDO::PARAM_INT);
-$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);

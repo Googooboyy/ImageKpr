@@ -20,3 +20,6 @@ define('GOOGLE_CLIENT_SECRET', '');
 define('GOOGLE_REDIRECT_URI', 'https://your-domain.example/auth/google/callback.php');
 // Optional: Google "sub" for a user allowed even when not on the email allowlist (if used).
 define('ADMIN_GOOGLE_SUB', '');
+
+// Emergency only: list images with user_id NULL to every logged-in user (unsafe if multiple accounts share the app).
+// define('IMAGEKPR_SHARE_NULL_USER_ROWS', true);

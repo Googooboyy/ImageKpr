@@ -1,4 +1,5 @@
 <?php
+ob_start();
 require_once __DIR__ . '/inc/auth.php';
 imagekpr_require_login_html();
 $ikName = isset($_SESSION['name']) ? (string) $_SESSION['name'] : '';

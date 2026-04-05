@@ -10,12 +10,27 @@
 
   function fetchJSON(url) {
     return fetch(url, { credentials: 'same-origin' }).then(r => {
-      if (r.status === 401) {
+      const status = r.status;
+      if (status === 401) {
         redirectToLogin();
-        throw new Error('Unauthorized');
+        const e = new Error('Unauthorized');
+        e.status = 401;
+        throw e;
       }
-      if (!r.ok) throw new Error(r.statusText);
-      return r.json();
+      return r.text().then(text => {
+        if (!r.ok) {
+          const err = new Error(r.statusText || 'Request failed');
+          err.status = status;
+          throw err;
+        }
+        try {
+          return JSON.parse(text);
+        } catch (_) {
+          const err = new Error('Invalid JSON response');
+          err.status = status;
+          throw err;
+        }
+      });
     });
   }
 
@@ -286,6 +301,21 @@
     banner.hidden = false;
   }
 
+  function parseImageTags(img) {
+    const raw = img && img.tags;
+    if (Array.isArray(raw)) return raw;
+    if (raw == null || raw === '') return [];
+    if (typeof raw === 'string') {
+      try {
+        const t = JSON.parse(raw);
+        return Array.isArray(t) ? t : [];
+      } catch (_) {
+        return [];
+      }
+    }
+    return [];
+  }
+
   function renderCard(img) {
     const article = document.createElement('article');
     article.className = 'grid-item card';
@@ -295,7 +325,7 @@
     const name = truncate(img.filename, 24);
     const size = formatBytes(img.size_bytes || 0);
     const date = formatDate(img.date_uploaded);
-    const tags = Array.isArray(img.tags) ? img.tags : (img.tags ? (JSON.parse(img.tags || '[]') || []) : []);
+    const tags = parseImageTags(img);
     const tagsHtml = tags.length > 0
       ? '<div class="card-tags">' + tags.map(t => '<span class="card-tag" title="' + escapeHtml(t || '') + '">' + escapeHtml(t || '') + '</span>').join('') + '</div>'
       : '';
@@ -390,7 +420,7 @@
   function openManageTagsImageDialog() {
     if (!currentModalImg) return;
     const img = currentModalImg;
-    const tags = Array.isArray(img.tags) ? [...img.tags] : (img.tags ? [...(JSON.parse(img.tags || '[]') || [])] : []);
+    const tags = [...parseImageTags(img)];
     const d = document.getElementById('manage-tags-image-dialog');
     const pills = document.getElementById('manage-tags-image-pills');
     const selectEl = document.getElementById('manage-tags-image-select');
@@ -715,16 +745,52 @@
 
   let gridState = { page: 1, perPage: 50, sort: 'date_desc', search: '', tagFilter: '', total: 0, loading: false };
 
+  function showApiImagesError(err, append) {
+    if (append) {
+      showToast('Could not load more images.', true);
+      return;
+    }
+    if (err && err.status === 401) return;
+    const st = err && err.status;
+    const hint = st ? ' (HTTP ' + st + ')' : '';
+    gridState.total = 0;
+    const loadMore = document.getElementById('load-more');
+    if (loadMore) {
+      loadMore.innerHTML = '';
+      loadMore.style.display = 'none';
+    }
+    const grid = document.getElementById('grid');
+    if (grid) {
+      grid.innerHTML =
+        '<p class="empty grid-load-error"><strong>Could not load images' + escapeHtml(hint) + '.</strong><br>' +
+        'The server may be returning an error. Check <code>api/images.php</code> or your host PHP error log. ' +
+        'If you expect images here, confirm <code>config.php</code> uses the same database you checked in phpMyAdmin.</p>';
+    }
+    showToast('Could not load images' + hint, true);
+  }
+
   function loadGrid(params, append) {
     const q = new URLSearchParams(params || {});
     fetchJSON(API_BASE + '/images.php?' + q).then(data => {
       const grid = document.getElementById('grid');
       const loadMore = document.getElementById('load-more');
+      const total = data.total || 0;
+      const rows = data.images || [];
+      if (!append && total > 0 && rows.length === 0) {
+        grid.innerHTML =
+          '<p class="empty grid-load-error"><strong>Library reports ' + escapeHtml(String(total)) + ' image(s) but none were returned.</strong><br>' +
+          'This is often a MySQL/PDO issue with paginated queries. Deploy the latest <code>api/images.php</code> from the repo, or ask your host to enable PDO emulated prepares.</p>';
+        gridState.total = total;
+        showToast('Images missing from response — check api/images.php (LIMIT/OFFSET fix).', true);
+        if (loadMore) { loadMore.innerHTML = ''; loadMore.style.display = 'none'; }
+        updateHintBanner();
+        return;
+      }
       if (!append) grid.innerHTML = '';
-      (data.images || []).forEach(img => {
+      rows.forEach(img => {
         grid.appendChild(renderCard(img));
       });
-      gridState.total = data.total || 0;
+      gridState.total = total;
       gridState.page = data.page || 1;
       const imgs = grid.querySelectorAll('img[data-src]');
       if (typeof IntersectionObserver !== 'undefined') {
@@ -744,7 +810,12 @@
       }
       const loaded = grid.querySelectorAll('.grid-item').length;
       if (gridState.total === 0 && !append) {
-        grid.innerHTML = '<p class="empty">No images yet. Upload some!</p>';
+        grid.innerHTML =
+          '<p class="empty">No images yet. Upload some!</p>' +
+          '<p class="empty" style="font-size:0.85rem;max-width:36rem;margin-left:auto;margin-right:auto;line-height:1.45">' +
+          'If the database already has rows, open <a href="' + API_BASE + '/whoami.php" target="_blank" rel="noopener">api/whoami.php</a> ' +
+          'and confirm <code>user_id</code> matches <code>images.user_id</code>. In DevTools → Network, <code>images.php</code> responses include ' +
+          'header <code>X-ImageKpr-User-Id</code>. Or set <code>IMAGEKPR_SHARE_NULL_USER_ROWS</code> in <code>config.php</code> temporarily if rows are still NULL.</p>';
       }
       if (append) return;
       if (gridState.total > 1000) {
@@ -771,8 +842,8 @@
         loadMore.style.display = 'none';
       }
       updateHintBanner();
-    }).catch(() => {
-      if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No images yet. Upload some!</p>';
+    }).catch((err) => {
+      showApiImagesError(err, append);
       updateHintBanner();
     });
   }
@@ -829,11 +900,25 @@
     if (gridState.tagFilter) url += '&tag=' + encodeURIComponent(gridState.tagFilter);
     if (gridState.search) url += '&search=' + encodeURIComponent(gridState.search);
     fetchJSON(url).then(data => {
-      const filtered = (data.images || []).filter(img => ids.includes(Number(img.id)));
+      let filtered = (data.images || []).filter(img => ids.includes(Number(img.id)));
+      if (!append && filtered.length === 0 && (data.total || 0) > 0 && ids.length > 0) {
+        showToast('This folder’s saved IDs do not match your library (often after DB changes). Showing all images.', true);
+        const fi = document.getElementById('folder-filter');
+        if (fi) fi.value = '';
+        populateFolderIcons('');
+        refreshGrid(false);
+        return;
+      }
       const grid = document.getElementById('grid');
       if (!append) grid.innerHTML = '';
       filtered.forEach(img => grid.appendChild(renderCard(img)));
       gridState.total = filtered.length;
+      if (!append && filtered.length === 0) {
+        grid.innerHTML =
+          '<p class="empty">No images in this folder view.</p>' +
+          '<p class="empty" style="font-size:0.85rem;max-width:36rem;margin-left:auto;margin-right:auto">Click <strong>All</strong> above, or open ' +
+          '<a href="' + API_BASE + '/whoami.php" target="_blank" rel="noopener">api/whoami.php</a> to verify your account.</p>';
+      }
       document.getElementById('load-more').innerHTML = '';
       const imgs = grid.querySelectorAll('img[data-src]');
       if (typeof IntersectionObserver !== 'undefined') {
@@ -852,7 +937,10 @@
         imgs.forEach(el => { el.src = el.dataset.src || ''; el.removeAttribute('data-src'); });
       }
       updateHintBanner();
-    }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No images in this folder.</p>'; updateHintBanner(); });
+    }).catch((err) => {
+      showApiImagesError(err, append);
+      updateHintBanner();
+    });
   }
 
   function loadUncategorizedGrid(append) {
@@ -891,7 +979,10 @@
         imgs.forEach(el => { el.src = el.dataset.src || ''; el.removeAttribute('data-src'); });
       }
       updateHintBanner();
-    }).catch(() => { if (!append) document.getElementById('grid').innerHTML = '<p class="empty">No uncategorized images.</p>'; updateHintBanner(); });
+    }).catch((err) => {
+      showApiImagesError(err, append);
+      updateHintBanner();
+    });
   }
 
   function debounce(fn, ms) {
@@ -971,7 +1062,6 @@
           if (ids.length > 0) setLastBatchIds(ids);
           if (addToFolderName && ids.length > 0 && window.ImageKprFolders) {
             window.ImageKprFolders.addToFolder(addToFolderName, ids);
-            if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
           }
           validItems.forEach((it, idx) => {
             const id = ids[idx];
@@ -986,7 +1076,10 @@
               window.ImageKprFolders.addToFolder(it.folder, [id]);
             }
           });
-          if (window.ImageKprFolders && window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+          /* Folder filter uses localStorage IDs; a named folder hides uploads not in that list. Show “All” after upload. */
+          const folderFilter = document.getElementById('folder-filter');
+          if (folderFilter) folderFilter.value = '';
+          populateFolderIcons('');
           gridState.page = 1;
           refreshGrid(false);
           loadStats();
@@ -1567,8 +1660,8 @@
   function loadStats() {
     loadInbox();
     fetchJSON(API_BASE + '/stats.php?t=' + Date.now()).then(data => {
-      cachedStats.total_images = data.total_images;
-      cachedStats.total_storage_gb = data.total_storage_gb;
+      cachedStats.total_images = data.total_images != null ? data.total_images : '—';
+      cachedStats.total_storage_gb = data.total_storage_gb != null ? data.total_storage_gb : '0.00';
       updateHintBanner();
     }).catch(() => {
       cachedStats.total_images = '—';
@@ -1701,6 +1794,9 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    /* Avoid restored/stale folder filter (localStorage IDs ≠ current library). */
+    const folderFilterBoot = document.getElementById('folder-filter');
+    if (folderFilterBoot) folderFilterBoot.value = '';
     populateFolderIcons();
     populateSortPills();
     if (window.ImageKprFolders) window.ImageKprFolders.onChange = () => { populateFolderIcons(); refreshGrid(false); };

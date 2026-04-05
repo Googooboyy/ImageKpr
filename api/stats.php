@@ -3,6 +3,7 @@ require_once __DIR__ . '/../inc/auth.php';
 imagekpr_require_api_user();
 $uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
+header('X-ImageKpr-User-Id: ' . (int) $uid);
 
 try {
   $pdo = imagekpr_pdo();
@@ -12,23 +13,26 @@ try {
   exit;
 }
 
-$stmt = $pdo->prepare('SELECT COUNT(*) FROM images WHERE user_id = ?');
-$stmt->execute([$uid]);
-$totalImages = (int) $stmt->fetchColumn();
+imagekpr_ensure_config();
+$uidInt = (int) $uid;
+$userWhere = 'user_id = ' . $uidInt;
+if (defined('IMAGEKPR_SHARE_NULL_USER_ROWS') && IMAGEKPR_SHARE_NULL_USER_ROWS) {
+  $userWhere = '(user_id = ' . $uidInt . ' OR user_id IS NULL)';
+}
 
-$stmt = $pdo->prepare('SELECT COALESCE(SUM(size_bytes), 0) FROM images WHERE user_id = ?');
-$stmt->execute([$uid]);
-$totalStorageBytes = (int) $stmt->fetchColumn();
+$totalImages = (int) $pdo->query('SELECT COUNT(*) FROM images WHERE ' . $userWhere)->fetchColumn();
+
+$totalStorageBytes = (int) $pdo->query('SELECT COALESCE(SUM(size_bytes), 0) FROM images WHERE ' . $userWhere)->fetchColumn();
 $totalStorageGb = number_format($totalStorageBytes / (1024 * 1024 * 1024), 2);
 
 $stmt = $pdo->prepare(
   'SELECT id, filename, url, date_uploaded, size_bytes, width, height, tags
    FROM images
-   WHERE user_id = ?
+   WHERE ' . $userWhere . '
    ORDER BY date_uploaded DESC
    LIMIT 10'
 );
-$stmt->execute([$uid]);
+$stmt->execute();
 $last10 = $stmt->fetchAll(PDO::FETCH_ASSOC);
 foreach ($last10 as &$row) {
   if (isset($row['tags']) && is_string($row['tags'])) {

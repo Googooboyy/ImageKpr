@@ -1,4 +1,5 @@
 <?php
+ob_start();
 require_once __DIR__ . '/../inc/auth.php';
 imagekpr_start_session();
 $_SESSION = [];
@@ -7,5 +8,4 @@ if (ini_get('session.use_cookies')) {
   setcookie(session_name(), '', time() - 42000, $p['path'], $p['domain'] ?? '', $p['secure'], $p['httponly']);
 }
 session_destroy();
-header('Location: ../login.php');
-exit;
+imagekpr_redirect_html('login.php', 1);

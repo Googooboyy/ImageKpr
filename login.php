@@ -1,4 +1,5 @@
 <?php
+ob_start();
 require_once __DIR__ . '/inc/auth.php';
 imagekpr_redirect_if_logged_in();
 $err = isset($_GET['error']) ? (string) $_GET['error'] : '';
@@ -10,6 +11,7 @@ $msgs = [
   'token' => 'Could not complete sign-in with Google. Try again.',
   'userinfo' => 'Could not read your Google profile. Try again.',
   'forbidden' => 'Your account is not authorized. Ask an admin to add your email to the allowlist.',
+  'database' => 'Sign-in failed: database is not ready. Run migrations/phase7_auth.sql on the server, then try again.',
 ];
 $msg = $msgs[$err] ?? '';
 ?><!DOCTYPE html>
