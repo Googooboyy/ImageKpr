@@ -108,6 +108,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
           <button type="button" id="modal-copy">Copy URL</button>
           <button type="button" id="modal-copy-image">Copy Image</button>
           <button type="button" id="modal-download">Download</button>
+          <button type="button" id="modal-fullscreen-btn">Full screen</button>
           <button type="button" id="modal-delete" class="ikpr-btn-delete">Delete</button>
           <button type="button" id="modal-manage-tags" class="ikpr-btn-tags">Apply/Manage Tags</button>
           <button type="button" id="modal-manage-folders" class="ikpr-btn-folders">Apply/Manage Folders</button>
@@ -119,6 +120,13 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <input type="text" id="modal-filename" placeholder="Filename">
         <button type="button" id="modal-rename-btn">Rename</button>
       </div>
+    </div>
+  </div>
+
+  <div id="modal-fullscreen" class="modal-fullscreen" hidden aria-hidden="true">
+    <div class="modal-fullscreen-stage">
+      <img id="modal-fullscreen-img" class="modal-fullscreen-img" src="" alt="">
+      <button type="button" id="modal-fullscreen-exit" class="slideshow-exit" aria-label="Exit full screen">×</button>
     </div>
   </div>
 

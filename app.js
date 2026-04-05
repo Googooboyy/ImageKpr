@@ -5,6 +5,7 @@
   (function resetSlideshowDomOnLoad() {
     const p = document.getElementById('slideshow-player');
     const w = document.getElementById('slideshow-settings-wrap');
+    const mf = document.getElementById('modal-fullscreen');
     if (p) {
       p.hidden = true;
       p.classList.remove('slideshow-player-locked');
@@ -13,6 +14,10 @@
     if (w) {
       w.hidden = true;
       w.classList.remove('slideshow-settings-open');
+    }
+    if (mf) {
+      mf.hidden = true;
+      mf.setAttribute('aria-hidden', 'true');
     }
   })();
 
@@ -625,6 +630,138 @@
     nextBtn.disabled = i === list.length - 1;
   }
 
+  let modalFullscreenState = null;
+
+  function closeModalFullscreen() {
+    const shell = document.getElementById('modal-fullscreen');
+    if (!shell || shell.hidden) return;
+    if (modalFullscreenState) {
+      if (modalFullscreenState.onKeyDown) document.removeEventListener('keydown', modalFullscreenState.onKeyDown, true);
+      if (modalFullscreenState.onFsChange) document.removeEventListener('fullscreenchange', modalFullscreenState.onFsChange);
+      if (modalFullscreenState.stageClickHandler && modalFullscreenState.stage) {
+        modalFullscreenState.stage.removeEventListener('click', modalFullscreenState.stageClickHandler);
+      }
+      modalFullscreenState = null;
+    }
+    const exitBtn = document.getElementById('modal-fullscreen-exit');
+    if (exitBtn) exitBtn.onclick = null;
+    try {
+      if (document.fullscreenElement === shell) document.exitFullscreen();
+    } catch (_) {}
+    const fsImg = document.getElementById('modal-fullscreen-img');
+    if (fsImg) {
+      fsImg.removeAttribute('src');
+      fsImg.removeAttribute('alt');
+    }
+    shell.hidden = true;
+    shell.setAttribute('aria-hidden', 'true');
+  }
+
+  function modalFullscreenNavigate(delta) {
+    if (!currentModalImg) return false;
+    const list = getOrderedVisibleImages();
+    const id = Number(currentModalImg.id);
+    const i = list.findIndex(img => Number(img.id) === id);
+    if (i < 0) return false;
+    const next = list[i + delta];
+    if (!next) return false;
+    openModal(next);
+    const fsImg = document.getElementById('modal-fullscreen-img');
+    if (fsImg) {
+      fsImg.src = currentModalImg.url;
+      fsImg.alt = currentModalImg.filename || '';
+    }
+    return true;
+  }
+
+  function openModalFullscreen() {
+    const modal = document.getElementById('modal');
+    if (!modal || modal.hidden || !currentModalImg) return;
+    closeModalFullscreen();
+    const shell = document.getElementById('modal-fullscreen');
+    const stage = shell && shell.querySelector('.modal-fullscreen-stage');
+    const fsImg = document.getElementById('modal-fullscreen-img');
+    const exitBtn = document.getElementById('modal-fullscreen-exit');
+    if (!shell || !stage || !fsImg || !exitBtn) return;
+
+    fsImg.src = currentModalImg.url;
+    fsImg.alt = currentModalImg.filename || '';
+
+    modalFullscreenState = {
+      stage,
+      expectFullscreen: false,
+      stageClickHandler: null,
+      onKeyDown: null,
+      onFsChange: null,
+    };
+
+    modalFullscreenState.stageClickHandler = (e) => {
+      if (e.target === exitBtn || (exitBtn.contains && exitBtn.contains(e.target))) return;
+      const r = slideshowContainedImageRect(fsImg, stage);
+      const x = e.clientX;
+      const y = e.clientY;
+      if (r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return;
+      closeModalFullscreen();
+    };
+    stage.addEventListener('click', modalFullscreenState.stageClickHandler);
+
+    modalFullscreenState.onKeyDown = (e) => {
+      if (shell.hidden) return;
+      const t = e.target;
+      if (t && t.nodeType === 1) {
+        if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return;
+        if (t.closest && t.closest('[contenteditable="true"]')) return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeModalFullscreen();
+        return;
+      }
+      if (e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        modalFullscreenNavigate(1);
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        modalFullscreenNavigate(1);
+        return;
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        modalFullscreenNavigate(-1);
+        return;
+      }
+    };
+    document.addEventListener('keydown', modalFullscreenState.onKeyDown, true);
+
+    modalFullscreenState.onFsChange = () => {
+      if (shell.hidden || !modalFullscreenState) return;
+      if (modalFullscreenState.expectFullscreen && !document.fullscreenElement) {
+        closeModalFullscreen();
+      }
+    };
+    document.addEventListener('fullscreenchange', modalFullscreenState.onFsChange);
+
+    exitBtn.onclick = () => closeModalFullscreen();
+
+    shell.hidden = false;
+    shell.setAttribute('aria-hidden', 'false');
+
+    if (shell.requestFullscreen) {
+      try {
+        const p = shell.requestFullscreen();
+        if (p && typeof p.then === 'function') {
+          p.then(() => {
+            if (modalFullscreenState) modalFullscreenState.expectFullscreen = true;
+          }).catch(() => {});
+        } else if (modalFullscreenState) {
+          modalFullscreenState.expectFullscreen = true;
+        }
+      } catch (_) {}
+    }
+  }
+
   let slideshowState = null;
 
   function getSlideshowImageById(id) {
@@ -797,6 +934,7 @@
   }
 
   function openSlideshowPlayer(slides, options) {
+    closeModalFullscreen();
     closeSlideshowPlayer();
     slideshowState = {
       slides,
@@ -1261,6 +1399,7 @@
   }
 
   function closeModal() {
+    closeModalFullscreen();
     document.getElementById('modal').hidden = true;
     document.body.style.overflow = '';
     updateModalNavUi();
@@ -2505,6 +2644,8 @@
     document.addEventListener('keydown', (e) => {
       const ssPlayer = document.getElementById('slideshow-player');
       if (ssPlayer && !ssPlayer.hidden) return;
+      const modalFs = document.getElementById('modal-fullscreen');
+      if (modalFs && !modalFs.hidden) return;
       const modal = document.getElementById('modal');
       if (!modal || modal.hidden) return;
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -2543,6 +2684,8 @@
       a.download = img.alt || 'image';
       a.click();
     });
+    const modalFullscreenBtn = document.getElementById('modal-fullscreen-btn');
+    if (modalFullscreenBtn) modalFullscreenBtn.addEventListener('click', openModalFullscreen);
     document.getElementById('bulk-clear').addEventListener('click', () => {
       selectedIds.clear();
       selectedImages.clear();
