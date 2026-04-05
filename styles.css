@@ -32,8 +32,7 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 
 .folders-filter { padding: 0.25rem 2rem; display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; border-bottom: 1px solid #eee; }
 #folder-filter { padding: 0; }
-#manage-folders-btn { padding: 0.25rem 0.6rem; cursor: pointer; font-size: 0.8rem; border: 1px solid #ccc; background: #fff; border-radius: 4px; align-self: center; margin-left: auto; }
-#manage-folders-btn:hover { background: #f5f5f5; border-color: #999; }
+#manage-folders-btn { align-self: center; margin-left: auto; font-size: 0.8rem; }
 .folder-icons { display: flex; gap: 4px; flex-wrap: wrap; align-items: flex-end; }
 .folder-icon-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; width: 80px; min-width: 80px; flex-shrink: 0; }
 .folder-icon-btn-wrap { position: relative; flex-shrink: 0; }
@@ -104,7 +103,7 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 .tag-filter-chip { padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.8125rem; border: 1px solid #ffe082; background: #fff9c4; color: #f57f17; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
 .tag-filter-chip:hover { background: #fff59d; border-color: #ffca28; }
 .tag-filter-chip.active { background: #f57f17; border-color: #f57f17; color: #fff; }
-#manage-tags-btn { padding: 0.25rem 0.75rem; cursor: pointer; }
+#manage-tags-btn { font-size: 0.8rem; }
 
 .main-content { padding: 1rem 2rem; width: 100%; }
 #search { padding: 0.35rem 0.5rem; min-width: 140px; font-size: 0.875rem; }
@@ -425,4 +424,149 @@ body { margin: 0; font-family: system-ui, -apple-system, sans-serif; color: #333
 }
 .user-session-logout:hover {
   text-decoration: underline;
+}
+
+/* Themed actions: tags (light green), folders (light blue), delete (red) */
+.ikpr-btn-tags,
+.ikpr-btn-folders,
+.ikpr-btn-delete {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.ikpr-btn-tags {
+  background: #d4edda;
+  border: 1px solid #6abf73;
+  color: #1e4620;
+}
+.ikpr-btn-tags:hover {
+  background: #c3e6cb;
+  border-color: #3d9b4a;
+  color: #153818;
+}
+.ikpr-btn-tags:active {
+  background: #b1dfbb;
+}
+.ikpr-btn-folders {
+  background: #cfe2ff;
+  border: 1px solid #6ea8fe;
+  color: #084298;
+}
+.ikpr-btn-folders:hover {
+  background: #b6d4fe;
+  border-color: #0d6efd;
+  color: #052c65;
+}
+.ikpr-btn-folders:active {
+  background: #9ec5fe;
+}
+.ikpr-btn-delete {
+  background: #f8d7da;
+  border: 1px solid #e0636d;
+  color: #842029;
+}
+.ikpr-btn-delete:hover {
+  background: #f1aeb5;
+  border-color: #dc3545;
+  color: #58151c;
+}
+.ikpr-btn-delete:active {
+  background: #ea868f;
+}
+.ikpr-btn-compact {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+}
+
+.bulk-bar .ikpr-btn-tags,
+.bulk-bar .ikpr-btn-folders,
+.bulk-bar .ikpr-btn-delete {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.875rem;
+}
+.bulk-bar .ikpr-btn-tags { color: #1e4620; }
+.bulk-bar .ikpr-btn-folders { color: #084298; }
+.bulk-bar .ikpr-btn-delete { color: #842029; }
+
+.modal-actions button.ikpr-btn-tags:hover {
+  background: #c3e6cb;
+  border-color: #3d9b4a;
+  color: #153818;
+}
+.modal-actions button.ikpr-btn-folders:hover {
+  background: #b6d4fe;
+  border-color: #0d6efd;
+  color: #052c65;
+}
+.modal-actions button.ikpr-btn-delete:hover {
+  background: #f1aeb5;
+  border-color: #dc3545;
+  color: #58151c;
+}
+
+#manage-tags-btn.ikpr-btn-tags,
+#manage-folders-btn.ikpr-btn-folders {
+  padding: 0.25rem 0.75rem;
+}
+
+.add-tag-row .ikpr-btn-tags,
+.add-tag-row .ikpr-btn-folders {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.875rem;
+}
+
+.dialog-actions button.ikpr-btn-tags {
+  background: #d4edda;
+  border-color: #6abf73;
+  color: #1e4620;
+}
+.dialog-actions button.ikpr-btn-tags:hover {
+  background: #c3e6cb;
+  border-color: #3d9b4a;
+  color: #153818;
+}
+.dialog-actions button.ikpr-btn-folders {
+  background: #cfe2ff;
+  border-color: #6ea8fe;
+  color: #084298;
+}
+.dialog-actions button.ikpr-btn-folders:hover {
+  background: #b6d4fe;
+  border-color: #0d6efd;
+  color: #052c65;
+}
+.dialog-actions button.ikpr-btn-delete {
+  background: #f8d7da;
+  border-color: #e0636d;
+  color: #842029;
+}
+.dialog-actions button.ikpr-btn-delete:hover {
+  background: #f1aeb5;
+  border-color: #dc3545;
+  color: #58151c;
+}
+
+.upload-confirm-btn.ikpr-btn-tags {
+  background: #d4edda;
+  border-color: #6abf73;
+  color: #1e4620;
+}
+.upload-confirm-btn.ikpr-btn-tags:hover {
+  background: #c3e6cb;
+  border-color: #3d9b4a;
+}
+.upload-confirm-btn.ikpr-btn-folders {
+  background: #cfe2ff;
+  border-color: #6ea8fe;
+  color: #084298;
+}
+.upload-confirm-btn.ikpr-btn-folders:hover {
+  background: #b6d4fe;
+  border-color: #0d6efd;
+}
+
+#manage-create-folder.ikpr-btn-folders {
+  margin-top: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.875rem;
 }

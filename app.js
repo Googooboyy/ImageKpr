@@ -239,6 +239,78 @@
     }
   }
 
+  function absoluteImageUrl(url) {
+    if (!url) return '';
+    try {
+      return new URL(url, window.location.href).href;
+    } catch {
+      return url;
+    }
+  }
+
+  function clipboardMimeForImageBlob(blob, urlHint) {
+    let t = (blob.type || '').toLowerCase();
+    if (t === 'image/jpg') t = 'image/jpeg';
+    if (/^image\/(png|jpeg|gif|webp)$/.test(t)) return t;
+    const u = (urlHint || '').toLowerCase();
+    if (u.endsWith('.png')) return 'image/png';
+    if (u.endsWith('.jpg') || u.endsWith('.jpeg')) return 'image/jpeg';
+    if (u.endsWith('.gif')) return 'image/gif';
+    if (u.endsWith('.webp')) return 'image/webp';
+    return 'image/png';
+  }
+
+  function copyImageFromModalImgElement(imgEl) {
+    if (!imgEl || !imgEl.complete || !imgEl.naturalWidth) {
+      return Promise.reject(new Error('image not ready'));
+    }
+    const c = document.createElement('canvas');
+    c.width = imgEl.naturalWidth;
+    c.height = imgEl.naturalHeight;
+    c.getContext('2d').drawImage(imgEl, 0, 0);
+    return new Promise((resolve, reject) => {
+      c.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('toBlob failed'));
+          return;
+        }
+        navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]).then(resolve).catch(reject);
+      }, 'image/png');
+    });
+  }
+
+  /** Copy raster image to clipboard; optional in unsupported browsers (button hidden on init). */
+  function copyImageToClipboard(url, prominent) {
+    if (!url || !navigator.clipboard?.write || !window.ClipboardItem) {
+      showToast('Copy image is not supported in this browser', prominent);
+      return;
+    }
+    const abs = absoluteImageUrl(url);
+    let sameOrigin = true;
+    try {
+      sameOrigin = new URL(abs).origin === window.location.origin;
+    } catch (_) {
+      sameOrigin = false;
+    }
+    const imgEl = document.getElementById('modal-img');
+    const tryClipboard = (blob) => {
+      const mime = clipboardMimeForImageBlob(blob, abs);
+      return navigator.clipboard.write([new ClipboardItem({ [mime]: blob })]);
+    };
+    fetch(abs, { credentials: sameOrigin ? 'same-origin' : 'omit', mode: 'cors' })
+      .then((r) => {
+        if (!r.ok) throw new Error('fetch failed');
+        return r.blob();
+      })
+      .then((blob) => tryClipboard(blob))
+      .then(() => showToast(prominent ? 'Image copied to clipboard!' : 'Copied!', prominent))
+      .catch(() => {
+        copyImageFromModalImgElement(imgEl)
+          .then(() => showToast(prominent ? 'Image copied to clipboard!' : 'Copied!', prominent))
+          .catch(() => showToast('Copy image failed — try Download instead', prominent));
+      });
+  }
+
   function formatBytes(b) {
     if (b < 1024) return b + ' B';
     if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
@@ -1321,14 +1393,14 @@
         row.appendChild(renameBtn);
         const tagsBtn = document.createElement('button');
         tagsBtn.type = 'button';
-        tagsBtn.className = 'upload-confirm-btn';
-        tagsBtn.textContent = 'Manage Tags';
+        tagsBtn.className = 'upload-confirm-btn ikpr-btn-tags';
+        tagsBtn.textContent = 'Apply/Manage Tags';
         tagsBtn.onclick = () => openUploadManageTags(item);
         row.appendChild(tagsBtn);
         const foldersBtn = document.createElement('button');
         foldersBtn.type = 'button';
-        foldersBtn.className = 'upload-confirm-btn';
-        foldersBtn.textContent = 'Manage Folders';
+        foldersBtn.className = 'upload-confirm-btn ikpr-btn-folders';
+        foldersBtn.textContent = 'Apply/Manage Folders';
         foldersBtn.onclick = () => openUploadManageFolders(item);
         row.appendChild(foldersBtn);
         removeBtn.addEventListener('click', async () => {
@@ -1569,14 +1641,14 @@
 
         const tagsBtn = document.createElement('button');
         tagsBtn.type = 'button';
-        tagsBtn.className = 'upload-confirm-btn';
-        tagsBtn.textContent = 'Manage Tags';
+        tagsBtn.className = 'upload-confirm-btn ikpr-btn-tags';
+        tagsBtn.textContent = 'Apply/Manage Tags';
         tagsBtn.onclick = () => openInboxManageTags(item);
 
         const foldersBtn = document.createElement('button');
         foldersBtn.type = 'button';
-        foldersBtn.className = 'upload-confirm-btn';
-        foldersBtn.textContent = 'Manage Folders';
+        foldersBtn.className = 'upload-confirm-btn ikpr-btn-folders';
+        foldersBtn.textContent = 'Apply/Manage Folders';
         foldersBtn.onclick = () => openInboxManageFolders(item);
 
         row.appendChild(thumbWrap);
@@ -1856,7 +1928,7 @@
       listEl.innerHTML = '';
       Object.entries(data).forEach(([name, ids]) => {
         const div = document.createElement('div');
-        div.innerHTML = '<span>' + name + ' (' + ids.length + ')</span> <button data-name="' + name + '" class="manage-rename">Rename</button> <button data-name="' + name + '" class="manage-delete">Delete</button>';
+        div.innerHTML = '<span>' + name + ' (' + ids.length + ')</span> <button type="button" data-name="' + name + '" class="manage-rename ikpr-btn-folders ikpr-btn-compact">Rename</button> <button type="button" data-name="' + name + '" class="manage-delete ikpr-btn-delete ikpr-btn-compact">Delete</button>';
         listEl.appendChild(div);
       });
       d.hidden = false;
@@ -1888,7 +1960,7 @@
           listEl.innerHTML = '';
           Object.entries(data).forEach(([n, ids]) => {
             const div = document.createElement('div');
-            div.innerHTML = '<span>' + n + ' (' + ids.length + ')</span> <button data-name="' + n + '" class="manage-rename">Rename</button> <button data-name="' + n + '" class="manage-delete">Delete</button>';
+            div.innerHTML = '<span>' + n + ' (' + ids.length + ')</span> <button type="button" data-name="' + n + '" class="manage-rename ikpr-btn-folders ikpr-btn-compact">Rename</button> <button type="button" data-name="' + n + '" class="manage-delete ikpr-btn-delete ikpr-btn-compact">Delete</button>';
             listEl.appendChild(div);
           });
           showToast('Renamed to "' + newName + '"');
@@ -1902,7 +1974,7 @@
         listEl.innerHTML = '';
         Object.entries(data).forEach(([n, ids]) => {
           const div = document.createElement('div');
-          div.innerHTML = '<span>' + n + ' (' + ids.length + ')</span> <button data-name="' + n + '" class="manage-rename">Rename</button> <button data-name="' + n + '" class="manage-delete">Delete</button>';
+          div.innerHTML = '<span>' + n + ' (' + ids.length + ')</span> <button type="button" data-name="' + n + '" class="manage-rename ikpr-btn-folders ikpr-btn-compact">Rename</button> <button type="button" data-name="' + n + '" class="manage-delete ikpr-btn-delete ikpr-btn-compact">Delete</button>';
           listEl.appendChild(div);
         });
         showToast('Folder deleted');
@@ -1931,7 +2003,7 @@
           listEl.innerHTML = '';
           Object.entries(data).forEach(([name, ids]) => {
             const div = document.createElement('div');
-            div.innerHTML = '<span>' + name + ' (' + ids.length + ')</span> <button data-name="' + name + '" class="manage-rename">Rename</button> <button data-name="' + name + '" class="manage-delete">Delete</button>';
+            div.innerHTML = '<span>' + name + ' (' + ids.length + ')</span> <button type="button" data-name="' + name + '" class="manage-rename ikpr-btn-folders ikpr-btn-compact">Rename</button> <button type="button" data-name="' + name + '" class="manage-delete ikpr-btn-delete ikpr-btn-compact">Delete</button>';
             listEl.appendChild(div);
           });
           const successEl = document.getElementById('manage-import-success');
@@ -2046,6 +2118,17 @@
       const url = document.getElementById('modal-img').src;
       if (url) copyUrl(url, true);
     });
+    const modalCopyImageBtn = document.getElementById('modal-copy-image');
+    if (modalCopyImageBtn) {
+      if (!navigator.clipboard?.write || !window.ClipboardItem) {
+        modalCopyImageBtn.hidden = true;
+      } else {
+        modalCopyImageBtn.addEventListener('click', () => {
+          const url = document.getElementById('modal-img').src;
+          if (url) copyImageToClipboard(url, true);
+        });
+      }
+    }
     document.getElementById('modal-manage-tags').addEventListener('click', openManageTagsImageDialog);
     document.getElementById('modal-manage-folders').addEventListener('click', openManageFoldersImageDialog);
     document.getElementById('modal-download').addEventListener('click', () => {
@@ -2133,7 +2216,7 @@
         tags.forEach(tag => {
           const div = document.createElement('div');
           div.className = 'manage-tag-item';
-          div.innerHTML = '<span>' + escapeHtml(tag) + '</span><button type="button" class="manage-tag-rename" data-tag="' + escapeHtml(tag) + '">Rename</button><button type="button" class="manage-tag-remove" data-tag="' + escapeHtml(tag) + '">Remove from all</button>';
+          div.innerHTML = '<span>' + escapeHtml(tag) + '</span><button type="button" class="manage-tag-rename ikpr-btn-tags ikpr-btn-compact" data-tag="' + escapeHtml(tag) + '">Rename</button><button type="button" class="manage-tag-remove ikpr-btn-tags ikpr-btn-compact" data-tag="' + escapeHtml(tag) + '">Remove from all</button>';
           listEl.appendChild(div);
         });
         d.hidden = false;
