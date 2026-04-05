@@ -1472,12 +1472,24 @@
       }
       const loaded = grid.querySelectorAll('.grid-item').length;
       if (gridState.total === 0 && !append) {
-        grid.innerHTML =
-          '<p class="empty">No images yet. Upload some!</p>' +
-          '<p class="empty" style="font-size:0.85rem;max-width:36rem;margin-left:auto;margin-right:auto;line-height:1.45">' +
-          'If the database already has rows, open <a href="' + API_BASE + '/whoami.php" target="_blank" rel="noopener">api/whoami.php</a> ' +
-          'and confirm <code>user_id</code> matches <code>images.user_id</code>. In DevTools → Network, <code>images.php</code> responses include ' +
-          'header <code>X-ImageKpr-User-Id</code>. Or set <code>IMAGEKPR_SHARE_NULL_USER_ROWS</code> in <code>config.php</code> temporarily if rows are still NULL.</p>';
+        const q = (gridState.search || '').trim();
+        const tag = (gridState.tagFilter || '').trim();
+        if (q) {
+          grid.innerHTML =
+            '<p class="empty">No images match your search.</p>' +
+            '<p class="empty" style="font-size:0.85rem;max-width:36rem;margin-left:auto;margin-right:auto;line-height:1.45">Try different words or clear the search box to see your whole library.</p>';
+        } else if (tag) {
+          grid.innerHTML =
+            '<p class="empty">No images with this tag in the current view.</p>' +
+            '<p class="empty" style="font-size:0.85rem;max-width:36rem;margin-left:auto;margin-right:auto;line-height:1.45">Clear the tag filter or choose <strong>All</strong> to browse everything.</p>';
+        } else {
+          grid.innerHTML =
+            '<p class="empty">No images yet. Upload some!</p>' +
+            '<p class="empty" style="font-size:0.85rem;max-width:36rem;margin-left:auto;margin-right:auto;line-height:1.45">' +
+            'If the database already has rows, open <a href="' + API_BASE + '/whoami.php" target="_blank" rel="noopener">api/whoami.php</a> ' +
+            'and confirm <code>user_id</code> matches <code>images.user_id</code>. In DevTools → Network, <code>images.php</code> responses include ' +
+            'header <code>X-ImageKpr-User-Id</code>. Or set <code>IMAGEKPR_SHARE_NULL_USER_ROWS</code> in <code>config.php</code> temporarily if rows are still NULL.</p>';
+        }
       }
       if (append) return;
       if (gridState.total > 1000) {
@@ -2850,6 +2862,35 @@
     document.getElementById('bulk-select-all').addEventListener('click', selectAllVisibleInGrid);
     document.getElementById('bulk-select-all-bar').addEventListener('click', selectAllVisibleInGrid);
 
+    (function initGridScaleToggle() {
+      const KEY = 'imagekprMainGridScale';
+      const root = document.documentElement;
+      const options = ['0.5', '0.75', '1', '1.5', '2'];
+      const radios = Array.from(document.querySelectorAll('input[name="grid-scale"]'));
+      if (radios.length === 0 || !root) return;
+      function applyScale(scale, persist) {
+        const value = options.includes(scale) ? scale : '1';
+        root.style.setProperty('--grid-scale', value);
+        radios.forEach((r) => { r.checked = r.value === value; });
+        if (!persist) return;
+        try {
+          localStorage.setItem(KEY, value);
+        } catch (_) {}
+      }
+      let initial = '1';
+      try {
+        const saved = localStorage.getItem(KEY);
+        if (saved && options.includes(saved)) initial = saved;
+      } catch (_) {}
+      applyScale(initial, false);
+      radios.forEach((r) => {
+        r.addEventListener('change', () => {
+          if (!r.checked) return;
+          applyScale(r.value, true);
+        });
+      });
+    })();
+
     (function initSelectionThumbsLargeToggle() {
       const banner = document.getElementById('selection-banner');
       const cb = document.getElementById('selection-thumbs-large');
@@ -2872,10 +2913,61 @@
       const row = document.getElementById('selection-row');
       if (!row) return;
       let dragFrom = null;
+      let dragEl = null;
+      let previewTargetId = null;
+      let dragStartOrder = [];
+      let dropCommitted = false;
+      let lastPointerX = null;
+      let lastReorderAt = 0;
+
+      function clearReflowTransitions() {
+        row.querySelectorAll('.selection-thumb').forEach((el) => {
+          el.style.transition = '';
+        });
+      }
+
+      function animateThumbReflow(mutator) {
+        const thumbsBefore = Array.from(row.querySelectorAll('.selection-thumb'));
+        const firstRects = new Map();
+        thumbsBefore.forEach((el) => firstRects.set(el, el.getBoundingClientRect()));
+        mutator();
+        const thumbsAfter = Array.from(row.querySelectorAll('.selection-thumb'));
+        thumbsAfter.forEach((el) => {
+          const fr = firstRects.get(el);
+          if (!fr) return;
+          const lr = el.getBoundingClientRect();
+          const dx = fr.left - lr.left;
+          const dy = fr.top - lr.top;
+          if (!dx && !dy) return;
+          el.style.transition = 'none';
+          el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        });
+        row.offsetWidth;
+        thumbsAfter.forEach((el) => {
+          if (!el.style.transform) return;
+          el.style.transition = 'transform 110ms ease';
+          el.style.transform = '';
+        });
+        setTimeout(clearReflowTransitions, 140);
+      }
+
+      function applySelectionOrderFromDom() {
+        const domIds = Array.from(row.querySelectorAll('.selection-thumb'))
+          .map((el) => Number(el.dataset.id))
+          .filter((id) => selectedIds.has(id));
+        if (domIds.length > 0) selectedOrder = domIds;
+      }
+
       row.addEventListener('dragstart', (e) => {
         const thumb = e.target.closest('.selection-thumb');
         if (!thumb) return;
         dragFrom = Number(thumb.dataset.id);
+        dragEl = thumb;
+        previewTargetId = null;
+        dropCommitted = false;
+        dragStartOrder = selectedOrder.slice();
+        lastPointerX = null;
+        lastReorderAt = 0;
         e.dataTransfer.setData('text/plain', String(dragFrom));
         e.dataTransfer.effectAllowed = 'move';
         thumb.classList.add('selection-thumb-dragging');
@@ -2883,27 +2975,93 @@
       row.addEventListener('dragend', () => {
         row.querySelectorAll('.selection-thumb-dragging').forEach((el) => el.classList.remove('selection-thumb-dragging'));
         row.querySelectorAll('.selection-thumb-dropeffect').forEach((el) => el.classList.remove('selection-thumb-dropeffect'));
+        clearReflowTransitions();
+        if (!dropCommitted && dragStartOrder.length > 0) {
+          selectedOrder = dragStartOrder.slice();
+          updateSelectionBanner();
+        }
         dragFrom = null;
+        dragEl = null;
+        previewTargetId = null;
+        dragStartOrder = [];
+        dropCommitted = false;
+        lastPointerX = null;
+        lastReorderAt = 0;
       });
       row.addEventListener('dragover', (e) => {
-        const thumb = e.target.closest('.selection-thumb');
-        if (!thumb || dragFrom == null) return;
-        const overId = Number(thumb.dataset.id);
-        if (overId === dragFrom) return;
+        if (!dragEl || dragFrom == null) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        const EDGE_TRIGGER_RATIO = 0.16;
+        const MIN_REORDER_INTERVAL_MS = 95;
+        const x = e.clientX;
+        const now = Date.now();
+        const dx = lastPointerX == null ? 0 : (x - lastPointerX);
+        const direction = dx > 0 ? 1 : (dx < 0 ? -1 : 0);
+        lastPointerX = x;
+        const thumb = e.target.closest('.selection-thumb');
+        if (!thumb || !row.contains(thumb)) {
+          const last = row.querySelector('.selection-thumb:last-child');
+          if (!last || last === dragEl) return;
+          if (direction <= 0) return;
+          if (now - lastReorderAt < MIN_REORDER_INTERVAL_MS) return;
+          if (previewTargetId === '__end__') return;
+          previewTargetId = '__end__';
+          lastReorderAt = now;
+          row.querySelectorAll('.selection-thumb-dropeffect').forEach((el) => el.classList.remove('selection-thumb-dropeffect'));
+          last.classList.add('selection-thumb-dropeffect');
+          animateThumbReflow(() => {
+            row.appendChild(dragEl);
+          });
+          return;
+        }
+        if (thumb === dragEl) {
+          const r = thumb.getBoundingClientRect();
+          if (direction > 0 && e.clientX > r.left + (r.width * (0.5 + EDGE_TRIGGER_RATIO))) {
+            const last2 = row.querySelector('.selection-thumb:last-child');
+            if (last2 && last2 !== dragEl && previewTargetId !== '__end__' && now - lastReorderAt >= MIN_REORDER_INTERVAL_MS) {
+              previewTargetId = '__end__';
+              lastReorderAt = now;
+              row.querySelectorAll('.selection-thumb-dropeffect').forEach((el) => el.classList.remove('selection-thumb-dropeffect'));
+              last2.classList.add('selection-thumb-dropeffect');
+              animateThumbReflow(() => {
+                row.appendChild(dragEl);
+              });
+            }
+          }
+          return;
+        }
+        const overId = Number(thumb.dataset.id);
+        if (!overId || overId === dragFrom) return;
+        const dragRect = dragEl.getBoundingClientRect();
+        const overRect = thumb.getBoundingClientRect();
+        const draggingRight = direction > 0 || (direction === 0 && dragRect.left < overRect.left);
+        const draggingLeft = direction < 0 || (direction === 0 && dragRect.left > overRect.left);
+        if (draggingRight) {
+          const leftGate = overRect.left + (overRect.width * EDGE_TRIGGER_RATIO);
+          if (e.clientX < leftGate) return;
+        } else if (draggingLeft) {
+          const rightGate = overRect.right - (overRect.width * EDGE_TRIGGER_RATIO);
+          if (e.clientX > rightGate) return;
+        } else {
+          return;
+        }
+        if (now - lastReorderAt < MIN_REORDER_INTERVAL_MS) return;
+        if (overId === previewTargetId) return;
+        previewTargetId = overId;
+        lastReorderAt = now;
         row.querySelectorAll('.selection-thumb-dropeffect').forEach((el) => el.classList.remove('selection-thumb-dropeffect'));
         thumb.classList.add('selection-thumb-dropeffect');
+        animateThumbReflow(() => {
+          row.insertBefore(dragEl, thumb);
+        });
       });
       row.addEventListener('drop', (e) => {
         e.preventDefault();
-        const thumb = e.target.closest('.selection-thumb');
         row.querySelectorAll('.selection-thumb-dropeffect').forEach((el) => el.classList.remove('selection-thumb-dropeffect'));
-        if (!thumb) return;
-        const fromId = Number(e.dataTransfer.getData('text/plain'));
-        const toId = Number(thumb.dataset.id);
-        if (!fromId || !toId || fromId === toId) return;
-        reorderSelectionThumbs(fromId, toId);
+        if (!dragEl || dragFrom == null) return;
+        applySelectionOrderFromDom();
+        dropCommitted = true;
         updateSelectionBanner();
       });
     })();

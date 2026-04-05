@@ -69,13 +69,28 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
           <button type="button" id="scroll-to-top" class="scroll-to-top-btn" aria-label="Scroll to top" title="Scroll to top">↑ Top</button>
         </div>
       </div>
+      <div class="grid-size-row" aria-label="Grid image size">
+        <span class="grid-size-label">Grid size</span>
+        <div class="grid-size-controls" role="radiogroup" aria-label="Main grid size scale">
+          <input type="radio" id="grid-scale-05" name="grid-scale" value="0.5">
+          <label for="grid-scale-05">0.5x</label>
+          <input type="radio" id="grid-scale-075" name="grid-scale" value="0.75">
+          <label for="grid-scale-075">0.75x</label>
+          <input type="radio" id="grid-scale-10" name="grid-scale" value="1">
+          <label for="grid-scale-10">1x</label>
+          <input type="radio" id="grid-scale-15" name="grid-scale" value="1.5">
+          <label for="grid-scale-15">1.5x</label>
+          <input type="radio" id="grid-scale-20" name="grid-scale" value="2">
+          <label for="grid-scale-20">2x</label>
+        </div>
+      </div>
       <div class="selection-banner-below" id="selection-banner" hidden>
       <div class="bulk-bar" id="bulk-bar">
         <span id="bulk-count">0 selected</span>
         <button type="button" id="bulk-select-all-bar" title="Add every image currently shown in the grid to this selection (same filters; scroll to load more first if needed)">Select all</button>
         <button type="button" id="bulk-delete" class="ikpr-btn-delete">Delete</button>
         <button type="button" id="bulk-download">Download ZIP</button>
-        <button type="button" id="bulk-slideshow">Slideshow</button>
+        <button type="button" id="bulk-slideshow" class="ikpr-btn-dark">Slideshow</button>
         <button type="button" id="bulk-tags" class="ikpr-btn-tags">Apply/Manage Tags</button>
         <button type="button" id="bulk-folders" class="ikpr-btn-folders">Apply/Manage Folders</button>
         <button type="button" id="bulk-rename">Rename</button>
@@ -108,7 +123,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
           <button type="button" id="modal-copy">Copy URL</button>
           <button type="button" id="modal-copy-image">Copy Image</button>
           <button type="button" id="modal-download">Download</button>
-          <button type="button" id="modal-fullscreen-btn">Full screen</button>
+          <button type="button" id="modal-fullscreen-btn" class="ikpr-btn-dark">Full screen</button>
           <button type="button" id="modal-delete" class="ikpr-btn-delete">Delete</button>
           <button type="button" id="modal-manage-tags" class="ikpr-btn-tags">Apply/Manage Tags</button>
           <button type="button" id="modal-manage-folders" class="ikpr-btn-folders">Apply/Manage Folders</button>
