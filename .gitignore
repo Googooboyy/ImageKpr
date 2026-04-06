@@ -1,5 +1,5 @@
 # Config with secrets (use config.example.php as template)
-config.php
+/config.php
 
 # Uploaded images (user content, not tracked)
 images/*

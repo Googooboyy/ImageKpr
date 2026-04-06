@@ -21,5 +21,9 @@ define('GOOGLE_REDIRECT_URI', 'https://your-domain.example/auth/google/callback.
 // Optional: Google "sub" for a user allowed even when not on the email allowlist (if used).
 define('ADMIN_GOOGLE_SUB', '');
 
+// Optional (Phase 9+): default per-user storage cap in bytes when users.storage_quota_bytes IS NULL.
+// Omit or use 0 for no default limit (unlimited until a per-user quota is set).
+// define('DEFAULT_STORAGE_QUOTA_BYTES', 10737418240); // 10 GiB
+
 // Emergency only: list images with user_id NULL to every logged-in user (unsafe if multiple accounts share the app).
 // define('IMAGEKPR_SHARE_NULL_USER_ROWS', true);

@@ -87,6 +87,47 @@ function imagekpr_csrf_verify(): bool
   return is_string($sess) && $sess !== '' && is_string($t) && hash_equals($sess, $t);
 }
 
+/** Site default quota (bytes) when user row has NULL storage_quota_bytes; null = no default cap. */
+function imagekpr_default_storage_quota_bytes(): ?int
+{
+  imagekpr_ensure_config();
+  if (!defined('DEFAULT_STORAGE_QUOTA_BYTES')) {
+    return null;
+  }
+  $v = (int) DEFAULT_STORAGE_QUOTA_BYTES;
+  return $v > 0 ? $v : null;
+}
+
+/**
+ * Effective cap in bytes: NULL = unlimited.
+ * DB NULL → site default or unlimited; DB 0 → unlimited; DB >0 → cap.
+ */
+function imagekpr_effective_quota_bytes(?int $storageQuotaColumn): ?int
+{
+  if ($storageQuotaColumn !== null && $storageQuotaColumn > 0) {
+    return $storageQuotaColumn;
+  }
+  if ($storageQuotaColumn === 0) {
+    return null;
+  }
+  return imagekpr_default_storage_quota_bytes();
+}
+
+function imagekpr_format_bytes(int $bytes): string
+{
+  if ($bytes < 1024) {
+    return $bytes . ' B';
+  }
+  $units = ['KB', 'MB', 'GB', 'TB'];
+  $v = (float) $bytes;
+  $u = -1;
+  do {
+    $v /= 1024;
+    $u++;
+  } while ($v >= 1024 && $u < count($units) - 1);
+  return round($v, $u >= 2 ? 2 : 1) . ' ' . $units[$u];
+}
+
 /** Append-only audit row. $meta JSON-encoded; null stored as SQL NULL. */
 function imagekpr_admin_audit_log(PDO $pdo, int $actorUserId, string $action, ?array $meta = null): void
 {
