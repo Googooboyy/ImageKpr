@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/admin.php';
 imagekpr_require_api_user();
 $uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
@@ -38,6 +39,13 @@ if (imagekpr_share_null_user_rows_enabled()) {
 }
 $where = [$userScope];
 $params = [];
+$tier = imagekpr_user_upload_tier($pdo, $uidInt);
+$tierMb = $tier['upload_size_mb'] ?? 3;
+$tierDowngradedAt = $tier['upload_tier_downgraded_at'] ?? null;
+if (imagekpr_upload_tier_grace_expired($tierDowngradedAt)) {
+  $where[] = 'size_bytes <= :upload_limit_bytes';
+  $params[':upload_limit_bytes'] = imagekpr_upload_limit_bytes_from_mb((int) $tierMb);
+}
 
 if ($search !== '') {
   $where[] = '(filename LIKE :search OR tags LIKE :search_tags)';
@@ -90,7 +98,7 @@ switch ($sort) {
 $countSql = "SELECT COUNT(*) FROM images WHERE $whereClause";
 $stmt = $pdo->prepare($countSql);
 foreach ($params as $k => $v) {
-  if (preg_match('/^:ids\d+$/', $k)) {
+  if (preg_match('/^:ids\d+$/', $k) || $k === ':upload_limit_bytes') {
     $stmt->bindValue($k, $v, PDO::PARAM_INT);
   } else {
     $stmt->bindValue($k, $v, PDO::PARAM_STR);
@@ -110,7 +118,7 @@ $sql = "SELECT id, filename, url, date_uploaded, size_bytes, width, height, tags
         LIMIT $lim OFFSET $off";
 $stmt = $pdo->prepare($sql);
 foreach ($params as $k => $v) {
-  if (preg_match('/^:ids\d+$/', $k)) {
+  if (preg_match('/^:ids\d+$/', $k) || $k === ':upload_limit_bytes') {
     $stmt->bindValue($k, $v, PDO::PARAM_INT);
   } else {
     $stmt->bindValue($k, $v, PDO::PARAM_STR);

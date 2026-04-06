@@ -168,6 +168,113 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
   exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_upload_tier') {
+  if (!imagekpr_csrf_verify()) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Security token invalid. Try again.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $targetId = (int) ($_POST['user_id'] ?? 0);
+  if ($targetId < 1) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Invalid user.'];
+    header('Location: index.php', true, 303);
+    exit;
+  }
+  $newMb = imagekpr_normalize_upload_size_mb($_POST['upload_size_mb'] ?? 3);
+  $stOld = $pdo->prepare('SELECT id, email, upload_size_mb, upload_tier_downgraded_at FROM users WHERE id = ? LIMIT 1');
+  $stOld->execute([$targetId]);
+  $oldRow = $stOld->fetch(PDO::FETCH_ASSOC);
+  if ($oldRow === false) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'User not found.'];
+    header('Location: index.php', true, 303);
+    exit;
+  }
+  $oldMb = imagekpr_normalize_upload_size_mb($oldRow['upload_size_mb'] ?? 3);
+  $oldDown = isset($oldRow['upload_tier_downgraded_at']) ? (string) $oldRow['upload_tier_downgraded_at'] : null;
+  if ($oldDown !== null && trim($oldDown) === '') {
+    $oldDown = null;
+  }
+  $newDown = $oldDown;
+  if ($newMb < $oldMb) {
+    $newDown = date('Y-m-d H:i:s');
+  } elseif ($newMb > $oldMb) {
+    $newDown = null;
+  }
+  $up = $pdo->prepare('UPDATE users SET upload_size_mb = ?, upload_tier_downgraded_at = ? WHERE id = ?');
+  $up->execute([$newMb, $newDown, $targetId]);
+  imagekpr_admin_audit_log($pdo, $actorId, 'user_upload_tier_set', [
+    'target_user_id' => $targetId,
+    'target_email' => $oldRow['email'],
+    'old_upload_size_mb' => $oldMb,
+    'new_upload_size_mb' => $newMb,
+    'old_upload_tier_downgraded_at' => $oldDown,
+    'new_upload_tier_downgraded_at' => $newDown,
+  ]);
+  $suffix = ($newMb < $oldMb) ? ' Grace starts now (30 days).' : '';
+  $_SESSION['admin_flash'] = ['type' => 'ok', 'msg' => 'Upload tier updated for ' . $oldRow['email'] . ' to ' . $newMb . 'MB.' . $suffix];
+  $redir = 'index.php';
+  $q = $_GET;
+  if (!empty($q)) {
+    $redir .= '?' . http_build_query($q);
+  }
+  header('Location: ' . $redir, true, 303);
+  exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_set_upload_tier') {
+  if (!imagekpr_csrf_verify()) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Security token invalid. Try again.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $rawIds = $_POST['bulk_user_ids'] ?? [];
+  if (!is_array($rawIds)) {
+    $rawIds = [];
+  }
+  $ids = [];
+  foreach ($rawIds as $v) {
+    $ids[] = (int) $v;
+  }
+  $ids = array_values(array_unique(array_filter($ids, static fn ($x) => $x > 0)));
+  if ($ids === []) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Select at least one user.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $newMb = imagekpr_normalize_upload_size_mb($_POST['bulk_upload_size_mb'] ?? 3);
+  $st = $pdo->prepare('UPDATE users SET upload_size_mb = ?, upload_tier_downgraded_at = CASE WHEN upload_size_mb > ? THEN NOW() WHEN upload_size_mb < ? THEN NULL ELSE upload_tier_downgraded_at END WHERE id = ?');
+  foreach ($ids as $tid) {
+    $st->execute([$newMb, $newMb, $newMb, $tid]);
+  }
+  imagekpr_admin_audit_log($pdo, $actorId, 'bulk_user_upload_tier_set', [
+    'target_user_ids' => $ids,
+    'new_upload_size_mb' => $newMb,
+  ]);
+  $_SESSION['admin_flash'] = ['type' => 'ok', 'msg' => 'Upload tier set to ' . $newMb . 'MB for ' . count($ids) . ' user(s).'];
+  $redir = 'index.php';
+  $q = $_GET;
+  if (!empty($q)) {
+    $redir .= '?' . http_build_query($q);
+  }
+  header('Location: ' . $redir, true, 303);
+  exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_purge_gallery') {
   if (!imagekpr_csrf_verify()) {
     $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Security token invalid. Try again.'];
@@ -242,6 +349,7 @@ $sortMap = [
   'last' => 'u.last_login_at',
   'admin' => 'u.is_admin',
   'quo' => 'u.storage_quota_bytes',
+  'upl' => 'u.upload_size_mb',
 ];
 if (!isset($sortMap[$sort])) {
   $sort = 'email';
@@ -257,12 +365,12 @@ if ($qSearch !== '') {
   $params[] = $like;
 }
 
-$sql = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes,
+$sql = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at,
   COALESCE(SUM(i.size_bytes), 0) AS used_bytes
   FROM users u
   LEFT JOIN images i ON i.user_id = u.id'
   . $whereSql .
-  ' GROUP BY u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes
+  ' GROUP BY u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at
   ORDER BY ' . $orderCol . ' ' . $dir . ', u.id ASC';
 
 $st = $pdo->prepare($sql);
@@ -272,14 +380,15 @@ $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 $totalStorage = (int) $pdo->query('SELECT COALESCE(SUM(size_bytes), 0) FROM images')->fetchColumn();
 $userCount = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
 
-$sqlAll = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes,
+$sqlAll = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at,
   COALESCE(SUM(i.size_bytes), 0) AS used_bytes
   FROM users u
   LEFT JOIN images i ON i.user_id = u.id
-  GROUP BY u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes';
+  GROUP BY u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at';
 $allRows = $pdo->query($sqlAll)->fetchAll(PDO::FETCH_ASSOC);
 
 $overQuota = 0;
+$expiredGraceUsers = 0;
 foreach ($allRows as $r) {
   $used = (int) $r['used_bytes'];
   $dbq = $r['storage_quota_bytes'];
@@ -287,6 +396,9 @@ foreach ($allRows as $r) {
   $eff = imagekpr_effective_quota_bytes($dbq);
   if ($eff !== null && $used > $eff) {
     $overQuota++;
+  }
+  if (imagekpr_upload_tier_grace_expired(isset($r['upload_tier_downgraded_at']) ? (string) $r['upload_tier_downgraded_at'] : null)) {
+    $expiredGraceUsers++;
   }
 }
 $byUsed = $allRows;
@@ -408,6 +520,10 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
         <dd><?php echo $overQuota > 0 ? '<span class="admin-over">' . (int) $overQuota . '</span>' : (int) $overQuota; ?></dd>
       </div>
       <div class="admin-stat">
+        <dt>Upload grace expired</dt>
+        <dd><?php echo $expiredGraceUsers > 0 ? '<span class="admin-over">' . (int) $expiredGraceUsers . '</span>' : (int) $expiredGraceUsers; ?></dd>
+      </div>
+      <div class="admin-stat">
         <dt>Largest users</dt>
         <dd>
           <?php if (empty($topUsers)) { ?>
@@ -465,6 +581,15 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
         </fieldset>
         <button type="submit" name="action" value="bulk_set_quota">Apply quota to selected</button>
       </div>
+      <div class="admin-bulk-row">
+        <fieldset>
+          <legend>Bulk upload tier (selected rows)</legend>
+          <label><input type="radio" name="bulk_upload_size_mb" value="3" checked> 3MB</label>
+          <label><input type="radio" name="bulk_upload_size_mb" value="10"> 10MB</label>
+          <label><input type="radio" name="bulk_upload_size_mb" value="30"> 30MB</label>
+        </fieldset>
+        <button type="submit" name="action" value="bulk_set_upload_tier">Apply upload tier to selected</button>
+      </div>
       <fieldset class="admin-bulk-purge">
         <legend>Purge gallery only (destructive)</legend>
         <p class="admin-muted">Deletes <strong>published gallery</strong> database rows and image files for the selected users. Does <strong>not</strong> remove user accounts, the email allowlist, or files in the shared inbox folder.</p>
@@ -488,6 +613,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
             <th class="admin-col-days" title="Whole days since last sign-in (— if never)">Last access<br><span class="admin-th-sub">days ago</span></th>
             <th class="admin-col-admin"><?php echo admin_sort_link('admin', 'Admin', $sort, $dir, $qSearch); ?></th>
             <th class="admin-col-quota">Set quota</th>
+            <th class="admin-col-quota"><?php echo admin_sort_link('upl', 'Set upload tier', $sort, $dir, $qSearch); ?></th>
           </tr>
         </thead>
         <tbody>
@@ -511,6 +637,12 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
             if ($dbq !== null && $dbq > 0) {
               $customGb = (string) round($dbq / (1024 * 1024 * 1024), 4);
             }
+            $uploadMb = imagekpr_normalize_upload_size_mb($r['upload_size_mb'] ?? 3);
+            $tierDownAt = isset($r['upload_tier_downgraded_at']) ? (string) $r['upload_tier_downgraded_at'] : null;
+            if ($tierDownAt !== null && trim($tierDownAt) === '') {
+              $tierDownAt = null;
+            }
+            $tierGraceExpired = imagekpr_upload_tier_grace_expired($tierDownAt);
             ?>
             <tr>
               <td class="admin-col-cb"><input type="checkbox" class="admin-user-cb" form="bulkUserForm" name="bulk_user_ids[]" value="<?php echo (int) $r['id']; ?>" aria-label="Select <?php echo htmlspecialchars((string) $r['email'], ENT_QUOTES, 'UTF-8'); ?>"></td>
@@ -554,6 +686,25 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
                   <label title="Use site default quota from config / Admin Config"><input type="radio" name="quota_mode" value="default" <?php echo $dbq === null ? 'checked' : ''; ?>> Default</label>
                   <label title="No storage cap"><input type="radio" name="quota_mode" value="unlimited" <?php echo $dbq === 0 ? 'checked' : ''; ?>> Unlimited</label>
                   <label title="Custom cap in gigabytes"><input type="radio" name="quota_mode" value="custom" <?php echo $dbq !== null && $dbq > 0 ? 'checked' : ''; ?>> GB <input type="number" name="quota_gb" min="0.001" step="any" value="<?php echo htmlspecialchars($customGb, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Gigabytes"></label>
+                  <button type="submit">Save</button>
+                </form>
+              </td>
+              <td class="admin-col-quota">
+                <form class="admin-quota-form" method="post" action="index.php<?php
+            $hiddenQ = array_filter(['q' => $qSearch !== '' ? $qSearch : null, 'sort' => $sort !== 'email' ? $sort : null, 'dir' => $dir !== 'ASC' ? strtolower($dir) : null]);
+            if (!empty($hiddenQ)) {
+              echo '?' . htmlspecialchars(http_build_query($hiddenQ), ENT_QUOTES, 'UTF-8');
+            }
+            ?>">
+                  <?php echo imagekpr_csrf_field(); ?>
+                  <input type="hidden" name="action" value="set_upload_tier">
+                  <input type="hidden" name="user_id" value="<?php echo (int) $r['id']; ?>">
+                  <label><input type="radio" name="upload_size_mb" value="3" <?php echo $uploadMb === 3 ? 'checked' : ''; ?>> 3MB</label>
+                  <label><input type="radio" name="upload_size_mb" value="10" <?php echo $uploadMb === 10 ? 'checked' : ''; ?>> 10MB</label>
+                  <label><input type="radio" name="upload_size_mb" value="30" <?php echo $uploadMb === 30 ? 'checked' : ''; ?>> 30MB</label>
+                  <?php if ($tierDownAt) { ?>
+                    <span class="admin-muted"><?php echo $tierGraceExpired ? 'Grace expired' : ('Grace until ' . htmlspecialchars(date('Y-m-d', strtotime($tierDownAt . ' +30 days')), ENT_QUOTES, 'UTF-8')); ?></span>
+                  <?php } ?>
                   <button type="submit">Save</button>
                 </form>
               </td>

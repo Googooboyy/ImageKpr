@@ -25,6 +25,10 @@ define('ADMIN_GOOGLE_SUB', '');
 // Omit or use 0 for no default limit (unlimited until a per-user quota is set).
 // define('DEFAULT_STORAGE_QUOTA_BYTES', 10737418240); // 10 GiB
 
+// Optional: login session persistence in seconds (code defaults to 14 days).
+// Set this if your host expires sessions too quickly.
+// define('IMAGEKPR_SESSION_TTL_SECONDS', 1209600);
+
 // Emergency only: list images with user_id NULL to every logged-in user (unsafe if multiple accounts share the app).
 // define('IMAGEKPR_SHARE_NULL_USER_ROWS', true);
 

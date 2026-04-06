@@ -148,6 +148,77 @@ function imagekpr_format_bytes(int $bytes): string
   return round($v, $u >= 2 ? 2 : 1) . ' ' . $units[$u];
 }
 
+/** Allowed per-image upload size tiers (MB). */
+function imagekpr_allowed_upload_size_tiers_mb(): array
+{
+  return [3, 10, 30];
+}
+
+/** Normalize requested tier to a safe supported value (defaults to 3MB). */
+function imagekpr_normalize_upload_size_mb($raw): int
+{
+  $v = (int) $raw;
+  return in_array($v, imagekpr_allowed_upload_size_tiers_mb(), true) ? $v : 3;
+}
+
+function imagekpr_upload_limit_bytes_from_mb(int $mb): int
+{
+  return $mb * 1024 * 1024;
+}
+
+/** Upload downgrade grace period in days. */
+function imagekpr_upload_tier_grace_days(): int
+{
+  return 30;
+}
+
+/** True when the downgrade grace window has elapsed. */
+function imagekpr_upload_tier_grace_expired(?string $downgradedAt): bool
+{
+  if ($downgradedAt === null || trim($downgradedAt) === '') {
+    return false;
+  }
+  $ts = strtotime($downgradedAt);
+  if ($ts === false) {
+    return false;
+  }
+  return (time() - $ts) >= (imagekpr_upload_tier_grace_days() * 86400);
+}
+
+/**
+ * Return upload tier + downgrade marker for a user.
+ * @return array{upload_size_mb:int,upload_tier_downgraded_at:?string}|null
+ */
+function imagekpr_user_upload_tier(PDO $pdo, int $userId): ?array
+{
+  if ($userId < 1) {
+    return null;
+  }
+  $st = $pdo->prepare('SELECT upload_size_mb, upload_tier_downgraded_at FROM users WHERE id = ? LIMIT 1');
+  $st->execute([$userId]);
+  $row = $st->fetch(PDO::FETCH_ASSOC);
+  if ($row === false) {
+    return null;
+  }
+  $mb = imagekpr_normalize_upload_size_mb($row['upload_size_mb'] ?? 3);
+  $downgradedAt = isset($row['upload_tier_downgraded_at']) ? (string) $row['upload_tier_downgraded_at'] : null;
+  if ($downgradedAt !== null && trim($downgradedAt) === '') {
+    $downgradedAt = null;
+  }
+  return [
+    'upload_size_mb' => $mb,
+    'upload_tier_downgraded_at' => $downgradedAt,
+  ];
+}
+
+/** Effective max upload bytes for a single image for this user. */
+function imagekpr_user_max_upload_bytes(PDO $pdo, int $userId): int
+{
+  $tier = imagekpr_user_upload_tier($pdo, $userId);
+  $mb = $tier['upload_size_mb'] ?? 3;
+  return imagekpr_upload_limit_bytes_from_mb($mb);
+}
+
 function imagekpr_user_storage_used(PDO $pdo, int $userId): int
 {
   if ($userId < 1) {

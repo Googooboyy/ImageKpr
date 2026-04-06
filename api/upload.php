@@ -13,7 +13,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   exit;
 }
 
-const MAX_SIZE = 3 * 1024 * 1024;
 const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 function sanitizeFilename($name) {
@@ -62,6 +61,8 @@ try {
   echo json_encode(['success' => false, 'error' => 'Database connection failed']);
   exit;
 }
+$maxUploadBytes = imagekpr_user_max_upload_bytes($pdo, $uid);
+$maxUploadMb = (int) round($maxUploadBytes / (1024 * 1024));
 
 $plannedDelta = 0;
 $sizeStmt = $pdo->prepare('SELECT COALESCE(size_bytes, 0) FROM images WHERE filename = ? AND user_id = ? LIMIT 1');
@@ -69,7 +70,7 @@ foreach ($files as $file) {
   if ($file['error'] !== UPLOAD_ERR_OK) {
     continue;
   }
-  if ($file['size'] > MAX_SIZE) {
+  if ($file['size'] > $maxUploadBytes) {
     continue;
   }
   $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -105,8 +106,8 @@ foreach ($files as $file) {
     $uploaded[] = ['success' => false, 'error' => 'Upload error ' . $file['error']];
     continue;
   }
-  if ($file['size'] > MAX_SIZE) {
-    $uploaded[] = ['success' => false, 'error' => 'File too large (max 3MB)'];
+  if ($file['size'] > $maxUploadBytes) {
+    $uploaded[] = ['success' => false, 'error' => 'File too large (max ' . $maxUploadMb . 'MB)'];
     continue;
   }
   $finfo = finfo_open(FILEINFO_MIME_TYPE);

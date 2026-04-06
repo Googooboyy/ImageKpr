@@ -42,9 +42,28 @@ function imagekpr_start_session(): void
     return;
   }
   ini_set('session.use_strict_mode', '1');
+  $ttl = defined('IMAGEKPR_SESSION_TTL_SECONDS') ? (int) IMAGEKPR_SESSION_TTL_SECONDS : 1209600; // 14 days
+  if ($ttl < 300) {
+    $ttl = 300;
+  }
+  ini_set('session.gc_maxlifetime', (string) $ttl);
+  ini_set('session.cookie_lifetime', (string) $ttl);
   ini_set('session.cookie_path', '/');
   ini_set('session.cookie_httponly', '1');
   ini_set('session.cookie_secure', $https ? '1' : '0');
+  if (function_exists('session_set_cookie_params')) {
+    if (PHP_VERSION_ID >= 70300) {
+      session_set_cookie_params([
+        'lifetime' => $ttl,
+        'path' => '/',
+        'secure' => $https,
+        'httponly' => true,
+        'samesite' => 'Lax',
+      ]);
+    } else {
+      session_set_cookie_params($ttl, '/; samesite=Lax', '', $https, true);
+    }
+  }
   if (version_compare(PHP_VERSION, '7.3.0', '>=')) {
     ini_set('session.cookie_samesite', 'Lax');
   }

@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   avatar_url VARCHAR(512) DEFAULT NULL,
   is_admin TINYINT(1) NOT NULL DEFAULT 0,
   storage_quota_bytes BIGINT UNSIGNED NULL DEFAULT NULL,
+  upload_size_mb TINYINT UNSIGNED NOT NULL DEFAULT 3,
+  upload_tier_downgraded_at DATETIME NULL DEFAULT NULL,
   created_at DATETIME NOT NULL,
   last_login_at DATETIME DEFAULT NULL,
   UNIQUE KEY uq_google_sub (google_sub),

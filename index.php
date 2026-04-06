@@ -51,7 +51,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <input type="file" id="upload-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple hidden>
         <div class="upload-zone-text">
           <span id="upload-text">Drag & drop or click to upload</span>
-          <span class="upload-zone-hint">Files larger than 3MB will be resized to fit or smaller.</span>
+          <span class="upload-zone-hint">Files above your limit can be auto-resized if you choose Continue.</span>
         </div>
         <div id="upload-progress" class="upload-progress" hidden></div>
       </div>
@@ -124,7 +124,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <button type="button" id="bulk-clear">Clear</button>
       </div>
       <div class="selection-selected-header">
-        <span class="dashboard-label dashboard-label-selected">Selected <span class="dashboard-label-hint">— drag thumbnails to set slideshow order</span></span>
+        <span class="dashboard-label dashboard-label-selected">Selected <span class="dashboard-label-hint">— drag thumbnails to set slideshow order: Left (start) &gt; Right (end)</span></span>
         <label class="selection-thumbs-large-label"><input type="checkbox" id="selection-thumbs-large" aria-label="Use 100 pixel thumbnails for selection strip"> Bigger thumbnails (100px)</label>
       </div>
       <div class="selection-row" id="selection-row"></div>

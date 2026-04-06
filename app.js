@@ -1676,33 +1676,59 @@
     return function (...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); };
   }
 
-  const MAX_UPLOAD = 3 * 1024 * 1024;
+  let MAX_UPLOAD = 3 * 1024 * 1024;
+  let MAX_UPLOAD_MB = 3;
   const MAX_WIDTH = 1920;
 
-  function resizeIfNeeded(file) {
+  function canvasToBlob(canvas, type, quality) {
+    return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+  }
+
+  async function resizeIfNeeded(file, forceResizeForLimit) {
+    if (!file.type.match(/image/)) return file;
+    const forceResize = forceResizeForLimit === true || file.size > MAX_UPLOAD;
     return new Promise((resolve) => {
-      if (file.size <= MAX_UPLOAD && !file.type.match(/image/)) {
-        resolve(file);
-        return;
-      }
+      const objectUrl = URL.createObjectURL(file);
       const img = new Image();
-      img.onload = () => {
-        if (img.width <= MAX_WIDTH) {
+      img.onload = async () => {
+        try {
+          const needsByWidth = img.width > MAX_WIDTH;
+          if (!forceResize && !needsByWidth) {
+            resolve(file);
+            return;
+          }
+          let scale = Math.min(1, MAX_WIDTH / img.width);
+          if (!isFinite(scale) || scale <= 0) scale = 1;
+          let outFile = file;
+          for (let attempt = 0; attempt < 7; attempt++) {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext('2d');
+            if (!ctx) break;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const quality = Math.max(0.45, 0.9 - (attempt * 0.08));
+            const blob = await canvasToBlob(canvas, file.type, quality);
+            if (!blob) break;
+            outFile = new File([blob], file.name, { type: file.type });
+            if (outFile.size <= MAX_UPLOAD) {
+              resolve(outFile);
+              return;
+            }
+            scale *= 0.85;
+          }
+          resolve(outFile);
+        } catch (_) {
           resolve(file);
-          return;
+        } finally {
+          URL.revokeObjectURL(objectUrl);
         }
-        const canvas = document.createElement('canvas');
-        const r = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = Math.round(img.height * r);
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(blob => {
-          resolve(blob ? new File([blob], file.name, { type: file.type }) : file);
-        }, file.type, 0.9);
       };
-      img.onerror = () => resolve(file);
-      img.src = URL.createObjectURL(file);
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file);
+      };
+      img.src = objectUrl;
     });
   }
 
@@ -1718,9 +1744,7 @@
   function uploadFiles(items, addToFolderName) {
     const prog = document.getElementById('upload-progress');
     const text = document.getElementById('upload-text');
-    const validItems = items.filter(it => it.file.size <= MAX_UPLOAD);
-    const tooBig = items.filter(it => it.file.size > MAX_UPLOAD);
-    if (tooBig.length) showToast(tooBig.length + ' file(s) skipped (max 3MB)');
+    const validItems = items.filter(it => it.file && it.file.size > 0);
     if (validItems.length === 0) return;
     text.hidden = true;
     prog.hidden = false;
@@ -1790,19 +1814,27 @@
     xhr.send(fd);
   }
 
-  function processAndUpload(items, addToFolderName) {
-    Promise.all(items.map(it => resizeIfNeeded(it.file))).then(resized => {
+  function processAndUpload(items, addToFolderName, forceResizeBig) {
+    Promise.all(items.map(it => resizeIfNeeded(it.file, forceResizeBig))).then(resized => {
       const updated = items.map((it, i) => ({ ...it, file: resized[i] || it.file }));
       uploadFiles(updated, addToFolderName);
     });
   }
 
+  function askOversizeDecision(tooBigCount) {
+    const msg = tooBigCount + ' file(s) are above your ' + MAX_UPLOAD_MB + 'MB upload limit.\n\nContinue to auto-resize and upload, or Cancel to stop this batch.';
+    return window.confirm(msg);
+  }
+
   function showUploadConfirmModal(files) {
     const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (arr.length === 0) return;
     const tooBig = arr.filter(f => f.size > MAX_UPLOAD);
-    if (tooBig.length) showToast(tooBig.length + ' file(s) skipped (max 3MB)');
-    const valid = arr.filter(f => f.size <= MAX_UPLOAD);
-    if (valid.length === 0) return;
+    const forceResizeBig = tooBig.length > 0;
+    if (forceResizeBig && !askOversizeDecision(tooBig.length)) {
+      showToast('Upload cancelled');
+      return;
+    }
 
     const dialog = document.getElementById('upload-confirm-dialog');
     const grid = document.getElementById('upload-confirm-grid');
@@ -1812,7 +1844,7 @@
     const folderSelect = document.getElementById('upload-add-to-folder-select');
     const folderNewInput = document.getElementById('upload-add-to-folder-new');
 
-    let pendingItems = valid.map(f => ({ file: f, newName: '', tags: [], folder: null }));
+    let pendingItems = arr.map(f => ({ file: f, newName: '', tags: [], folder: null }));
     let objectUrls = [];
 
     function refreshFolderSelect() {
@@ -2012,7 +2044,7 @@
     uploadBtn.onclick = () => {
       const addToFolderName = getAddToFolderName();
       closeModal();
-      if (pendingItems.length > 0) processAndUpload(pendingItems, addToFolderName);
+      if (pendingItems.length > 0) processAndUpload(pendingItems, addToFolderName, forceResizeBig);
     };
     cancelBtn.onclick = closeModal;
 
@@ -2522,6 +2554,16 @@
 
   function syncMaintenanceUiFromWhoami() {
     fetchJSON(API_BASE + '/whoami.php').then(d => {
+      if (Number.isFinite(Number(d.upload_max_bytes)) && Number(d.upload_max_bytes) > 0) {
+        MAX_UPLOAD = Number(d.upload_max_bytes);
+      }
+      if (Number.isFinite(Number(d.upload_size_mb)) && Number(d.upload_size_mb) > 0) {
+        MAX_UPLOAD_MB = Number(d.upload_size_mb);
+      }
+      const hintEl = document.querySelector('.upload-zone-hint');
+      if (hintEl) {
+        hintEl.textContent = 'Files above your ' + MAX_UPLOAD_MB + 'MB limit can be auto-resized if you choose Continue.';
+      }
       const on = d.maintenance === true;
       if (on) {
         document.body.classList.add('ikpr-maintenance');
