@@ -18,9 +18,8 @@ if ($idsParam !== '') {
   $ids = array_unique(array_filter($raw));
 }
 if (imagekpr_bulk_ids_too_many($ids)) {
-  http_response_code(400);
-  echo json_encode(['error' => 'Too many ids (max ' . imagekpr_max_bulk_image_ids() . ')']);
-  exit;
+  $cap = imagekpr_max_bulk_image_ids();
+  imagekpr_json_request_limit_exceeded($cap, 'Too many ids (max ' . $cap . ')');
 }
 
 try {

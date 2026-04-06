@@ -117,6 +117,22 @@ function imagekpr_effective_quota_bytes(?int $storageQuotaColumn): ?int
   return imagekpr_default_storage_quota_bytes();
 }
 
+/**
+ * Whole days elapsed since a MySQL DATETIME until now (floor). Null if missing/invalid.
+ * Used for admin dashboard (e.g. days since users.created_at or last_login_at). Clamped at 0 if clock skew.
+ */
+function imagekpr_days_since_mysql_datetime(?string $mysqlDt): ?int
+{
+  if ($mysqlDt === null || trim($mysqlDt) === '') {
+    return null;
+  }
+  $ts = strtotime($mysqlDt);
+  if ($ts === false) {
+    return null;
+  }
+  return max(0, (int) floor((time() - $ts) / 86400));
+}
+
 function imagekpr_format_bytes(int $bytes): string
 {
   if ($bytes < 1024) {

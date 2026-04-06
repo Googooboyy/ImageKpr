@@ -132,3 +132,37 @@ function imagekpr_max_images_per_page(): int
   imagekpr_ensure_config();
   return imagekpr_setting_int_bounded('max_images_per_page', MAX_IMAGES_PER_PAGE, 1, 5000);
 }
+
+/**
+ * Message shown when a request exceeds bulk/file/filename caps.
+ * Optional app_settings key request_limit_user_message: use placeholder {max} for the numeric limit.
+ * If empty/unset, returns $technicalFallback (the default terse API text).
+ */
+function imagekpr_request_limit_public_message(int $max, string $technicalFallback): string
+{
+  imagekpr_ensure_config();
+  $tpl = ImageKprAppSettings::get('request_limit_user_message');
+  $tpl = $tpl !== null ? trim($tpl) : '';
+  if ($tpl === '') {
+    return $technicalFallback;
+  }
+  return str_replace('{max}', (string) $max, $tpl);
+}
+
+/**
+ * Respond with 400 JSON when a request exceeds a configured numeric cap.
+ *
+ * @param bool $withSuccessFalse use { success: false, error } shape (upload, tags, bulk APIs)
+ */
+function imagekpr_json_request_limit_exceeded(int $max, string $technicalFallback, bool $withSuccessFalse = false): void
+{
+  $msg = imagekpr_request_limit_public_message($max, $technicalFallback);
+  http_response_code(400);
+  header('Content-Type: application/json; charset=utf-8');
+  if ($withSuccessFalse) {
+    echo json_encode(['success' => false, 'error' => $msg], JSON_UNESCAPED_UNICODE);
+  } else {
+    echo json_encode(['error' => $msg], JSON_UNESCAPED_UNICODE);
+  }
+  exit;
+}

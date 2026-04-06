@@ -1,7 +1,10 @@
-# Deny direct access to config
-<Files "config.php">
-  Require all denied
-</Files>
+# Deny HTTP access to the root secrets file only.
+# Do not use <Files "config.php"> — on Apache that matches every path named config.php,
+# including admin/config.php (Phase 12 admin UI).
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^config\.php$ - [F,L]
+</IfModule>
 
 # Same-origin app uses cookie sessions; avoid wildcard CORS. Re-enable narrowly if you embed APIs on another origin.
 

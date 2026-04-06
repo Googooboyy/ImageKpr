@@ -55,9 +55,8 @@ if (!$id && (!$ids || empty($ids))) {
 
 $rawTarget = $ids ? array_map('intval', $ids) : [$id];
 if ($ids && imagekpr_bulk_ids_too_many($rawTarget)) {
-  http_response_code(400);
-  echo json_encode(['success' => false, 'error' => 'Too many ids (max ' . imagekpr_max_bulk_image_ids() . ')']);
-  exit;
+  $cap = imagekpr_max_bulk_image_ids();
+  imagekpr_json_request_limit_exceeded($cap, 'Too many ids (max ' . $cap . ')', true);
 }
 $targetIds = imagekpr_cap_bulk_ids($rawTarget);
 if (empty($targetIds)) {

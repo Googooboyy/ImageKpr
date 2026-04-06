@@ -120,9 +120,8 @@ if ($method === 'PATCH') {
     }
     $ids = array_values(array_unique(array_filter(array_map('intval', $rawIds))));
     if (imagekpr_bulk_ids_too_many($ids)) {
-      http_response_code(400);
-      echo json_encode(['error' => 'Too many image_ids (max ' . imagekpr_max_bulk_image_ids() . ')']);
-      exit;
+      $cap = imagekpr_max_bulk_image_ids();
+      imagekpr_json_request_limit_exceeded($cap, 'Too many image_ids (max ' . $cap . ')');
     }
     if ($ids === []) {
       echo json_encode(['success' => true]);
@@ -162,9 +161,8 @@ if ($method === 'PATCH') {
     }
     $ids = array_values(array_unique(array_filter(array_map('intval', $rawIds))));
     if (imagekpr_bulk_ids_too_many($ids)) {
-      http_response_code(400);
-      echo json_encode(['error' => 'Too many image_ids (max ' . imagekpr_max_bulk_image_ids() . ')']);
-      exit;
+      $cap = imagekpr_max_bulk_image_ids();
+      imagekpr_json_request_limit_exceeded($cap, 'Too many image_ids (max ' . $cap . ')');
     }
     $folderId = imagekpr_folder_row_id($pdo, $uid, $name);
     if ($folderId === null) {

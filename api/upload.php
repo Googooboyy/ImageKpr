@@ -28,9 +28,8 @@ if (isset($_FILES['file'])) {
   if (is_array($_FILES['file']['name'])) {
     $n = count($_FILES['file']['name']);
     if ($n > imagekpr_max_files_per_upload_post()) {
-      http_response_code(400);
-      echo json_encode(['success' => false, 'error' => 'Too many files (max ' . imagekpr_max_files_per_upload_post() . ')']);
-      exit;
+      $cap = imagekpr_max_files_per_upload_post();
+      imagekpr_json_request_limit_exceeded($cap, 'Too many files (max ' . $cap . ')', true);
     }
     for ($i = 0; $i < $n; $i++) {
       $files[] = [

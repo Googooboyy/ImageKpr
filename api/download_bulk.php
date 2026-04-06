@@ -22,8 +22,8 @@ if (empty($ids)) {
   exit;
 }
 if (imagekpr_bulk_ids_too_many($ids)) {
-  http_response_code(400);
-  exit;
+  $cap = imagekpr_max_bulk_image_ids();
+  imagekpr_json_request_limit_exceeded($cap, 'Too many ids (max ' . $cap . ')');
 }
 $ids = imagekpr_cap_bulk_ids($ids);
 

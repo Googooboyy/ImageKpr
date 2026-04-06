@@ -257,12 +257,12 @@ if ($qSearch !== '') {
   $params[] = $like;
 }
 
-$sql = 'SELECT u.id, u.email, u.name, u.is_admin, u.last_login_at, u.storage_quota_bytes,
+$sql = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes,
   COALESCE(SUM(i.size_bytes), 0) AS used_bytes
   FROM users u
   LEFT JOIN images i ON i.user_id = u.id'
   . $whereSql .
-  ' GROUP BY u.id, u.email, u.name, u.is_admin, u.last_login_at, u.storage_quota_bytes
+  ' GROUP BY u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes
   ORDER BY ' . $orderCol . ' ' . $dir . ', u.id ASC';
 
 $st = $pdo->prepare($sql);
@@ -272,11 +272,11 @@ $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 $totalStorage = (int) $pdo->query('SELECT COALESCE(SUM(size_bytes), 0) FROM images')->fetchColumn();
 $userCount = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
 
-$sqlAll = 'SELECT u.id, u.email, u.name, u.is_admin, u.last_login_at, u.storage_quota_bytes,
+$sqlAll = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes,
   COALESCE(SUM(i.size_bytes), 0) AS used_bytes
   FROM users u
   LEFT JOIN images i ON i.user_id = u.id
-  GROUP BY u.id, u.email, u.name, u.is_admin, u.last_login_at, u.storage_quota_bytes';
+  GROUP BY u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes';
 $allRows = $pdo->query($sqlAll)->fetchAll(PDO::FETCH_ASSOC);
 
 $overQuota = 0;
@@ -324,7 +324,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
   <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></title>
   <link rel="stylesheet" href="../styles.css">
   <style>
-    .admin-wrap { max-width: 1100px; margin: 0 auto; padding: 1rem 1.5rem 2rem; }
+    .admin-wrap { max-width: min(1240px, calc(100vw - 1.5rem)); margin: 0 auto; padding: 1rem 0.75rem 2rem; box-sizing: border-box; }
     .admin-nav { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; padding: 0.75rem 0; border-bottom: 1px solid #ddd; margin-bottom: 1.25rem; }
     .admin-nav a { color: #1565c0; text-decoration: none; font-weight: 600; }
     .admin-nav a:hover { text-decoration: underline; }
@@ -342,18 +342,28 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     .admin-search { margin: 0.5rem 0 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
     .admin-search input[type="search"] { padding: 0.35rem 0.5rem; min-width: 200px; }
     .admin-search button { padding: 0.35rem 0.75rem; cursor: pointer; }
-    .admin-table-wrap { overflow-x: auto; border: 1px solid #eee; border-radius: 6px; }
-    table.admin-users { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    table.admin-users th, table.admin-users td { padding: 0.5rem 0.65rem; text-align: left; border-bottom: 1px solid #eee; vertical-align: top; }
-    table.admin-users th { background: #f5f5f5; font-weight: 600; white-space: nowrap; }
+    .admin-table-wrap { overflow-x: auto; border: 1px solid #eee; border-radius: 6px; -webkit-overflow-scrolling: touch; }
+    table.admin-users { width: 100%; border-collapse: collapse; font-size: 0.8rem; table-layout: fixed; }
+    table.admin-users th, table.admin-users td { padding: 0.4rem 0.45rem; text-align: left; border-bottom: 1px solid #eee; vertical-align: top; }
+    table.admin-users th { background: #f5f5f5; font-weight: 600; white-space: normal; line-height: 1.25; hyphens: auto; }
+    table.admin-users .admin-th-sub { font-weight: 500; color: #666; font-size: 0.72rem; }
     table.admin-users th a { color: #1565c0; text-decoration: none; }
     table.admin-users th a:hover { text-decoration: underline; }
     table.admin-users tr:last-child td { border-bottom: none; }
+    table.admin-users .admin-col-cb { width: 2.25rem; box-sizing: border-box; }
+    table.admin-users .admin-col-email { width: 20%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    table.admin-users .admin-col-name { width: 11%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    table.admin-users .admin-col-used { width: 6.5%; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+    table.admin-users .admin-col-qtxt { width: 12%; word-break: break-word; hyphens: auto; line-height: 1.3; font-size: 0.78rem; }
+    table.admin-users .admin-col-login { width: 10%; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 0.78rem; }
+    table.admin-users .admin-col-days { width: 4rem; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+    table.admin-users .admin-col-admin { width: 2.5rem; white-space: nowrap; text-align: center; }
+    table.admin-users .admin-col-quota { width: 11rem; min-width: 8.5rem; }
     .admin-over { color: #c62828; font-weight: 600; }
-    .admin-quota-form { display: flex; flex-direction: column; gap: 0.35rem; min-width: 200px; }
-    .admin-quota-form label { display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; flex-wrap: wrap; }
-    .admin-quota-form input[type="number"] { width: 6rem; padding: 0.2rem 0.35rem; }
-    .admin-quota-form button { padding: 0.25rem 0.5rem; font-size: 0.8rem; cursor: pointer; margin-top: 0.25rem; align-self: flex-start; }
+    .admin-quota-form { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+    .admin-quota-form label { display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; flex-wrap: nowrap; }
+    .admin-quota-form input[type="number"] { width: 3.5rem; min-width: 0; padding: 0.15rem 0.25rem; font-size: 0.75rem; }
+    .admin-quota-form button { padding: 0.2rem 0.45rem; font-size: 0.72rem; cursor: pointer; margin-top: 0.15rem; align-self: flex-start; }
     .admin-mono { font-family: ui-monospace, monospace; font-size: 0.8rem; }
     .admin-bulk { background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px; padding: 0.75rem 1rem; margin: 0 0 1rem; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
     .admin-bulk fieldset { border: none; margin: 0; padding: 0; }
@@ -468,14 +478,16 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
       <table class="admin-users">
         <thead>
           <tr>
-            <th style="width:2.5rem"><input type="checkbox" id="admin-select-all" title="Select all on this page" aria-label="Select all users on this page"></th>
-            <th><?php echo admin_sort_link('email', 'Email', $sort, $dir, $qSearch); ?></th>
-            <th><?php echo admin_sort_link('name', 'Name', $sort, $dir, $qSearch); ?></th>
-            <th><?php echo admin_sort_link('used', 'Used', $sort, $dir, $qSearch); ?></th>
-            <th><?php echo admin_sort_link('quo', 'Quota', $sort, $dir, $qSearch); ?></th>
-            <th><?php echo admin_sort_link('last', 'Last login', $sort, $dir, $qSearch); ?></th>
-            <th><?php echo admin_sort_link('admin', 'Admin', $sort, $dir, $qSearch); ?></th>
-            <th>Set quota</th>
+            <th class="admin-col-cb"><input type="checkbox" id="admin-select-all" title="Select all on this page" aria-label="Select all users on this page"></th>
+            <th class="admin-col-email"><?php echo admin_sort_link('email', 'Email', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-name"><?php echo admin_sort_link('name', 'Name', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-used"><?php echo admin_sort_link('used', 'Used', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-qtxt"><?php echo admin_sort_link('quo', 'Quota', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-login"><?php echo admin_sort_link('last', 'Last login', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-days" title="Whole days since first successful sign-in (account created)">1st access<br><span class="admin-th-sub">days ago</span></th>
+            <th class="admin-col-days" title="Whole days since last sign-in (— if never)">Last access<br><span class="admin-th-sub">days ago</span></th>
+            <th class="admin-col-admin"><?php echo admin_sort_link('admin', 'Admin', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-quota">Set quota</th>
           </tr>
         </thead>
         <tbody>
@@ -501,17 +513,35 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
             }
             ?>
             <tr>
-              <td><input type="checkbox" class="admin-user-cb" form="bulkUserForm" name="bulk_user_ids[]" value="<?php echo (int) $r['id']; ?>" aria-label="Select <?php echo htmlspecialchars((string) $r['email'], ENT_QUOTES, 'UTF-8'); ?>"></td>
-              <td class="admin-mono"><?php echo htmlspecialchars((string) $r['email'], ENT_QUOTES, 'UTF-8'); ?></td>
-              <td><?php echo htmlspecialchars((string) ($r['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
-              <td class="<?php echo $over ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars(imagekpr_format_bytes($used), ENT_QUOTES, 'UTF-8'); ?></td>
-              <td><?php echo htmlspecialchars($displayQuota, ENT_QUOTES, 'UTF-8'); ?></td>
-              <td class="admin-muted"><?php
+              <td class="admin-col-cb"><input type="checkbox" class="admin-user-cb" form="bulkUserForm" name="bulk_user_ids[]" value="<?php echo (int) $r['id']; ?>" aria-label="Select <?php echo htmlspecialchars((string) $r['email'], ENT_QUOTES, 'UTF-8'); ?>"></td>
+              <?php
+              $emailDisp = (string) $r['email'];
+              $nameDisp = (string) ($r['name'] ?? '');
+              ?>
+              <td class="admin-mono admin-col-email" title="<?php echo htmlspecialchars($emailDisp, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($emailDisp, ENT_QUOTES, 'UTF-8'); ?></td>
+              <td class="admin-col-name" title="<?php echo htmlspecialchars($nameDisp !== '' ? $nameDisp : '(no name)', ENT_QUOTES, 'UTF-8'); ?>"><?php echo $nameDisp !== '' ? htmlspecialchars($nameDisp, ENT_QUOTES, 'UTF-8') : '—'; ?></td>
+              <td class="admin-col-used <?php echo $over ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars(imagekpr_format_bytes($used), ENT_QUOTES, 'UTF-8'); ?></td>
+              <td class="admin-col-qtxt"><?php echo htmlspecialchars($displayQuota, ENT_QUOTES, 'UTF-8'); ?></td>
+              <td class="admin-muted admin-col-login"><?php
                 $ll = $r['last_login_at'];
-            echo $ll ? htmlspecialchars((string) $ll, ENT_QUOTES, 'UTF-8') : '—';
+            if ($ll) {
+              $llStr = (string) $ll;
+              $llTs = strtotime($llStr);
+              echo $llTs !== false ? htmlspecialchars(date('Y-m-d H:i', $llTs), ENT_QUOTES, 'UTF-8') : htmlspecialchars($llStr, ENT_QUOTES, 'UTF-8');
+            } else {
+              echo '—';
+            }
             ?></td>
-              <td><?php echo (int) $r['is_admin'] ? 'Yes' : ''; ?></td>
-              <td>
+              <td class="admin-muted admin-col-days"><?php
+                $df = imagekpr_days_since_mysql_datetime(isset($r['created_at']) ? (string) $r['created_at'] : null);
+            echo $df !== null ? (string) (int) $df : '—';
+            ?></td>
+              <td class="admin-muted admin-col-days"><?php
+                $dl = imagekpr_days_since_mysql_datetime($ll !== null && $ll !== '' ? (string) $ll : null);
+            echo $dl !== null ? (string) (int) $dl : '—';
+            ?></td>
+              <td class="admin-col-admin"><?php echo (int) $r['is_admin'] ? 'Yes' : ''; ?></td>
+              <td class="admin-col-quota">
                 <form class="admin-quota-form" method="post" action="index.php<?php
             $hiddenQ = array_filter(['q' => $qSearch !== '' ? $qSearch : null, 'sort' => $sort !== 'email' ? $sort : null, 'dir' => $dir !== 'ASC' ? strtolower($dir) : null]);
             if (!empty($hiddenQ)) {
@@ -521,9 +551,9 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
                   <?php echo imagekpr_csrf_field(); ?>
                   <input type="hidden" name="action" value="set_quota">
                   <input type="hidden" name="user_id" value="<?php echo (int) $r['id']; ?>">
-                  <label><input type="radio" name="quota_mode" value="default" <?php echo $dbq === null ? 'checked' : ''; ?>> Site default</label>
-                  <label><input type="radio" name="quota_mode" value="unlimited" <?php echo $dbq === 0 ? 'checked' : ''; ?>> Unlimited</label>
-                  <label><input type="radio" name="quota_mode" value="custom" <?php echo $dbq !== null && $dbq > 0 ? 'checked' : ''; ?>> GB <input type="number" name="quota_gb" min="0.001" step="any" value="<?php echo htmlspecialchars($customGb, ENT_QUOTES, 'UTF-8'); ?>"></label>
+                  <label title="Use site default quota from config / Admin Config"><input type="radio" name="quota_mode" value="default" <?php echo $dbq === null ? 'checked' : ''; ?>> Default</label>
+                  <label title="No storage cap"><input type="radio" name="quota_mode" value="unlimited" <?php echo $dbq === 0 ? 'checked' : ''; ?>> Unlimited</label>
+                  <label title="Custom cap in gigabytes"><input type="radio" name="quota_mode" value="custom" <?php echo $dbq !== null && $dbq > 0 ? 'checked' : ''; ?>> GB <input type="number" name="quota_gb" min="0.001" step="any" value="<?php echo htmlspecialchars($customGb, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Gigabytes"></label>
                   <button type="submit">Save</button>
                 </form>
               </td>

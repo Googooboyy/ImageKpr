@@ -24,9 +24,8 @@ if (!is_array($names)) {
   exit;
 }
 if (count($names) > imagekpr_max_duplicate_check_filenames()) {
-  http_response_code(400);
-  echo json_encode(['success' => false, 'error' => 'Too many filenames (max ' . imagekpr_max_duplicate_check_filenames() . ')']);
-  exit;
+  $cap = imagekpr_max_duplicate_check_filenames();
+  imagekpr_json_request_limit_exceeded($cap, 'Too many filenames (max ' . $cap . ')', true);
 }
 
 try {
