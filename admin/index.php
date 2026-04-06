@@ -168,6 +168,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
   exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_purge_gallery') {
+  if (!imagekpr_csrf_verify()) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Security token invalid. Try again.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $phrase = trim((string) ($_POST['purge_confirm'] ?? ''));
+  if (strcasecmp($phrase, imagekpr_admin_purge_confirm_phrase()) !== 0) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Confirmation phrase does not match. No images were deleted.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $rawIds = $_POST['bulk_user_ids'] ?? [];
+  if (!is_array($rawIds)) {
+    $rawIds = [];
+  }
+  $ids = [];
+  foreach ($rawIds as $v) {
+    $ids[] = (int) $v;
+  }
+  $ids = array_values(array_unique(array_filter($ids, static fn ($x) => $x > 0)));
+  if ($ids === []) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Select at least one user to purge.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+
+  $result = imagekpr_admin_purge_gallery_for_users($pdo, $ids);
+  imagekpr_admin_audit_log($pdo, $actorId, 'bulk_gallery_purge', [
+    'target_user_ids' => $ids,
+    'rows_deleted' => $result['rows_deleted'],
+    'files_removed' => $result['files_removed'],
+  ]);
+  $_SESSION['admin_flash'] = [
+    'type' => 'ok',
+    'msg' => 'Gallery purged for ' . count($ids) . ' user(s): ' . $result['rows_deleted'] . ' image row(s) removed, ' . $result['files_removed'] . ' file(s) deleted from disk.',
+  ];
+  $redir = 'index.php';
+  $q = $_GET;
+  if (!empty($q)) {
+    $redir .= '?' . http_build_query($q);
+  }
+  header('Location: ' . $redir, true, 303);
+  exit;
+}
+
 $flash = $_SESSION['admin_flash'] ?? null;
 unset($_SESSION['admin_flash']);
 
@@ -300,6 +361,15 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     .admin-bulk label { display: inline-flex; align-items: center; gap: 0.35rem; margin-right: 0.75rem; font-size: 0.8rem; }
     .admin-bulk input[type="number"] { width: 5rem; padding: 0.2rem 0.35rem; }
     .admin-bulk button { padding: 0.35rem 0.75rem; cursor: pointer; font-weight: 600; }
+    .admin-bulk-actions { flex-direction: column; align-items: stretch; }
+    .admin-bulk-actions .admin-bulk-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
+    .admin-bulk-purge { margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px solid #ef9a9a; }
+    .admin-bulk-purge legend { color: #b71c1c; }
+    .admin-bulk-purge .admin-muted { max-width: 42rem; margin: 0 0 0.5rem; }
+    .admin-bulk-purge label { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .admin-bulk-purge input[type="text"] { min-width: 14rem; padding: 0.35rem 0.5rem; font-family: ui-monospace, monospace; }
+    .admin-btn-danger { background: #c62828; color: #fff; border: 1px solid #8e0000; }
+    .admin-btn-danger:hover { background: #b71c1c; }
   </style>
 </head>
 <body>
@@ -373,16 +443,25 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     ]);
     $bulkAction = 'index.php' . (!empty($bulkActionQs) ? '?' . http_build_query($bulkActionQs) : '');
     ?>
-    <form id="bulkQuotaForm" class="admin-bulk" method="post" action="<?php echo htmlspecialchars($bulkAction, ENT_QUOTES, 'UTF-8'); ?>">
+    <?php $purgePhrase = imagekpr_admin_purge_confirm_phrase(); ?>
+    <form id="bulkUserForm" class="admin-bulk admin-bulk-actions" method="post" action="<?php echo htmlspecialchars($bulkAction, ENT_QUOTES, 'UTF-8'); ?>">
       <?php echo imagekpr_csrf_field(); ?>
-      <input type="hidden" name="action" value="bulk_set_quota">
-      <fieldset>
-        <legend>Bulk quota (selected rows)</legend>
-        <label><input type="radio" name="bulk_quota_mode" value="default" checked> Site default</label>
-        <label><input type="radio" name="bulk_quota_mode" value="unlimited"> Unlimited</label>
-        <label><input type="radio" name="bulk_quota_mode" value="custom"> GB <input type="number" name="bulk_quota_gb" min="0.001" step="any" value="10"></label>
+      <div class="admin-bulk-row">
+        <fieldset>
+          <legend>Bulk quota (selected rows)</legend>
+          <label><input type="radio" name="bulk_quota_mode" value="default" checked> Site default</label>
+          <label><input type="radio" name="bulk_quota_mode" value="unlimited"> Unlimited</label>
+          <label><input type="radio" name="bulk_quota_mode" value="custom"> GB <input type="number" name="bulk_quota_gb" min="0.001" step="any" value="10"></label>
+        </fieldset>
+        <button type="submit" name="action" value="bulk_set_quota">Apply quota to selected</button>
+      </div>
+      <fieldset class="admin-bulk-purge">
+        <legend>Purge gallery only (destructive)</legend>
+        <p class="admin-muted">Deletes <strong>published gallery</strong> database rows and image files for the selected users. Does <strong>not</strong> remove user accounts, the email allowlist, or files in the shared inbox folder.</p>
+        <label>Type <kbd><?php echo htmlspecialchars($purgePhrase, ENT_QUOTES, 'UTF-8'); ?></kbd> to confirm:
+          <input type="text" name="purge_confirm" autocomplete="off" placeholder="<?php echo htmlspecialchars($purgePhrase, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Type confirmation phrase to purge galleries"></label>
+        <button type="submit" name="action" value="bulk_purge_gallery" class="admin-btn-danger">Purge gallery for selected</button>
       </fieldset>
-      <button type="submit">Apply to selected</button>
     </form>
 
     <div class="admin-table-wrap">
@@ -422,7 +501,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
             }
             ?>
             <tr>
-              <td><input type="checkbox" class="admin-user-cb" form="bulkQuotaForm" name="bulk_user_ids[]" value="<?php echo (int) $r['id']; ?>" aria-label="Select <?php echo htmlspecialchars((string) $r['email'], ENT_QUOTES, 'UTF-8'); ?>"></td>
+              <td><input type="checkbox" class="admin-user-cb" form="bulkUserForm" name="bulk_user_ids[]" value="<?php echo (int) $r['id']; ?>" aria-label="Select <?php echo htmlspecialchars((string) $r['email'], ENT_QUOTES, 'UTF-8'); ?>"></td>
               <td class="admin-mono"><?php echo htmlspecialchars((string) $r['email'], ENT_QUOTES, 'UTF-8'); ?></td>
               <td><?php echo htmlspecialchars((string) ($r['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
               <td class="<?php echo $over ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars(imagekpr_format_bytes($used), ENT_QUOTES, 'UTF-8'); ?></td>

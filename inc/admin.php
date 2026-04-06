@@ -160,6 +160,47 @@ function imagekpr_storage_quota_remaining(PDO $pdo, int $userId): ?int
   return max(0, $eff - $used);
 }
 
+/** Phrase admin must type exactly (after trim) to confirm bulk gallery purge; comparison is case-insensitive. */
+function imagekpr_admin_purge_confirm_phrase(): string
+{
+  return 'DELETE GALLERY IMAGES';
+}
+
+/**
+ * Remove all gallery images for the given users: unlink files under IMAGES_DIR, then DELETE rows.
+ * Does not modify users, allowlist, or inbox.
+ *
+ * @param int[] $userIds
+ * @return array{rows_deleted:int, files_removed:int}
+ */
+function imagekpr_admin_purge_gallery_for_users(PDO $pdo, array $userIds): array
+{
+  imagekpr_ensure_config();
+  $userIds = array_values(array_unique(array_filter(array_map('intval', $userIds), static fn ($x) => $x > 0)));
+  if ($userIds === []) {
+    return ['rows_deleted' => 0, 'files_removed' => 0];
+  }
+  $dir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
+  $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+  $st = $pdo->prepare("SELECT id, filename FROM images WHERE user_id IN ($placeholders)");
+  $st->execute($userIds);
+  $filesRemoved = 0;
+  while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+    $fn = basename((string) ($row['filename'] ?? ''));
+    if ($fn === '' || $fn === '.' || $fn === '..') {
+      continue;
+    }
+    $path = $dir . $fn;
+    if (is_file($path) && @unlink($path)) {
+      $filesRemoved++;
+    }
+  }
+  $del = $pdo->prepare("DELETE FROM images WHERE user_id IN ($placeholders)");
+  $del->execute($userIds);
+  $rowsDeleted = (int) $del->rowCount();
+  return ['rows_deleted' => $rowsDeleted, 'files_removed' => $filesRemoved];
+}
+
 /**
  * Whether adding net bytes would exceed quota.
  * @return string|null Error message if denied, null if allowed (including unlimited quota).
