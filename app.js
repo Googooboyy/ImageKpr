@@ -1156,10 +1156,11 @@
         span.className = 'folder-pill';
         span.innerHTML = escapeHtml(name) + ' <button type="button" aria-label="Remove from ' + escapeHtml(name) + '">&times;</button>';
         span.querySelector('button').addEventListener('click', () => {
-          window.ImageKprFolders && window.ImageKprFolders.removeFromFolder(name, imgId);
-          if (window.ImageKprFolders && window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
-          showToast('Removed from ' + name);
-          refresh();
+          if (!window.ImageKprFolders) return;
+          window.ImageKprFolders.removeFromFolder(name, imgId).then(() => {
+            showToast('Removed from ' + name);
+            refresh();
+          }).catch(err => showToast(err.message || 'Failed', true));
         });
         pills.appendChild(span);
       });
@@ -1167,20 +1168,20 @@
     function addToFolder() {
       const name = newInput.value.trim() || (selectEl.value ? selectEl.value.trim() : '');
       if (name && window.ImageKprFolders) {
-        window.ImageKprFolders.addToFolder(name, [imgId]);
-        if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
-        showToast('Added to ' + name);
-        refresh();
-        selectEl.innerHTML = '<option value="">— Select or type new —</option>';
-        const data = window.ImageKprFolders.load();
-        Object.keys(data).sort().forEach(n => {
-          const opt = document.createElement('option');
-          opt.value = n;
-          opt.textContent = n + ' (' + (data[n]?.length || 0) + ')';
-          selectEl.appendChild(opt);
-        });
-        newInput.value = '';
-        selectEl.value = '';
+        window.ImageKprFolders.addToFolder(name, [imgId]).then(() => {
+          showToast('Added to ' + name);
+          refresh();
+          selectEl.innerHTML = '<option value="">— Select or type new —</option>';
+          const data = window.ImageKprFolders.load();
+          Object.keys(data).sort().forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n;
+            opt.textContent = n + ' (' + (data[n]?.length || 0) + ')';
+            selectEl.appendChild(opt);
+          });
+          newInput.value = '';
+          selectEl.value = '';
+        }).catch(err => showToast(err.message || 'Failed', true));
       }
     }
 
@@ -1331,22 +1332,22 @@
     function doAdd() {
       const name = addNew.value.trim() || (addSelect.value ? addSelect.value.trim() : '');
       if (!name) return;
-      window.ImageKprFolders.addToFolder(name, ids);
-      if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
-      showToast('Added to ' + name);
-      addNew.value = '';
-      addSelect.value = '';
-      refreshSelects();
-      refreshGrid(false);
+      window.ImageKprFolders.addToFolder(name, ids).then(() => {
+        showToast('Added to ' + name);
+        addNew.value = '';
+        addSelect.value = '';
+        refreshSelects();
+        refreshGrid(false);
+      }).catch(err => showToast(err.message || 'Failed', true));
     }
     function doRemove() {
       const name = removeSelect.value ? removeSelect.value.trim() : '';
       if (!name) return;
-      ids.forEach(id => window.ImageKprFolders.removeFromFolder(name, id));
-      if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
-      showToast('Removed from ' + name);
-      refreshSelects();
-      refreshGrid(false);
+      window.ImageKprFolders.removeFromFolder(name, ids).then(() => {
+        showToast('Removed from ' + name);
+        refreshSelects();
+        refreshGrid(false);
+      }).catch(err => showToast(err.message || 'Failed', true));
     }
 
     refreshSelects();
@@ -1499,11 +1500,11 @@
         const prev = document.createElement('button');
         prev.textContent = 'Previous';
         prev.disabled = gridState.page <= 1;
-        prev.onclick = () => { gridState.page--; refreshGrid(false); };
+        prev.onclick = () => { gridState.page--; refreshGrid(false, { keepPage: true }); };
         const next = document.createElement('button');
         next.textContent = 'Next';
         next.disabled = loaded >= gridState.total;
-        next.onclick = () => { gridState.page++; refreshGrid(false); };
+        next.onclick = () => { gridState.page++; refreshGrid(false, { keepPage: true }); };
         p.appendChild(prev);
         p.appendChild(document.createTextNode(' Page ' + gridState.page + ' of ' + Math.ceil(gridState.total / gridState.perPage) + ' '));
         p.appendChild(next);
@@ -1538,7 +1539,18 @@
     try { localStorage.setItem(LAST_BATCH_KEY, JSON.stringify(ids)); } catch (_) {}
   }
 
-  function refreshGrid(append) {
+  /**
+   * Reload grid. When append is false, resets to page 1 unless opts.keepPage is true
+   * (used by prev/next when total > 1000). Infinite scroll uses loadGrid(…, true) and
+   * increments gridState.page; without this reset, a later refresh (e.g. after folder
+   * API refresh) would request page 2+ and show only the tail slice while total still
+   * reflects the full library count.
+   */
+  function refreshGrid(append, opts) {
+    opts = opts || {};
+    if (!append && !opts.keepPage) {
+      gridState.page = 1;
+    }
     const filterInput = document.getElementById('folder-filter');
     const filterVal = filterInput ? filterInput.value : '';
     if (filterVal === LATEST_FILTER) {
@@ -1734,8 +1746,9 @@
           showToast('Uploaded');
           const ids = extractUploadedIds(d);
           if (ids.length > 0) setLastBatchIds(ids);
+          const folderPromises = [];
           if (addToFolderName && ids.length > 0 && window.ImageKprFolders) {
-            window.ImageKprFolders.addToFolder(addToFolderName, ids);
+            folderPromises.push(window.ImageKprFolders.addToFolder(addToFolderName, ids));
           }
           validItems.forEach((it, idx) => {
             const id = ids[idx];
@@ -1747,17 +1760,24 @@
               }).catch(() => {});
             }
             if (id && it.folder && window.ImageKprFolders) {
-              window.ImageKprFolders.addToFolder(it.folder, [id]);
+              folderPromises.push(window.ImageKprFolders.addToFolder(it.folder, [id]));
             }
           });
-          /* Folder filter uses localStorage IDs; a named folder hides uploads not in that list. Show “All” after upload. */
-          const folderFilter = document.getElementById('folder-filter');
-          if (folderFilter) folderFilter.value = '';
-          populateFolderIcons('');
-          gridState.page = 1;
-          refreshGrid(false);
-          loadStats();
-          setTimeout(loadStats, 300);
+          const afterFolders = () => {
+            /* Named folder filter hides images not in that folder’s list; reset to All after upload. */
+            const folderFilter = document.getElementById('folder-filter');
+            if (folderFilter) folderFilter.value = '';
+            populateFolderIcons('');
+            gridState.page = 1;
+            refreshGrid(false);
+            loadStats();
+            setTimeout(loadStats, 300);
+          };
+          if (folderPromises.length) {
+            Promise.all(folderPromises).then(afterFolders).catch(() => afterFolders());
+          } else {
+            afterFolders();
+          }
         } else showToast(d.error || 'Upload failed');
       } catch (_) { showToast('Upload failed'); }
     };
@@ -1901,12 +1921,11 @@
     function openUploadManageFolders(item) {
       addToFolderSelectDialog().then(name => {
         if (name && window.ImageKprFolders) {
-          const d = window.ImageKprFolders.load();
-          if (!d[name]) d[name] = [];
-          window.ImageKprFolders.save(d);
-          item.folder = name;
-          showToast('Will add to ' + name);
-          renderGrid();
+          window.ImageKprFolders.createFolder(name).then(() => {
+            item.folder = name;
+            showToast('Will add to ' + name);
+            renderGrid();
+          }).catch(err => showToast(err.message || 'Failed', true));
         }
       });
     }
@@ -2135,12 +2154,11 @@
     function openInboxManageFolders(item) {
       addToFolderSelectDialog().then(name => {
         if (name && window.ImageKprFolders) {
-          const d = window.ImageKprFolders.load();
-          if (!d[name]) d[name] = [];
-          window.ImageKprFolders.save(d);
-          item.folder = name;
-          showToast('Will add to ' + name);
-          renderList();
+          window.ImageKprFolders.createFolder(name).then(() => {
+            item.folder = name;
+            showToast('Will add to ' + name);
+            renderList();
+          }).catch(err => showToast(err.message || 'Failed', true));
         }
       });
     }
@@ -2288,17 +2306,21 @@
                 folderMap[folder].push(ids[idx]);
               }
             });
+            const fp = [];
             Object.entries(folderMap).forEach(([name, idArr]) => {
-              if (window.ImageKprFolders) {
-                window.ImageKprFolders.addToFolder(name, idArr);
-                if (window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
-              }
+              if (window.ImageKprFolders) fp.push(window.ImageKprFolders.addToFolder(name, idArr));
             });
-            showToast('Imported ' + (data.imported || 0) + ' image(s)');
-            loadInbox();
-            loadStats();
-            refreshGrid(false);
-            if (window.ImageKprFolders && window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+            Promise.all(fp).then(() => {
+              showToast('Imported ' + (data.imported || 0) + ' image(s)');
+              loadInbox();
+              loadStats();
+              refreshGrid(false);
+            }).catch(() => {
+              showToast('Imported images; some folder assignments may have failed', true);
+              loadInbox();
+              loadStats();
+              refreshGrid(false);
+            });
           } else {
             showToast(data.error || 'Import failed', true);
           }
@@ -2469,6 +2491,35 @@
     });
   }
 
+  function renderManageFoldersList() {
+    const listEl = document.getElementById('manage-folders-list');
+    if (!listEl || !window.ImageKprFolders) return;
+    const data = window.ImageKprFolders.load();
+    listEl.innerHTML = '';
+    Object.keys(data).sort((a, b) => a.localeCompare(b)).forEach(name => {
+      const ids = data[name] || [];
+      const div = document.createElement('div');
+      const span = document.createElement('span');
+      span.textContent = name + ' (' + ids.length + ')';
+      const renameBtn = document.createElement('button');
+      renameBtn.type = 'button';
+      renameBtn.className = 'manage-rename ikpr-btn-folders ikpr-btn-compact';
+      renameBtn.dataset.name = name;
+      renameBtn.textContent = 'Rename';
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'manage-delete ikpr-btn-delete ikpr-btn-compact';
+      delBtn.dataset.name = name;
+      delBtn.textContent = 'Delete';
+      div.appendChild(span);
+      div.appendChild(document.createTextNode(' '));
+      div.appendChild(renameBtn);
+      div.appendChild(document.createTextNode(' '));
+      div.appendChild(delBtn);
+      listEl.appendChild(div);
+    });
+  }
+
   function syncMaintenanceUiFromWhoami() {
     fetchJSON(API_BASE + '/whoami.php').then(d => {
       const on = d.maintenance === true;
@@ -2488,9 +2539,14 @@
     }).catch(() => {});
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
+    try {
+      if (window.ImageKprFolders && window.ImageKprFolders.refresh) {
+        await window.ImageKprFolders.refresh();
+      }
+    } catch (_) {}
     syncMaintenanceUiFromWhoami();
-    /* Avoid restored/stale folder filter (localStorage IDs ≠ current library). */
+    /* Reset folder filter on load (IDs are server-backed; avoid a stale hidden filter). */
     const folderFilterBoot = document.getElementById('folder-filter');
     if (folderFilterBoot) folderFilterBoot.value = '';
     populateFolderIcons();
@@ -2499,119 +2555,68 @@
     populateTagsRow();
     document.getElementById('manage-folders-btn').addEventListener('click', () => {
       const d = document.getElementById('manage-folders-dialog');
-      const listEl = document.getElementById('manage-folders-list');
-      const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
-      listEl.innerHTML = '';
-      Object.entries(data).forEach(([name, ids]) => {
-        const div = document.createElement('div');
-        div.innerHTML = '<span>' + name + ' (' + ids.length + ')</span> <button type="button" data-name="' + name + '" class="manage-rename ikpr-btn-folders ikpr-btn-compact">Rename</button> <button type="button" data-name="' + name + '" class="manage-delete ikpr-btn-delete ikpr-btn-compact">Delete</button>';
-        listEl.appendChild(div);
-      });
+      renderManageFoldersList();
       d.hidden = false;
     });
     document.getElementById('manage-close').addEventListener('click', () => { document.getElementById('manage-folders-dialog').hidden = true; });
     document.getElementById('manage-create-folder').addEventListener('click', () => {
       const n = document.getElementById('new-folder-name').value.trim();
-      if (!n) return;
-      const data = window.ImageKprFolders ? window.ImageKprFolders.load() : {};
-      data[n] = [];
-      window.ImageKprFolders.save(data);
-      populateFolderIcons();
-      document.getElementById('new-folder-name').value = '';
-      document.getElementById('manage-folders-dialog').hidden = true;
-      showToast('Folder "' + n + '" created');
+      if (!n || !window.ImageKprFolders) return;
+      window.ImageKprFolders.createFolder(n).then(() => {
+        renderManageFoldersList();
+        populateFolderIcons();
+        document.getElementById('new-folder-name').value = '';
+        document.getElementById('manage-folders-dialog').hidden = true;
+        showToast('Folder "' + n + '" created');
+      }).catch(err => {
+        if (err.status === 409) {
+          showToast('Folder already exists', true);
+        } else {
+          showToast(err.message || 'Failed', true);
+        }
+      });
     });
     document.getElementById('manage-folders-list').addEventListener('click', async (e) => {
       const name = e.target.dataset.name;
-      if (!name) return;
-      const data = window.ImageKprFolders.load();
+      if (!name || !window.ImageKprFolders) return;
       if (e.target.classList.contains('manage-rename')) {
         addToFolderDialog(name).then(newName => {
           if (!newName || newName === name) return;
-          data[newName] = data[name] || [];
-          delete data[name];
-          window.ImageKprFolders.save(data);
-          populateFolderIcons();
-          const listEl = document.getElementById('manage-folders-list');
-          listEl.innerHTML = '';
-          Object.entries(data).forEach(([n, ids]) => {
-            const div = document.createElement('div');
-            div.innerHTML = '<span>' + n + ' (' + ids.length + ')</span> <button type="button" data-name="' + n + '" class="manage-rename ikpr-btn-folders ikpr-btn-compact">Rename</button> <button type="button" data-name="' + n + '" class="manage-delete ikpr-btn-delete ikpr-btn-compact">Delete</button>';
-            listEl.appendChild(div);
-          });
-          showToast('Renamed to "' + newName + '"');
+          window.ImageKprFolders.renameFolder(name, newName).then(() => {
+            const ff = document.getElementById('folder-filter');
+            if (ff && ff.value === name) ff.value = newName;
+            renderManageFoldersList();
+            populateFolderIcons();
+            showToast('Renamed to "' + newName + '"');
+          }).catch(err => showToast(err.message || 'Rename failed', true));
         });
       } else if (e.target.classList.contains('manage-delete')) {
         if (!(await confirmDialog('Delete folder "' + name + '"? Items will be removed from this folder.'))) return;
-        delete data[name];
-        window.ImageKprFolders.save(data);
-        populateFolderIcons();
-        const listEl = document.getElementById('manage-folders-list');
-        listEl.innerHTML = '';
-        Object.entries(data).forEach(([n, ids]) => {
-          const div = document.createElement('div');
-          div.innerHTML = '<span>' + n + ' (' + ids.length + ')</span> <button type="button" data-name="' + n + '" class="manage-rename ikpr-btn-folders ikpr-btn-compact">Rename</button> <button type="button" data-name="' + n + '" class="manage-delete ikpr-btn-delete ikpr-btn-compact">Delete</button>';
-          listEl.appendChild(div);
-        });
-        showToast('Folder deleted');
-      }
-    });
-    document.getElementById('manage-export').addEventListener('click', () => {
-      const a = document.createElement('a');
-      a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(window.ImageKprFolders.load(), null, 2));
-      a.download = 'imagekpr-folders.json';
-      a.click();
-    });
-    document.getElementById('manage-import').addEventListener('click', () => document.getElementById('manage-import-file').click());
-    document.getElementById('manage-import-file').addEventListener('change', e => {
-      const f = e.target.files[0];
-      if (!f) return;
-      const r = new FileReader();
-      r.onload = () => {
-        try {
-          const imported = JSON.parse(r.result);
-          const data = window.ImageKprFolders.load();
-          const count = typeof imported === 'object' && imported !== null ? Object.keys(imported).length : 0;
-          Object.assign(data, imported);
-          window.ImageKprFolders.save(data);
+        window.ImageKprFolders.deleteFolder(name).then(() => {
+          const ff = document.getElementById('folder-filter');
+          if (ff && ff.value === name) ff.value = '';
+          renderManageFoldersList();
           populateFolderIcons();
-          const listEl = document.getElementById('manage-folders-list');
-          listEl.innerHTML = '';
-          Object.entries(data).forEach(([name, ids]) => {
-            const div = document.createElement('div');
-            div.innerHTML = '<span>' + name + ' (' + ids.length + ')</span> <button type="button" data-name="' + name + '" class="manage-rename ikpr-btn-folders ikpr-btn-compact">Rename</button> <button type="button" data-name="' + name + '" class="manage-delete ikpr-btn-delete ikpr-btn-compact">Delete</button>';
-            listEl.appendChild(div);
-          });
-          const successEl = document.getElementById('manage-import-success');
-          successEl.textContent = '✓ Imported ' + count + ' folder(s)';
-          successEl.hidden = false;
-          showToast('Imported ' + count + ' folder(s)');
-          setTimeout(() => {
-            successEl.hidden = true;
-            document.getElementById('manage-folders-dialog').hidden = true;
-          }, 1500);
-        } catch (_) {
-          showToast('Invalid file');
-        }
-      };
-      r.readAsText(f);
-      e.target.value = '';
+          refreshGrid(false);
+          showToast('Folder deleted');
+        }).catch(err => showToast(err.message || 'Delete failed', true));
+      }
     });
     const origAddToFolder = window.ImageKprFolders.addToFolder;
     window.ImageKprFolders.addToFolder = (folderNameOrIds, idsMaybe) => {
       if (idsMaybe !== undefined) {
         /* Two args: (folderName, ids) – direct add from upload, no dialog */
-        origAddToFolder(folderNameOrIds, idsMaybe);
-      } else {
-        /* One arg: (ids) – bulk action, show select of pre-existing folders */
-        addToFolderSelectDialog().then(name => {
-          if (name) {
-            origAddToFolder(name, folderNameOrIds);
+        return origAddToFolder(folderNameOrIds, idsMaybe);
+      }
+      /* One arg: (ids) – bulk action, show select of pre-existing folders */
+      return addToFolderSelectDialog().then(chosen => {
+        if (chosen) {
+          return origAddToFolder(chosen, folderNameOrIds).then(() => {
             showToast('Added');
             populateFolderIcons();
-          }
-        });
-      }
+          });
+        }
+      });
     };
 
     loadStats();

@@ -12,10 +12,10 @@ A minimalistic image repository app for hosting and linking images. Built with L
 - **Modal** with Copy URL, Download, Delete, tag edit; visual feedback on hover/click
 - **Bulk actions** (selection mode): Delete, Download ZIP, Edit tags, Add to folder, Rename
 - **Hot folder (inbox)**: Drop images via FTP → Import all from dashboard
-- **Favourites & folders**: localStorage, import/export, manage folders dialog
+- **Folders**: per-user folders stored in MySQL (`api/folders.php`), manage folders dialog
 - Infinite scroll (up to 1000 images), then pagination
 
-> **Note for existing users:** The feature previously named "lists" is now called "folders." Your existing data is migrated automatically on first load (lists = folders). Exported files from earlier versions (`imagekpr-lists.json`) can still be imported; the JSON format is unchanged.
+> **Note:** Older builds stored folders only in the browser (`localStorage`). That data is not migrated automatically; deploy `migrations/phase13_folders.sql` (or use an updated `database.sql`) so folder assignments are stored per account on the server.
 
 ## Requirements
 
@@ -52,6 +52,7 @@ A minimalistic image repository app for hosting and linking images. Built with L
 │   ├── download_bulk.php
 │   ├── tags.php
 │   ├── rename_bulk.php
+│   ├── folders.php
 │   └── inbox.php
 ├── assets/
 │   └── imagekpr-logo.png

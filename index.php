@@ -291,11 +291,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
       <div id="manage-folders-list"></div>
       <label>New folder: <input type="text" id="new-folder-name" placeholder="Folder name"></label>
       <button type="button" id="manage-create-folder" class="ikpr-btn-folders">Create</button>
-      <p id="manage-import-success" class="manage-import-success" hidden></p>
       <div class="dialog-actions">
-        <button type="button" id="manage-import" class="ikpr-btn-folders">Import</button>
-        <button type="button" id="manage-export" class="ikpr-btn-folders">Export</button>
-        <input type="file" id="manage-import-file" accept=".json" hidden>
         <button type="button" id="manage-close" class="ikpr-btn-folders">Close</button>
       </div>
     </div>
