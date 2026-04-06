@@ -128,6 +128,57 @@ function imagekpr_format_bytes(int $bytes): string
   return round($v, $u >= 2 ? 2 : 1) . ' ' . $units[$u];
 }
 
+function imagekpr_user_storage_used(PDO $pdo, int $userId): int
+{
+  if ($userId < 1) {
+    return 0;
+  }
+  $st = $pdo->prepare('SELECT COALESCE(SUM(size_bytes), 0) FROM images WHERE user_id = ?');
+  $st->execute([$userId]);
+  return (int) $st->fetchColumn();
+}
+
+/** Remaining bytes under effective quota, or null if unlimited / unknown user. */
+function imagekpr_storage_quota_remaining(PDO $pdo, int $userId): ?int
+{
+  if ($userId < 1) {
+    return null;
+  }
+  $st = $pdo->prepare('SELECT storage_quota_bytes FROM users WHERE id = ? LIMIT 1');
+  $st->execute([$userId]);
+  $row = $st->fetch(PDO::FETCH_ASSOC);
+  if ($row === false) {
+    return null;
+  }
+  $dbq = $row['storage_quota_bytes'];
+  $dbq = $dbq === null ? null : (int) $dbq;
+  $eff = imagekpr_effective_quota_bytes($dbq);
+  if ($eff === null) {
+    return null;
+  }
+  $used = imagekpr_user_storage_used($pdo, $userId);
+  return max(0, $eff - $used);
+}
+
+/**
+ * Whether adding net bytes would exceed quota.
+ * @return string|null Error message if denied, null if allowed (including unlimited quota).
+ */
+function imagekpr_storage_quota_denies_add(PDO $pdo, int $userId, int $netAddBytes): ?string
+{
+  if ($netAddBytes < 1) {
+    return null;
+  }
+  $rem = imagekpr_storage_quota_remaining($pdo, $userId);
+  if ($rem === null) {
+    return null;
+  }
+  if ($netAddBytes <= $rem) {
+    return null;
+  }
+  return 'Storage quota exceeded. Remaining: ' . imagekpr_format_bytes($rem) . '.';
+}
+
 /** Append-only audit row. $meta JSON-encoded; null stored as SQL NULL. */
 function imagekpr_admin_audit_log(PDO $pdo, int $actorUserId, string $action, ?array $meta = null): void
 {

@@ -78,6 +78,96 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_q
   exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_set_quota') {
+  if (!imagekpr_csrf_verify()) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Security token invalid. Try again.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $rawIds = $_POST['bulk_user_ids'] ?? [];
+  if (!is_array($rawIds)) {
+    $rawIds = [];
+  }
+  $ids = [];
+  foreach ($rawIds as $v) {
+    $ids[] = (int) $v;
+  }
+  $ids = array_values(array_unique(array_filter($ids, static fn ($x) => $x > 0)));
+  if ($ids === []) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Select at least one user.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+
+  $mode = (string) ($_POST['bulk_quota_mode'] ?? '');
+  $newQuota = null;
+  if ($mode === 'default') {
+    $newQuota = null;
+  } elseif ($mode === 'unlimited') {
+    $newQuota = 0;
+  } elseif ($mode === 'custom') {
+    $gb = isset($_POST['bulk_quota_gb']) ? (float) str_replace(',', '.', (string) $_POST['bulk_quota_gb']) : 0;
+    if ($gb <= 0 || !is_finite($gb)) {
+      $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Bulk custom quota must be a positive number (GB).'];
+      $redir = 'index.php';
+      $q = $_GET;
+      if (!empty($q)) {
+        $redir .= '?' . http_build_query($q);
+      }
+      header('Location: ' . $redir, true, 303);
+      exit;
+    }
+    $bytes = (int) round($gb * 1024 * 1024 * 1024);
+    if ($bytes < 1) {
+      $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Bulk quota too small after conversion.'];
+      $redir = 'index.php';
+      $q = $_GET;
+      if (!empty($q)) {
+        $redir .= '?' . http_build_query($q);
+      }
+      header('Location: ' . $redir, true, 303);
+      exit;
+    }
+    $newQuota = $bytes;
+  } else {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Invalid bulk quota mode.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+
+  $up = $pdo->prepare('UPDATE users SET storage_quota_bytes = ? WHERE id = ?');
+  foreach ($ids as $tid) {
+    $up->execute([$newQuota, $tid]);
+  }
+  imagekpr_admin_audit_log($pdo, $actorId, 'bulk_user_quota_set', [
+    'target_user_ids' => $ids,
+    'new_storage_quota_bytes' => $newQuota,
+  ]);
+  $_SESSION['admin_flash'] = ['type' => 'ok', 'msg' => 'Quota updated for ' . count($ids) . ' user(s).'];
+  $redir = 'index.php';
+  $q = $_GET;
+  if (!empty($q)) {
+    $redir .= '?' . http_build_query($q);
+  }
+  header('Location: ' . $redir, true, 303);
+  exit;
+}
+
 $flash = $_SESSION['admin_flash'] ?? null;
 unset($_SESSION['admin_flash']);
 
@@ -204,6 +294,12 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     .admin-quota-form input[type="number"] { width: 6rem; padding: 0.2rem 0.35rem; }
     .admin-quota-form button { padding: 0.25rem 0.5rem; font-size: 0.8rem; cursor: pointer; margin-top: 0.25rem; align-self: flex-start; }
     .admin-mono { font-family: ui-monospace, monospace; font-size: 0.8rem; }
+    .admin-bulk { background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px; padding: 0.75rem 1rem; margin: 0 0 1rem; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
+    .admin-bulk fieldset { border: none; margin: 0; padding: 0; }
+    .admin-bulk legend { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.35rem; }
+    .admin-bulk label { display: inline-flex; align-items: center; gap: 0.35rem; margin-right: 0.75rem; font-size: 0.8rem; }
+    .admin-bulk input[type="number"] { width: 5rem; padding: 0.2rem 0.35rem; }
+    .admin-bulk button { padding: 0.35rem 0.75rem; cursor: pointer; font-weight: 600; }
   </style>
 </head>
 <body>
@@ -269,10 +365,31 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
       <?php } ?>
     </form>
 
+    <?php
+    $bulkActionQs = array_filter([
+      'q' => $qSearch !== '' ? $qSearch : null,
+      'sort' => $sort !== 'email' ? $sort : null,
+      'dir' => $dir !== 'ASC' ? strtolower($dir) : null,
+    ]);
+    $bulkAction = 'index.php' . (!empty($bulkActionQs) ? '?' . http_build_query($bulkActionQs) : '');
+    ?>
+    <form id="bulkQuotaForm" class="admin-bulk" method="post" action="<?php echo htmlspecialchars($bulkAction, ENT_QUOTES, 'UTF-8'); ?>">
+      <?php echo imagekpr_csrf_field(); ?>
+      <input type="hidden" name="action" value="bulk_set_quota">
+      <fieldset>
+        <legend>Bulk quota (selected rows)</legend>
+        <label><input type="radio" name="bulk_quota_mode" value="default" checked> Site default</label>
+        <label><input type="radio" name="bulk_quota_mode" value="unlimited"> Unlimited</label>
+        <label><input type="radio" name="bulk_quota_mode" value="custom"> GB <input type="number" name="bulk_quota_gb" min="0.001" step="any" value="10"></label>
+      </fieldset>
+      <button type="submit">Apply to selected</button>
+    </form>
+
     <div class="admin-table-wrap">
       <table class="admin-users">
         <thead>
           <tr>
+            <th style="width:2.5rem"><input type="checkbox" id="admin-select-all" title="Select all on this page" aria-label="Select all users on this page"></th>
             <th><?php echo admin_sort_link('email', 'Email', $sort, $dir, $qSearch); ?></th>
             <th><?php echo admin_sort_link('name', 'Name', $sort, $dir, $qSearch); ?></th>
             <th><?php echo admin_sort_link('used', 'Used', $sort, $dir, $qSearch); ?></th>
@@ -305,6 +422,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
             }
             ?>
             <tr>
+              <td><input type="checkbox" class="admin-user-cb" form="bulkQuotaForm" name="bulk_user_ids[]" value="<?php echo (int) $r['id']; ?>" aria-label="Select <?php echo htmlspecialchars((string) $r['email'], ENT_QUOTES, 'UTF-8'); ?>"></td>
               <td class="admin-mono"><?php echo htmlspecialchars((string) $r['email'], ENT_QUOTES, 'UTF-8'); ?></td>
               <td><?php echo htmlspecialchars((string) ($r['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
               <td class="<?php echo $over ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars(imagekpr_format_bytes($used), ENT_QUOTES, 'UTF-8'); ?></td>
@@ -336,5 +454,14 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
       </table>
     </div>
   </div>
+  <script>
+    (function () {
+      var all = document.getElementById('admin-select-all');
+      if (!all) return;
+      all.addEventListener('change', function () {
+        document.querySelectorAll('.admin-user-cb').forEach(function (cb) { cb.checked = all.checked; });
+      });
+    })();
+  </script>
 </body>
 </html>

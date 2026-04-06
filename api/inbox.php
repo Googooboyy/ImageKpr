@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/admin.php';
 imagekpr_require_api_user();
 $uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
@@ -100,6 +101,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $fb = basename($f);
       if ($fb && !isset($inDb[$fb])) $toImport[] = ['filename' => $fb];
     }
+  }
+
+  $importBatchBytes = 0;
+  foreach ($toImport as $it) {
+    $raw = is_array($it) ? ($it['filename'] ?? '') : $it;
+    if (!is_string($raw) || $raw === '') {
+      continue;
+    }
+    $f = basename($raw);
+    $path = $inboxDir . $f;
+    if (!is_file($path) || realpath(dirname($path)) !== $inboxReal) {
+      continue;
+    }
+    $fi = finfo_open(FILEINFO_MIME_TYPE);
+    $mime = $fi ? finfo_file($fi, $path) : '';
+    if ($fi) {
+      finfo_close($fi);
+    }
+    if (!in_array($mime, $allowedMimes)) {
+      continue;
+    }
+    $sz = filesize($path);
+    if ($sz === false || $sz > $maxSize) {
+      continue;
+    }
+    $importBatchBytes += (int) $sz;
+  }
+  $quotaErr = imagekpr_storage_quota_denies_add($pdo, $uid, $importBatchBytes);
+  if ($quotaErr !== null) {
+    http_response_code(507);
+    echo json_encode(['success' => false, 'error' => $quotaErr, 'quota' => true, 'imported' => 0, 'imported_ids' => []]);
+    exit;
   }
 
   $imported = 0;

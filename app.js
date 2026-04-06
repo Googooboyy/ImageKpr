@@ -2299,6 +2299,8 @@
             loadStats();
             refreshGrid(false);
             if (window.ImageKprFolders && window.ImageKprFolders.onChange) window.ImageKprFolders.onChange();
+          } else {
+            showToast(data.error || 'Import failed', true);
           }
         }).catch(() => showToast('Import failed'));
       };

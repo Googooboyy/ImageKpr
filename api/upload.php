@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/admin.php';
 imagekpr_require_api_user();
 $uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
@@ -58,6 +59,42 @@ try {
   $pdo = imagekpr_pdo();
 } catch (PDOException $e) {
   echo json_encode(['success' => false, 'error' => 'Database connection failed']);
+  exit;
+}
+
+$plannedDelta = 0;
+$sizeStmt = $pdo->prepare('SELECT COALESCE(size_bytes, 0) FROM images WHERE filename = ? AND user_id = ? LIMIT 1');
+foreach ($files as $file) {
+  if ($file['error'] !== UPLOAD_ERR_OK) {
+    continue;
+  }
+  if ($file['size'] > MAX_SIZE) {
+    continue;
+  }
+  $finfo = finfo_open(FILEINFO_MIME_TYPE);
+  $mime = finfo_file($finfo, $file['tmp_name']);
+  finfo_close($finfo);
+  if (!in_array($mime, ALLOWED_MIMES)) {
+    continue;
+  }
+  $baseName = sanitizeFilename($file['name']);
+  $ext = pathinfo($baseName, PATHINFO_EXTENSION);
+  $ext = $ext ? preg_replace('/[^a-z0-9]/', '', strtolower($ext)) : 'jpg';
+  $stem = pathinfo($baseName, PATHINFO_FILENAME) ?: 'image';
+  $baseName = $stem . '.' . $ext;
+  $doReplace = in_array($baseName, $replaceNames);
+  if ($doReplace) {
+    $sizeStmt->execute([$baseName, $uid]);
+    $oldSz = (int) $sizeStmt->fetchColumn();
+    $plannedDelta += (int) $file['size'] - $oldSz;
+  } else {
+    $plannedDelta += (int) $file['size'];
+  }
+}
+$quotaErr = imagekpr_storage_quota_denies_add($pdo, $uid, $plannedDelta);
+if ($quotaErr !== null) {
+  http_response_code(507);
+  echo json_encode(['success' => false, 'error' => $quotaErr, 'quota' => true]);
   exit;
 }
 
