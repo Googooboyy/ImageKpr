@@ -586,7 +586,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
           <legend>Bulk upload tier (selected rows)</legend>
           <label><input type="radio" name="bulk_upload_size_mb" value="3" checked> 3MB</label>
           <label><input type="radio" name="bulk_upload_size_mb" value="10"> 10MB</label>
-          <label><input type="radio" name="bulk_upload_size_mb" value="30"> 30MB</label>
+          <label><input type="radio" name="bulk_upload_size_mb" value="100"> 100MB</label>
         </fieldset>
         <button type="submit" name="action" value="bulk_set_upload_tier">Apply upload tier to selected</button>
       </div>
@@ -701,7 +701,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
                   <input type="hidden" name="user_id" value="<?php echo (int) $r['id']; ?>">
                   <label><input type="radio" name="upload_size_mb" value="3" <?php echo $uploadMb === 3 ? 'checked' : ''; ?>> 3MB</label>
                   <label><input type="radio" name="upload_size_mb" value="10" <?php echo $uploadMb === 10 ? 'checked' : ''; ?>> 10MB</label>
-                  <label><input type="radio" name="upload_size_mb" value="30" <?php echo $uploadMb === 30 ? 'checked' : ''; ?>> 30MB</label>
+                  <label><input type="radio" name="upload_size_mb" value="100" <?php echo $uploadMb === 100 ? 'checked' : ''; ?>> 100MB</label>
                   <?php if ($tierDownAt) { ?>
                     <span class="admin-muted"><?php echo $tierGraceExpired ? 'Grace expired' : ('Grace until ' . htmlspecialchars(date('Y-m-d', strtotime($tierDownAt . ' +30 days')), ENT_QUOTES, 'UTF-8')); ?></span>
                   <?php } ?>

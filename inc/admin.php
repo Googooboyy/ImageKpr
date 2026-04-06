@@ -151,13 +151,16 @@ function imagekpr_format_bytes(int $bytes): string
 /** Allowed per-image upload size tiers (MB). */
 function imagekpr_allowed_upload_size_tiers_mb(): array
 {
-  return [3, 10, 30];
+  return [3, 10, 100];
 }
 
 /** Normalize requested tier to a safe supported value (defaults to 3MB). */
 function imagekpr_normalize_upload_size_mb($raw): int
 {
   $v = (int) $raw;
+  if ($v === 30) {
+    $v = 100;
+  }
   return in_array($v, imagekpr_allowed_upload_size_tiers_mb(), true) ? $v : 3;
 }
 
