@@ -22,6 +22,7 @@
   })();
 
   const API_BASE = 'api';
+  const GRID_CARD_DRAG_MIME = 'application/x-imagekpr-grid-image';
 
   function redirectToLogin() {
     window.location.href = 'index.php#login';
@@ -484,6 +485,7 @@
     article.dataset.id = img.id;
     article.dataset.url = img.url;
     article.dataset.filename = img.filename;
+    article.draggable = true;
     const name = truncate(img.filename, 24);
     const size = formatBytes(img.size_bytes || 0);
     const date = formatDate(img.date_uploaded);
@@ -546,6 +548,32 @@
         icon.src = 'assets/copyurl-active.png';
         setTimeout(() => { icon.src = 'assets/copyurl-passive.png'; }, 2000);
       }
+    });
+    article.addEventListener('dragstart', (e) => {
+      const target = e.target;
+      if (target && target.closest && (target.closest('.card-select') || target.closest('.card-expand'))) {
+        e.preventDefault();
+        return;
+      }
+      const id = Number(img.id);
+      if (!Number.isFinite(id) || id < 1 || !e.dataTransfer) {
+        e.preventDefault();
+        return;
+      }
+      const payload = {
+        id: id,
+        filename: String(img.filename || ('image-' + id))
+      };
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData(GRID_CARD_DRAG_MIME, JSON.stringify(payload));
+      e.dataTransfer.setData('text/plain', String(id));
+      article.classList.add('card-dragging');
+    });
+    article.addEventListener('dragend', () => {
+      article.classList.remove('card-dragging');
+      document.querySelectorAll('.folder-icon-wrap.folder-drop-over').forEach((el) => {
+        el.classList.remove('folder-drop-over');
+      });
     });
     article._imageKprImg = img;
     return article;
@@ -2472,7 +2500,7 @@
     const cur = activeValue !== undefined ? activeValue : filterInput.value;
     container.innerHTML = '';
 
-    function addFolderIcon(label, value, title, iconSvgOrFolder) {
+    function addFolderIcon(label, value, title, iconSvgOrFolder, isDropTarget) {
       const wrap = document.createElement('div');
       wrap.className = 'folder-icon-wrap' + (cur === value ? ' active' : '');
       const btnWrap = document.createElement('div');
@@ -2511,15 +2539,58 @@
           populateFolderIcons(value);
         }
       });
+      if (isDropTarget && window.ImageKprFolders) {
+        const clearDropState = () => wrap.classList.remove('folder-drop-over');
+        wrap.addEventListener('dragenter', (e) => {
+          if (!e.dataTransfer) return;
+          const types = Array.from(e.dataTransfer.types || []);
+          if (!types.includes(GRID_CARD_DRAG_MIME)) return;
+          e.preventDefault();
+          wrap.classList.add('folder-drop-over');
+        });
+        wrap.addEventListener('dragover', (e) => {
+          if (!e.dataTransfer) return;
+          const types = Array.from(e.dataTransfer.types || []);
+          if (!types.includes(GRID_CARD_DRAG_MIME)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          wrap.classList.add('folder-drop-over');
+        });
+        wrap.addEventListener('dragleave', (e) => {
+          if (e.relatedTarget && wrap.contains(e.relatedTarget)) return;
+          clearDropState();
+        });
+        wrap.addEventListener('drop', (e) => {
+          e.preventDefault();
+          clearDropState();
+          if (!e.dataTransfer) return;
+          const raw = e.dataTransfer.getData(GRID_CARD_DRAG_MIME);
+          if (!raw) return;
+          let payload = null;
+          try {
+            payload = JSON.parse(raw);
+          } catch (_) {
+            payload = null;
+          }
+          const id = payload ? Number(payload.id) : NaN;
+          if (!Number.isFinite(id) || id < 1) return;
+          const imageName = payload && payload.filename ? String(payload.filename) : ('image-' + id);
+          window.ImageKprFolders.addToFolder(value, [id]).then(() => {
+            showToast('Added "' + imageName + '" to folder "' + value + '"');
+          }).catch((err) => {
+            showToast((err && err.message) || 'Failed to add image to folder', true);
+          });
+        });
+      }
       container.appendChild(wrap);
     }
 
-    addFolderIcon('All', '', 'Show all images', 'folder');
-    addFolderIcon('Last uploaded', LATEST_FILTER, 'Show only the last uploaded batch of images', CLOCK_SVG);
-    addFolderIcon('Uncategorized', UNCATEGORIZED_FILTER, 'Show images not in any folder', 'folder');
+    addFolderIcon('All', '', 'Show all images', 'folder', false);
+    addFolderIcon('Last uploaded', LATEST_FILTER, 'Show only the last uploaded batch of images', CLOCK_SVG, false);
+    addFolderIcon('Uncategorized', UNCATEGORIZED_FILTER, 'Show images not in any folder', 'folder', false);
     Object.keys(data).sort().forEach(name => {
       const label = name + ' (' + (data[name]?.length || 0) + ')';
-      addFolderIcon(label, name, label, 'folder');
+      addFolderIcon(label, name, label, 'folder', true);
     });
   }
 

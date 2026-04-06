@@ -142,6 +142,16 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
 .folder-icon-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; width: 80px; min-width: 80px; flex-shrink: 0; }
 .folder-icon-btn-wrap { position: relative; flex-shrink: 0; }
 .folder-icon-wrap button { flex-shrink: 0; }
+.folder-icon-wrap.folder-drop-over .folder-icon {
+  background: #d4edda;
+  color: #1b5e20;
+  outline: 2px solid #2e7d32;
+  outline-offset: 1px;
+}
+.folder-icon-wrap.folder-drop-over .folder-icon-label {
+  color: #1b5e20;
+  font-weight: 600;
+}
 .folder-icon-tooltip {
   position: absolute;
   bottom: 100%;
@@ -244,6 +254,8 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
 }
 
 .card { cursor: pointer; }
+.card[draggable="true"] { cursor: grab; }
+.card.card-dragging { opacity: 0.72; }
 .card-inner { position: relative; padding: 0.5rem; border: 1px solid #eee; border-radius: 8px; transition: box-shadow 0.2s, border-color 0.2s; }
 .card-inner:hover { border-color: #ccc; box-shadow: 0 2px 8px rgba(0,0,0,0.08); outline: 5px solid #333; outline-offset: -1px; }
 .card-inner:active { box-shadow: 0 0 0 2px #999; }
