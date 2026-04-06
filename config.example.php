@@ -27,3 +27,7 @@ define('ADMIN_GOOGLE_SUB', '');
 
 // Emergency only: list images with user_id NULL to every logged-in user (unsafe if multiple accounts share the app).
 // define('IMAGEKPR_SHARE_NULL_USER_ROWS', true);
+
+// Phase 12: default quota cap, share-null, maintenance/read-only, API bulk limits, and signup email allowlist
+// are manageable in Admin → Config (stored in app_settings / email_allowlist). Constants above remain fallbacks
+// where the DB has no row yet.

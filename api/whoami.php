@@ -6,8 +6,12 @@
 require_once __DIR__ . '/../inc/auth.php';
 imagekpr_require_api_user();
 header('Content-Type: application/json; charset=utf-8');
+imagekpr_ensure_config();
+$maint = imagekpr_maintenance_enabled();
 echo json_encode([
   'user_id' => imagekpr_user_id(),
   'email' => isset($_SESSION['email']) ? (string) $_SESSION['email'] : null,
   'name' => isset($_SESSION['name']) ? (string) $_SESSION['name'] : null,
+  'maintenance' => $maint,
+  'maintenance_message' => $maint ? imagekpr_maintenance_banner_text() : '',
 ], JSON_UNESCAPED_UNICODE);

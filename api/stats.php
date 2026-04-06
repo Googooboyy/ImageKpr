@@ -16,7 +16,7 @@ try {
 imagekpr_ensure_config();
 $uidInt = (int) $uid;
 $userWhere = 'user_id = ' . $uidInt;
-if (defined('IMAGEKPR_SHARE_NULL_USER_ROWS') && IMAGEKPR_SHARE_NULL_USER_ROWS) {
+if (imagekpr_share_null_user_rows_enabled()) {
   $userWhere = '(user_id = ' . $uidInt . ' OR user_id IS NULL)';
 }
 

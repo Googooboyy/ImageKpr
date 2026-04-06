@@ -23,9 +23,9 @@ if (!is_array($names)) {
   echo json_encode(['success' => false, 'error' => 'Invalid input']);
   exit;
 }
-if (count($names) > MAX_DUPLICATE_CHECK_FILENAMES) {
+if (count($names) > imagekpr_max_duplicate_check_filenames()) {
   http_response_code(400);
-  echo json_encode(['success' => false, 'error' => 'Too many filenames (max ' . MAX_DUPLICATE_CHECK_FILENAMES . ')']);
+  echo json_encode(['success' => false, 'error' => 'Too many filenames (max ' . imagekpr_max_duplicate_check_filenames() . ')']);
   exit;
 }
 

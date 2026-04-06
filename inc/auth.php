@@ -14,6 +14,7 @@ function imagekpr_ensure_config(): void
   }
   require_once $cfg;
   require_once __DIR__ . '/request_limits.php';
+  require_once __DIR__ . '/settings.php';
   $done = true;
 }
 function imagekpr_json_security_headers(): void

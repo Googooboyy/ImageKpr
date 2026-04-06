@@ -91,6 +91,10 @@ function imagekpr_csrf_verify(): bool
 function imagekpr_default_storage_quota_bytes(): ?int
 {
   imagekpr_ensure_config();
+  $fromDb = imagekpr_site_default_quota_from_settings();
+  if (ImageKprAppSettings::has('default_storage_quota_bytes')) {
+    return $fromDb;
+  }
   if (!defined('DEFAULT_STORAGE_QUOTA_BYTES')) {
     return null;
   }

@@ -1,7 +1,9 @@
 <?php
 require_once __DIR__ . '/../inc/auth.php';
 require_once __DIR__ . '/../inc/admin.php';
+require_once __DIR__ . '/../inc/maintenance.php';
 imagekpr_require_api_user();
+imagekpr_block_if_maintenance_json();
 $uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
 
@@ -25,9 +27,9 @@ $files = [];
 if (isset($_FILES['file'])) {
   if (is_array($_FILES['file']['name'])) {
     $n = count($_FILES['file']['name']);
-    if ($n > MAX_FILES_PER_UPLOAD_POST) {
+    if ($n > imagekpr_max_files_per_upload_post()) {
       http_response_code(400);
-      echo json_encode(['success' => false, 'error' => 'Too many files (max ' . MAX_FILES_PER_UPLOAD_POST . ')']);
+      echo json_encode(['success' => false, 'error' => 'Too many files (max ' . imagekpr_max_files_per_upload_post() . ')']);
       exit;
     }
     for ($i = 0; $i < $n; $i++) {

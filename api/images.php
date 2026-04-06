@@ -8,7 +8,7 @@ header('X-ImageKpr-User-Id: ' . (int) $uid);
 $allowedSort = ['date_desc', 'date_asc', 'size_desc', 'size_asc', 'name_asc', 'name_desc', 'random'];
 $sort = isset($_GET['sort']) && in_array($_GET['sort'], $allowedSort) ? $_GET['sort'] : 'date_desc';
 $page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = min(MAX_IMAGES_PER_PAGE, max(1, (int)($_GET['per_page'] ?? 50)));
+$perPage = min(imagekpr_max_images_per_page(), max(1, (int)($_GET['per_page'] ?? 50)));
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $tag = isset($_GET['tag']) ? trim($_GET['tag']) : '';
 $idsParam = isset($_GET['ids']) ? trim($_GET['ids']) : '';
@@ -19,7 +19,7 @@ if ($idsParam !== '') {
 }
 if (imagekpr_bulk_ids_too_many($ids)) {
   http_response_code(400);
-  echo json_encode(['error' => 'Too many ids (max ' . MAX_BULK_IMAGE_IDS . ')']);
+  echo json_encode(['error' => 'Too many ids (max ' . imagekpr_max_bulk_image_ids() . ')']);
   exit;
 }
 
@@ -34,7 +34,7 @@ try {
 imagekpr_ensure_config();
 $uidInt = (int) $uid;
 $userScope = '(user_id = ' . $uidInt . ')';
-if (defined('IMAGEKPR_SHARE_NULL_USER_ROWS') && IMAGEKPR_SHARE_NULL_USER_ROWS) {
+if (imagekpr_share_null_user_rows_enabled()) {
   $userScope = '(user_id = ' . $uidInt . ' OR user_id IS NULL)';
 }
 $where = [$userScope];

@@ -2469,7 +2469,27 @@
     });
   }
 
+  function syncMaintenanceUiFromWhoami() {
+    fetchJSON(API_BASE + '/whoami.php').then(d => {
+      const on = d.maintenance === true;
+      if (on) {
+        document.body.classList.add('ikpr-maintenance');
+        if (!document.querySelector('.ikpr-maintenance-banner')) {
+          const b = document.createElement('div');
+          b.className = 'ikpr-maintenance-banner';
+          b.setAttribute('role', 'alert');
+          b.textContent = typeof d.maintenance_message === 'string' ? d.maintenance_message : '';
+          document.body.insertBefore(b, document.body.firstChild);
+        }
+      } else {
+        document.body.classList.remove('ikpr-maintenance');
+        document.querySelectorAll('.ikpr-maintenance-banner').forEach(el => el.remove());
+      }
+    }).catch(() => {});
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
+    syncMaintenanceUiFromWhoami();
     /* Avoid restored/stale folder filter (localStorage IDs ≠ current library). */
     const folderFilterBoot = document.getElementById('folder-filter');
     if (folderFilterBoot) folderFilterBoot.value = '';
