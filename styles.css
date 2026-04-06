@@ -587,6 +587,14 @@ body.ikpr-landing { background: #fafafa; }
 .ikpr-landing-block h1 { margin: 0 0 0.5rem; font-size: 1.75rem; }
 .ikpr-landing-block h2 { margin: 0 0 0.75rem; font-size: 1.15rem; }
 .ikpr-landing-lead { margin: 0; color: #444; }
+.ikpr-landing-about-tagline { font-weight: 600; margin-top: 0.25rem !important; }
+.ikpr-landing-about-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+  line-height: 1.45;
+  color: #444;
+}
+.ikpr-landing-about-list li + li { margin-top: 0.35rem; }
 .ikpr-landing-block p { margin: 0.5rem 0 0; line-height: 1.45; color: #444; }
 .ikpr-landing-block p:first-of-type { margin-top: 0; }
 .ikpr-landing-muted { color: #666; font-size: 0.9rem; margin-top: 0.75rem !important; }
