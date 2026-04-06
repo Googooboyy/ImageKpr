@@ -122,7 +122,7 @@ function imagekpr_require_api_user(): void
   if (imagekpr_user_id() < 1) {
     http_response_code(401);
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'Unauthorized', 'login' => 'login.php']);
+    echo json_encode(['error' => 'Unauthorized', 'login' => 'index.php']);
     exit;
   }
 }
@@ -130,7 +130,7 @@ function imagekpr_require_login_html(): void
 {
   imagekpr_start_session();
   if (imagekpr_user_id() < 1) {
-    imagekpr_redirect_html('login.php', 0);
+    imagekpr_redirect_html('index.php', 0);
   }
 }
 function imagekpr_redirect_if_logged_in(): void

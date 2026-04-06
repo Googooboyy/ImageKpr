@@ -1,8 +1,20 @@
 <?php
 ob_start();
 require_once __DIR__ . '/inc/auth.php';
-imagekpr_require_login_html();
 imagekpr_ensure_config();
+imagekpr_start_session();
+$ikLoggedIn = imagekpr_user_id() >= 1;
+
+if (!$ikLoggedIn) {
+  $ikMaintenance = imagekpr_maintenance_enabled();
+  $ikMaintenanceMsg = $ikMaintenance ? imagekpr_maintenance_banner_text() : '';
+  $ikLoginErrAllowed = ['state', 'oauth', 'code', 'config', 'token', 'userinfo', 'forbidden', 'database'];
+  $rawErr = isset($_GET['error']) ? (string) $_GET['error'] : '';
+  $ikLoginErr = in_array($rawErr, $ikLoginErrAllowed, true) ? $rawErr : '';
+  require __DIR__ . '/inc/public_landing.php';
+  exit;
+}
+
 $ikMaintenance = imagekpr_maintenance_enabled();
 $ikMaintenanceMsg = $ikMaintenance ? imagekpr_maintenance_banner_text() : '';
 $ikName = isset($_SESSION['name']) ? (string) $_SESSION['name'] : '';

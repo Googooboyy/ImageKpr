@@ -18,7 +18,7 @@
       body: body !== undefined ? JSON.stringify(body) : undefined
     }).then(r => {
       if (r.status === 401) {
-        window.location.href = 'login.php';
+        window.location.href = 'index.php#login';
         const e = new Error('Unauthorized');
         e.status = 401;
         throw e;
@@ -131,7 +131,7 @@
     const url = API_BASE + '/folders.php?name=' + encodeURIComponent(n);
     return fetch(url, { method: 'DELETE', credentials: 'same-origin' }).then(r => {
       if (r.status === 401) {
-        window.location.href = 'login.php';
+        window.location.href = 'index.php#login';
         throw new Error('Unauthorized');
       }
       return r.text().then(text => {

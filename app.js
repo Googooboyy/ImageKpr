@@ -24,7 +24,7 @@
   const API_BASE = 'api';
 
   function redirectToLogin() {
-    window.location.href = 'login.php';
+    window.location.href = 'index.php#login';
   }
 
   function fetchJSON(url) {

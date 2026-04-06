@@ -512,6 +512,56 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
 .credits-footer a { color: #333; text-decoration: none; }
 .credits-footer a:hover { text-decoration: underline; }
 
+/* Public landing (guests on index.php) — structural blocks; polish later */
+body.ikpr-landing { background: #fafafa; }
+.ikpr-landing-stack { max-width: 42rem; margin: 0 auto; padding: 2rem 1.25rem 0; }
+.ikpr-landing-block {
+  background: #e8e8e8;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 1.75rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.ikpr-landing-block h1 { margin: 0 0 0.5rem; font-size: 1.75rem; }
+.ikpr-landing-block h2 { margin: 0 0 0.75rem; font-size: 1.15rem; }
+.ikpr-landing-lead { margin: 0; color: #444; }
+.ikpr-landing-block p { margin: 0.5rem 0 0; line-height: 1.45; color: #444; }
+.ikpr-landing-block p:first-of-type { margin-top: 0; }
+.ikpr-landing-error { color: #c0392b; font-size: 0.95rem; }
+.ikpr-landing-note { font-size: 0.85rem; opacity: 0.85; margin-top: 1rem !important; }
+.ikpr-btn-google {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: #4285f4;
+  color: #fff !important;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.ikpr-btn-google:hover { background: #3367d6; }
+.ikpr-landing-request-form { margin-top: 1rem; max-width: 100%; }
+.ikpr-landing-label { display: block; margin-top: 0.75rem; font-size: 0.85rem; font-weight: 600; color: #333; }
+.ikpr-landing-request-form input,
+.ikpr-landing-request-form textarea {
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.45rem 0.5rem;
+  font: inherit;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  background: #f5f5f5;
+}
+.ikpr-landing-submit {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  cursor: not-allowed;
+  opacity: 0.7;
+  border-radius: 4px;
+  border: 1px solid #999;
+}
+
 .user-session-bar {
   flex-shrink: 0;
   display: flex;

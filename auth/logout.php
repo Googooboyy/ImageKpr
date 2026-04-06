@@ -8,4 +8,4 @@ if (ini_get('session.use_cookies')) {
   setcookie(session_name(), '', time() - 42000, $p['path'], $p['domain'] ?? '', $p['secure'], $p['httponly']);
 }
 session_destroy();
-imagekpr_redirect_html('login.php', 1);
+imagekpr_redirect_html('index.php', 1);

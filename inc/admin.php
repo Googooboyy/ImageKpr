@@ -41,7 +41,7 @@ function imagekpr_require_admin_html(int $loginLevels = 1, int $appLevels = 1): 
 {
   imagekpr_start_session();
   if (imagekpr_user_id() < 1) {
-    imagekpr_redirect_html('login.php', $loginLevels);
+    imagekpr_redirect_html('index.php', $loginLevels);
   }
   try {
     $pdo = imagekpr_pdo();
