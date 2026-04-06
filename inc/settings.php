@@ -80,6 +80,12 @@ function imagekpr_maintenance_banner_text(): string
   return 'This site is in read-only maintenance mode. Uploads, imports, and edits are temporarily disabled.';
 }
 
+/** When true, the public “Request access” form accepts new rows in email_access_requests. */
+function imagekpr_accept_access_requests_enabled(): bool
+{
+  return ImageKprAppSettings::get('accept_access_requests') === '1';
+}
+
 /**
  * @return int|null Positive cap, or null = unlimited site default
  */

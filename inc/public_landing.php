@@ -1,7 +1,8 @@
 <?php
 /**
  * Public marketing / sign-in shell for guests (included from index.php only).
- * Expects: $ikMaintenance (bool), $ikMaintenanceMsg (string), $ikLoginErr (string).
+ * Expects: $ikMaintenance (bool), $ikMaintenanceMsg (string), $ikLoginErr (string),
+ *   $ikRequestStatus (string), $ikAcceptRequests (bool).
  */
 $ikLoginMsgs = [
   'state' => 'Sign-in session expired. Please try again.',
@@ -14,6 +15,18 @@ $ikLoginMsgs = [
   'database' => 'Sign-in failed: database is not ready. Run migrations/phase7_auth.sql on the server, then try again.',
 ];
 $ikLoginMsg = $ikLoginMsgs[$ikLoginErr] ?? '';
+
+$ikRequestMsgs = [
+  'ok' => 'Thanks — we received your request. An administrator will review it.',
+  'duplicate' => 'That email already has a pending request.',
+  'closed' => 'Access requests are not being accepted right now.',
+  'invalid' => 'Please enter a valid email address.',
+  'ratelimit' => 'Too many requests from your network. Please try again later.',
+  'already_allowed' => 'That email is already authorized to sign in.',
+  'database' => 'Could not save your request. The server may need a database update (run migrations/phase14_access_requests.sql).',
+  'csrf' => 'Your session expired. Please try submitting again.',
+];
+$ikRequestMsg = $ikRequestMsgs[$ikRequestStatus] ?? '';
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -44,13 +57,20 @@ $ikLoginMsg = $ikLoginMsgs[$ikLoginErr] ?? '';
 
     <section class="ikpr-landing-block ikpr-landing-request" aria-labelledby="ikpr-request-heading">
       <h2 id="ikpr-request-heading">Request access</h2>
-      <p>Need an account? Request access — we will connect this to the allowlist workflow soon.</p>
-      <form class="ikpr-landing-request-form" action="#" method="get" onsubmit="return false;" aria-label="Request access (not yet active)">
+      <p>Need an account? Submit your work email. An admin can approve it so you can sign in with Google.</p>
+      <?php if ($ikRequestMsg !== '') { ?>
+      <p class="ikpr-landing-request-feedback<?php echo ($ikRequestStatus === 'ok' || $ikRequestStatus === 'duplicate' || $ikRequestStatus === 'already_allowed') ? ' ikpr-landing-request-feedback--ok' : ' ikpr-landing-request-feedback--err'; ?>" role="status"><?php echo htmlspecialchars($ikRequestMsg, ENT_QUOTES, 'UTF-8'); ?></p>
+      <?php } ?>
+      <?php if (!$ikAcceptRequests) { ?>
+      <p class="ikpr-landing-muted">The administrator is not accepting new requests at the moment.</p>
+      <?php } ?>
+      <form class="ikpr-landing-request-form" action="request_access.php" method="post" aria-label="Request access">
+        <?php echo imagekpr_guest_csrf_field(); ?>
         <label class="ikpr-landing-label" for="ikpr-request-email">Email</label>
-        <input type="email" id="ikpr-request-email" name="email" autocomplete="email" disabled placeholder="you@example.com">
+        <input type="email" id="ikpr-request-email" name="email" required autocomplete="email" placeholder="you@example.com" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>>
         <label class="ikpr-landing-label" for="ikpr-request-note">Message (optional)</label>
-        <textarea id="ikpr-request-note" name="note" rows="3" disabled placeholder="Tell us how you plan to use ImageKpr"></textarea>
-        <button type="button" class="ikpr-landing-submit" disabled>Submit request (coming soon)</button>
+        <textarea id="ikpr-request-note" name="note" rows="3" maxlength="2000" placeholder="Tell us how you plan to use ImageKpr" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>></textarea>
+        <button type="submit" class="ikpr-landing-submit" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>>Submit request</button>
       </form>
     </section>
 

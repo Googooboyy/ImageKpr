@@ -93,46 +93,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     imagekpr_admin_config_redirect();
   }
 
-  if ($act === 'allowlist_add') {
-    $em = strtolower(trim((string) ($_POST['allow_email'] ?? '')));
-    if ($em === '' || !filter_var($em, FILTER_VALIDATE_EMAIL)) {
-      $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Enter a valid email address.'];
-      imagekpr_admin_config_redirect();
-    }
-    try {
-      $ins = $pdo->prepare('INSERT INTO email_allowlist (email) VALUES (?)');
-      $ins->execute([$em]);
-      imagekpr_admin_audit_log($pdo, $actorId, 'allowlist_add', ['email' => $em]);
-      $_SESSION['admin_flash'] = ['type' => 'ok', 'msg' => 'Added ' . $em . ' to the allowlist.'];
-    } catch (PDOException $e) {
-      if ((int) $e->errorInfo[1] === 1062) {
-        $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'That email is already on the allowlist.'];
-      } else {
-        $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Could not add email.'];
-      }
-    }
-    imagekpr_admin_config_redirect();
-  }
-
-  if ($act === 'allowlist_delete') {
-    $aid = (int) ($_POST['allowlist_id'] ?? 0);
-    if ($aid < 1) {
-      $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Invalid allowlist entry.'];
-      imagekpr_admin_config_redirect();
-    }
-    $st = $pdo->prepare('SELECT email FROM email_allowlist WHERE id = ? LIMIT 1');
-    $st->execute([$aid]);
-    $row = $st->fetch(PDO::FETCH_ASSOC);
-    if ($row === false) {
-      $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Allowlist entry not found.'];
-      imagekpr_admin_config_redirect();
-    }
-    $pdo->prepare('DELETE FROM email_allowlist WHERE id = ?')->execute([$aid]);
-    imagekpr_admin_audit_log($pdo, $actorId, 'allowlist_delete', ['id' => $aid, 'email' => $row['email']]);
-    $_SESSION['admin_flash'] = ['type' => 'ok', 'msg' => 'Removed ' . $row['email'] . ' from the allowlist.'];
-    imagekpr_admin_config_redirect();
-  }
-
   imagekpr_admin_config_redirect();
 }
 
@@ -140,9 +100,6 @@ $flash = $_SESSION['admin_flash'] ?? null;
 unset($_SESSION['admin_flash']);
 
 ImageKprAppSettings::bust();
-$allowRows = $pdo->query('SELECT id, email, created_at FROM email_allowlist ORDER BY email ASC')->fetchAll(PDO::FETCH_ASSOC);
-$allowCount = (int) $pdo->query('SELECT COUNT(*) FROM email_allowlist')->fetchColumn();
-$allowOpen = $allowCount === 0;
 
 $defQ = ImageKprAppSettings::get('default_storage_quota_bytes');
 $shareChecked = ImageKprAppSettings::get('share_null_user_rows') === '1';
@@ -208,15 +165,10 @@ $adminNavCurrent = 'config';
     .admin-limit-block label.block { margin-top: 0; }
     .admin-limit-block .admin-field-help { margin-bottom: 0; }
     .admin-config-form label.block, .admin-config-section label.block { display: block; margin: 0.5rem 0; font-size: 0.9rem; }
-    .admin-config-form input[type="text"], .admin-config-form input[type="number"], .admin-config-form textarea,
-    .admin-config-section input[type="email"] { width: 100%; max-width: 28rem; padding: 0.35rem 0.5rem; box-sizing: border-box; }
+    .admin-config-form input[type="text"], .admin-config-form input[type="number"], .admin-config-form textarea { width: 100%; max-width: 28rem; padding: 0.35rem 0.5rem; box-sizing: border-box; }
     .admin-config-form textarea { min-height: 4rem; }
-    .admin-config-form button[type="submit"], .admin-config-section button[type="submit"] { margin-top: 0.75rem; padding: 0.45rem 1.1rem; cursor: pointer; font-weight: 600; border-radius: 6px; }
-    table.allowlist { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 0.5rem; }
-    table.allowlist th, table.allowlist td { padding: 0.4rem 0.5rem; border-bottom: 1px solid #eee; text-align: left; }
+    .admin-config-form button[type="submit"] { margin-top: 0.75rem; padding: 0.45rem 1.1rem; cursor: pointer; font-weight: 600; border-radius: 6px; }
     .admin-mono { font-family: ui-monospace, monospace; font-size: 0.8rem; }
-    .admin-btn-danger { background: #c62828; color: #fff; border: 1px solid #8e0000; cursor: pointer; border-radius: 4px; }
-    .admin-btn-danger:hover { background: #b71c1c; }
     .admin-field-help { margin: 0.35rem 0 0.85rem; font-size: 0.85rem; color: #555; line-height: 1.5; max-width: 42rem; }
     .admin-field-help p { margin: 0.4rem 0 0; }
     .admin-field-help p:first-child { margin-top: 0; }
@@ -333,45 +285,7 @@ $adminNavCurrent = 'config';
       </div>
     </form>
 
-    <section class="admin-config-section admin-config-panel" aria-labelledby="allowlist-heading">
-      <h2 id="allowlist-heading">Email allowlist</h2>
-      <?php if ($allowOpen) { ?>
-        <p class="admin-muted"><strong>Open signup:</strong> the allowlist is empty, so any Google account can sign in (subject to OAuth). Add emails below to restrict access.</p>
-      <?php } else { ?>
-        <p class="admin-muted"><strong>Restricted:</strong> only listed emails may sign in (<?php echo (int) $allowCount; ?> entr<?php echo $allowCount === 1 ? 'y' : 'ies'; ?>).</p>
-      <?php } ?>
-
-      <form method="post" action="config.php" style="margin:0.75rem 0">
-        <?php echo imagekpr_csrf_field(); ?>
-        <input type="hidden" name="form_action" value="allowlist_add">
-        <label>Add email <input type="email" name="allow_email" required placeholder="user@example.com" style="min-width:16rem;padding:0.35rem"></label>
-        <button type="submit">Add</button>
-      </form>
-
-      <?php if (empty($allowRows)) { ?>
-        <p class="admin-muted">No addresses in the list.</p>
-      <?php } else { ?>
-        <table class="allowlist">
-          <thead><tr><th>Email</th><th>Added</th><th></th></tr></thead>
-          <tbody>
-            <?php foreach ($allowRows as $ar) { ?>
-            <tr>
-              <td class="admin-mono"><?php echo htmlspecialchars((string) $ar['email'], ENT_QUOTES, 'UTF-8'); ?></td>
-              <td class="admin-muted"><?php echo htmlspecialchars((string) $ar['created_at'], ENT_QUOTES, 'UTF-8'); ?></td>
-              <td>
-                <form method="post" action="config.php" style="display:inline" onsubmit="return confirm('Remove this email from the allowlist?');">
-                  <?php echo imagekpr_csrf_field(); ?>
-                  <input type="hidden" name="form_action" value="allowlist_delete">
-                  <input type="hidden" name="allowlist_id" value="<?php echo (int) $ar['id']; ?>">
-                  <button type="submit" class="admin-btn-danger" style="padding:0.2rem 0.5rem;font-size:0.8rem;cursor:pointer">Remove</button>
-                </form>
-              </td>
-            </tr>
-            <?php } ?>
-          </tbody>
-        </table>
-      <?php } ?>
-    </section>
+    <p class="admin-muted admin-config-section" style="margin-top:1.5rem">Email allowlist and access requests are managed on <a href="allowlist.php">Allowlist</a>.</p>
   </div>
 </body>
 </html>

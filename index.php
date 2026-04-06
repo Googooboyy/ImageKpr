@@ -11,6 +11,10 @@ if (!$ikLoggedIn) {
   $ikLoginErrAllowed = ['state', 'oauth', 'code', 'config', 'token', 'userinfo', 'forbidden', 'database'];
   $rawErr = isset($_GET['error']) ? (string) $_GET['error'] : '';
   $ikLoginErr = in_array($rawErr, $ikLoginErrAllowed, true) ? $rawErr : '';
+  $ikReqAllowed = ['ok', 'duplicate', 'closed', 'invalid', 'ratelimit', 'already_allowed', 'database', 'csrf'];
+  $rawReq = isset($_GET['request']) ? (string) $_GET['request'] : '';
+  $ikRequestStatus = in_array($rawReq, $ikReqAllowed, true) ? $rawReq : '';
+  $ikAcceptRequests = imagekpr_accept_access_requests_enabled();
   require __DIR__ . '/inc/public_landing.php';
   exit;
 }
