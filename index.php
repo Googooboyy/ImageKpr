@@ -8,9 +8,14 @@ $ikLoggedIn = imagekpr_user_id() >= 1;
 if (!$ikLoggedIn) {
   $ikMaintenance = imagekpr_maintenance_enabled();
   $ikMaintenanceMsg = $ikMaintenance ? imagekpr_maintenance_banner_text() : '';
-  $ikLoginErrAllowed = ['state', 'oauth', 'code', 'config', 'token', 'userinfo', 'forbidden', 'database'];
+  $ikLoginErrAllowed = imagekpr_guest_login_error_codes();
   $rawErr = isset($_GET['error']) ? (string) $_GET['error'] : '';
   $ikLoginErr = in_array($rawErr, $ikLoginErrAllowed, true) ? $rawErr : '';
+  if ($ikLoginErr === '' && !empty($_SESSION['ik_guest_login_error'])) {
+    $flashCode = (string) $_SESSION['ik_guest_login_error'];
+    unset($_SESSION['ik_guest_login_error']);
+    $ikLoginErr = in_array($flashCode, $ikLoginErrAllowed, true) ? $flashCode : '';
+  }
   $ikReqAllowed = ['ok', 'duplicate', 'closed', 'invalid', 'ratelimit', 'already_allowed', 'database', 'csrf'];
   $rawReq = isset($_GET['request']) ? (string) $_GET['request'] : '';
   $ikRequestStatus = in_array($rawReq, $ikReqAllowed, true) ? $rawReq : '';

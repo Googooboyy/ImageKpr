@@ -11,7 +11,7 @@ $ikLoginMsgs = [
   'config' => 'Server OAuth configuration is incomplete.',
   'token' => 'Could not complete sign-in with Google. Try again.',
   'userinfo' => 'Could not read your Google profile. Try again.',
-  'forbidden' => 'Your account is not authorized. Ask an admin to add your email to the allowlist.',
+  'forbidden' => 'Sorry, your email is not yet approved for app access. Please request access below.',
   'database' => 'Sign-in failed: database is not ready. Run migrations/phase7_auth.sql on the server, then try again.',
 ];
 $ikLoginMsg = $ikLoginMsgs[$ikLoginErr] ?? '';
@@ -39,18 +39,24 @@ $ikRequestMsg = $ikRequestMsgs[$ikRequestStatus] ?? '';
   <?php if ($ikMaintenance) { ?>
   <div class="ikpr-maintenance-banner" role="alert"><?php echo htmlspecialchars($ikMaintenanceMsg, ENT_QUOTES, 'UTF-8'); ?></div>
   <?php } ?>
+  <?php if ($ikLoginMsg !== '') { ?>
+  <div class="ikpr-landing-alert ikpr-landing-alert--error" role="alert"><?php echo htmlspecialchars($ikLoginMsg, ENT_QUOTES, 'UTF-8'); ?></div>
+  <?php } ?>
+  <header class="ikpr-landing-hero" role="banner">
+    <h1 id="ikpr-hero-heading" class="ikpr-landing-hero-title">
+      <img src="assets/imagekpr-logo.png" alt="ImageKpr" width="605" height="330" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+      <span class="ikpr-landing-hero-fallback">ImageKpr</span>
+    </h1>
+  </header>
   <main class="ikpr-landing-stack">
-    <section class="ikpr-landing-block ikpr-landing-hero" aria-labelledby="ikpr-hero-heading">
-      <h1 id="ikpr-hero-heading">ImageKpr</h1>
-      <p class="ikpr-landing-lead">Hero — headline and visuals will go here.</p>
+    <section class="ikpr-landing-block ikpr-landing-about" aria-labelledby="ikpr-about-heading">
+      <h2 id="ikpr-about-heading">About ImageKpr</h2>
+      <p>ImageKpr is a personal image library: upload images, organize them with folders and tags, search your collection, and share links. Sign in with Google to keep your gallery private to your account.</p>
     </section>
 
     <section class="ikpr-landing-block ikpr-landing-login" id="login" aria-labelledby="ikpr-login-heading">
       <h2 id="ikpr-login-heading">Sign in</h2>
       <p>Already have access? Sign in with Google to open your library.</p>
-      <?php if ($ikLoginMsg !== '') { ?>
-      <p class="ikpr-landing-error" role="alert"><?php echo htmlspecialchars($ikLoginMsg, ENT_QUOTES, 'UTF-8'); ?></p>
-      <?php } ?>
       <p><a class="ikpr-btn-google" href="auth/google/start.php">Continue with Google</a></p>
       <p class="ikpr-landing-note">You will be redirected to Google to sign in.</p>
     </section>
@@ -72,11 +78,6 @@ $ikRequestMsg = $ikRequestMsgs[$ikRequestStatus] ?? '';
         <textarea id="ikpr-request-note" name="note" rows="3" maxlength="2000" placeholder="Tell us how you plan to use ImageKpr" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>></textarea>
         <button type="submit" class="ikpr-landing-submit" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>>Submit request</button>
       </form>
-    </section>
-
-    <section class="ikpr-landing-block ikpr-landing-about" aria-labelledby="ikpr-about-heading">
-      <h2 id="ikpr-about-heading">About ImageKpr</h2>
-      <p>ImageKpr is a personal image library: upload images, organize them with folders and tags, search your collection, and share links. Sign in with Google to keep your gallery private to your account.</p>
     </section>
   </main>
 

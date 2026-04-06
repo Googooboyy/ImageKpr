@@ -96,6 +96,23 @@ function imagekpr_redirect_html(string $relativePath, int $parentLevels = 0): vo
   header('Location: ' . imagekpr_public_path($relativePath, $parentLevels), true, 302);
   exit;
 }
+/** Query keys for index.php guest sign-in errors (allowlist + OAuth failures). */
+function imagekpr_guest_login_error_codes(): array
+{
+  return ['state', 'oauth', 'code', 'config', 'token', 'userinfo', 'forbidden', 'database'];
+}
+/**
+ * Redirect to the public landing with a sign-in error. Stores the code in session so the message
+ * still appears if the query string is stripped by a proxy or CDN.
+ */
+function imagekpr_redirect_guest_login_error(string $errorCode, int $parentLevels = 0): void
+{
+  if (!in_array($errorCode, imagekpr_guest_login_error_codes(), true)) {
+    $errorCode = 'oauth';
+  }
+  $_SESSION['ik_guest_login_error'] = $errorCode;
+  imagekpr_redirect_html('index.php?error=' . rawurlencode($errorCode) . '#login', $parentLevels);
+}
 function imagekpr_email_allowed(PDO $pdo, string $email, string $googleSub): bool
 {
   if (defined('ADMIN_GOOGLE_SUB') && ADMIN_GOOGLE_SUB !== '' && $googleSub === ADMIN_GOOGLE_SUB) {

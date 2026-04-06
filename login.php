@@ -9,7 +9,7 @@ imagekpr_start_session();
 if (imagekpr_user_id() >= 1) {
   imagekpr_redirect_html('index.php', 0);
 }
-$allowed = ['state', 'oauth', 'code', 'config', 'token', 'userinfo', 'forbidden', 'database'];
+$allowed = imagekpr_guest_login_error_codes();
 $err = isset($_GET['error']) ? (string) $_GET['error'] : '';
 $qs = ($err !== '' && in_array($err, $allowed, true)) ? ('?error=' . rawurlencode($err)) : '';
 imagekpr_redirect_html('index.php' . $qs, 0);
