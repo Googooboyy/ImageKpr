@@ -60,5 +60,5 @@ try {
   exit;
 }
 
-header('Location: index.php?request=ok', true, 303);
+header('Location: index.php?submitted=1', true, 303);
 exit;

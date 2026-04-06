@@ -145,6 +145,33 @@ function imagekpr_email_allowed(PDO $pdo, string $email, string $googleSub): boo
   $st->execute([strtolower(trim($email))]);
   return (bool) $st->fetchColumn();
 }
+
+/**
+ * Whether the current session may use the main app and JSON APIs.
+ * Empty allowlist => open signup (every signed-in user has access).
+ */
+function imagekpr_user_has_app_access(PDO $pdo): bool
+{
+  if (imagekpr_user_id() < 1) {
+    return false;
+  }
+  $googleSub = isset($_SESSION['google_sub']) ? (string) $_SESSION['google_sub'] : '';
+  if (defined('ADMIN_GOOGLE_SUB') && ADMIN_GOOGLE_SUB !== '' && $googleSub === ADMIN_GOOGLE_SUB) {
+    return true;
+  }
+  $n = (int) $pdo->query('SELECT COUNT(*) FROM email_allowlist')->fetchColumn();
+  if ($n === 0) {
+    return true;
+  }
+  $email = isset($_SESSION['email']) ? strtolower(trim((string) $_SESSION['email'])) : '';
+  if ($email === '') {
+    return false;
+  }
+  $st = $pdo->prepare('SELECT 1 FROM email_allowlist WHERE email = ? LIMIT 1');
+  $st->execute([$email]);
+  return (bool) $st->fetchColumn();
+}
+
 function imagekpr_require_api_user(): void
 {
   imagekpr_start_session();
@@ -159,6 +186,26 @@ function imagekpr_require_api_user(): void
     http_response_code(401);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => 'Unauthorized', 'login' => 'index.php']);
+    exit;
+  }
+  try {
+    imagekpr_ensure_config();
+    $pdo = imagekpr_pdo();
+    if (!imagekpr_user_has_app_access($pdo)) {
+      http_response_code(403);
+      header('Content-Type: application/json; charset=utf-8');
+      echo json_encode([
+        'error' => 'Forbidden',
+        'hint' => 'Your account is pending approval.',
+        'pending_approval' => true,
+        'landing' => 'index.php',
+      ], JSON_UNESCAPED_UNICODE);
+      exit;
+    }
+  } catch (Throwable $e) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'Server error', 'hint' => 'Could not verify access']);
     exit;
   }
 }

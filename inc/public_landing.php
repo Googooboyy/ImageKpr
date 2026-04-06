@@ -2,7 +2,7 @@
 /**
  * Public marketing / sign-in shell for guests (included from index.php only).
  * Expects: $ikMaintenance (bool), $ikMaintenanceMsg (string), $ikLoginErr (string),
- *   $ikRequestStatus (string), $ikAcceptRequests (bool).
+ *   $ikRequestStatus (string), $ikAcceptRequests (bool), $ikSubmitted (bool).
  */
 $ikLoginMsgs = [
   'state' => 'Sign-in session expired. Please try again.',
@@ -11,10 +11,12 @@ $ikLoginMsgs = [
   'config' => 'Server OAuth configuration is incomplete.',
   'token' => 'Could not complete sign-in with Google. Try again.',
   'userinfo' => 'Could not read your Google profile. Try again.',
-  'forbidden' => 'Sorry, your email is not yet approved for app access. Please request access below.',
+  'forbidden' => 'Sign in with Google to join the review queue. If you are already waiting, sign in again to see your status.',
   'database' => 'Sign-in failed: database is not ready. Run migrations/phase7_auth.sql on the server, then try again.',
 ];
 $ikLoginMsg = $ikLoginMsgs[$ikLoginErr] ?? '';
+
+$ikShowQueueBanner = !empty($ikSubmitted) || $ikRequestStatus === 'ok';
 
 $ikRequestMsgs = [
   'ok' => 'Thanks — we received your request. An administrator will review it.',
@@ -42,6 +44,9 @@ $ikRequestMsg = $ikRequestMsgs[$ikRequestStatus] ?? '';
   <?php if ($ikLoginMsg !== '') { ?>
   <div class="ikpr-landing-alert ikpr-landing-alert--error" role="alert"><?php echo htmlspecialchars($ikLoginMsg, ENT_QUOTES, 'UTF-8'); ?></div>
   <?php } ?>
+  <?php if ($ikShowQueueBanner) { ?>
+  <div class="ikpr-landing-alert ikpr-landing-alert--success" role="status">You are in the queue! There is nothing else you need to do right now. Check back tomorrow — approvals are usually within a day or a few.</div>
+  <?php } ?>
   <header class="ikpr-landing-hero" role="banner">
     <h1 id="ikpr-hero-heading" class="ikpr-landing-hero-title">
       <img src="assets/imagekpr-logo.png" alt="ImageKpr" width="605" height="330" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
@@ -49,42 +54,31 @@ $ikRequestMsg = $ikRequestMsgs[$ikRequestStatus] ?? '';
     </h1>
   </header>
   <main class="ikpr-landing-stack">
-    <section class="ikpr-landing-block ikpr-landing-about" aria-labelledby="ikpr-about-heading">
-      <h2 id="ikpr-about-heading">About ImageKpr</h2>
-      <p class="ikpr-landing-lead ikpr-landing-about-tagline">Your personal stock image library.</p>
-      <ul class="ikpr-landing-about-list">
-        <li>Privacy-first — sign in with Google; your gallery stays private to your account.</li>
-        <li>Upload and organize images in one place.</li>
-        <li>Folders and tags to keep your collection tidy.</li>
-        <li>Search your library; run slideshows and presentations.</li>
-        <li>Share private image links.</li>
-        <li>Zip batches of images and download for distribution.</li>
-      </ul>
-    </section>
+<?php require __DIR__ . '/landing_about_section.php'; ?>
 
     <section class="ikpr-landing-block ikpr-landing-login" id="login" aria-labelledby="ikpr-login-heading">
       <h2 id="ikpr-login-heading">Sign in</h2>
-      <p>Already have access? Sign in with Google to open your library.</p>
+      <p>Already approved? Sign in with Google to open your library. New here? When access is restricted, signing in with Google adds your Google email to the review queue.</p>
       <p><a class="ikpr-btn-google" href="auth/google/start.php">Continue with Google</a></p>
       <p class="ikpr-landing-note">You will be redirected to Google to sign in.</p>
     </section>
 
     <section class="ikpr-landing-block ikpr-landing-request" aria-labelledby="ikpr-request-heading">
-      <h2 id="ikpr-request-heading">Request access</h2>
-      <p>Need an account? Submit your work email. An admin can approve it so you can sign in with Google.</p>
-      <?php if ($ikRequestMsg !== '') { ?>
-      <p class="ikpr-landing-request-feedback<?php echo ($ikRequestStatus === 'ok' || $ikRequestStatus === 'duplicate' || $ikRequestStatus === 'already_allowed') ? ' ikpr-landing-request-feedback--ok' : ' ikpr-landing-request-feedback--err'; ?>" role="status"><?php echo htmlspecialchars($ikRequestMsg, ENT_QUOTES, 'UTF-8'); ?></p>
+      <h2 id="ikpr-request-heading">Request early access</h2>
+      <p>Prefer not to use Google yet? Submit your work email and a short note. An administrator can approve you so you can sign in later.</p>
+      <?php if ($ikRequestMsg !== '' && $ikRequestStatus !== 'ok') { ?>
+      <p class="ikpr-landing-request-feedback<?php echo ($ikRequestStatus === 'duplicate' || $ikRequestStatus === 'already_allowed') ? ' ikpr-landing-request-feedback--ok' : ' ikpr-landing-request-feedback--err'; ?>" role="status"><?php echo htmlspecialchars($ikRequestMsg, ENT_QUOTES, 'UTF-8'); ?></p>
       <?php } ?>
       <?php if (!$ikAcceptRequests) { ?>
       <p class="ikpr-landing-muted">The administrator is not accepting new requests at the moment.</p>
       <?php } ?>
-      <form class="ikpr-landing-request-form" action="request_access.php" method="post" aria-label="Request access">
+      <form class="ikpr-landing-request-form" action="request_access.php" method="post" aria-label="Request early access">
         <?php echo imagekpr_guest_csrf_field(); ?>
         <label class="ikpr-landing-label" for="ikpr-request-email">Email</label>
         <input type="email" id="ikpr-request-email" name="email" required autocomplete="email" placeholder="you@example.com" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>>
         <label class="ikpr-landing-label" for="ikpr-request-note">Message (optional)</label>
         <textarea id="ikpr-request-note" name="note" rows="3" maxlength="2000" placeholder="Tell us how you plan to use ImageKpr" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>></textarea>
-        <button type="submit" class="ikpr-landing-submit" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>>Submit request</button>
+        <button type="submit" class="ikpr-landing-submit" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>>Submit</button>
       </form>
     </section>
   </main>

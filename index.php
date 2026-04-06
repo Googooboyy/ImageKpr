@@ -5,6 +5,26 @@ imagekpr_ensure_config();
 imagekpr_start_session();
 $ikLoggedIn = imagekpr_user_id() >= 1;
 
+if ($ikLoggedIn) {
+  try {
+    $pdo = imagekpr_pdo();
+    if (!imagekpr_user_has_app_access($pdo)) {
+      $ikMaintenance = imagekpr_maintenance_enabled();
+      $ikMaintenanceMsg = $ikMaintenance ? imagekpr_maintenance_banner_text() : '';
+      $ikName = isset($_SESSION['name']) ? (string) $_SESSION['name'] : '';
+      $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
+      $ikSubmitted = isset($_GET['submitted']) && (string) $_GET['submitted'] === '1';
+      require __DIR__ . '/inc/pending_landing.php';
+      exit;
+    }
+  } catch (Throwable $e) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo 'Could not verify your account. Please try again later.';
+    exit;
+  }
+}
+
 if (!$ikLoggedIn) {
   $ikMaintenance = imagekpr_maintenance_enabled();
   $ikMaintenanceMsg = $ikMaintenance ? imagekpr_maintenance_banner_text() : '';
@@ -20,6 +40,7 @@ if (!$ikLoggedIn) {
   $rawReq = isset($_GET['request']) ? (string) $_GET['request'] : '';
   $ikRequestStatus = in_array($rawReq, $ikReqAllowed, true) ? $rawReq : '';
   $ikAcceptRequests = imagekpr_accept_access_requests_enabled();
+  $ikSubmitted = isset($_GET['submitted']) && (string) $_GET['submitted'] === '1';
   require __DIR__ . '/inc/public_landing.php';
   exit;
 }

@@ -576,6 +576,164 @@ body.ikpr-landing { background: #fafafa; }
   border-color: #ef9a9a;
   color: #b71c1c;
 }
+.ikpr-landing-alert--success {
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+  color: #1b5e20;
+}
+.ikpr-landing-hero--with-session {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+.ikpr-landing-hero--with-session .ikpr-landing-hero-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: center;
+}
+.ikpr-landing-session {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem 0.75rem;
+  font-size: 0.85rem;
+  color: #444;
+  width: 100%;
+}
+@media (min-width: 36rem) {
+  .ikpr-landing-hero--with-session .ikpr-landing-session {
+    width: auto;
+    flex: 0 0 auto;
+  }
+}
+.ikpr-landing-session-id {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ikpr-landing-session-logout {
+  color: #1565c0;
+  text-decoration: none;
+  font-weight: 600;
+}
+.ikpr-landing-session-logout:hover {
+  text-decoration: underline;
+}
+.ikpr-landing-pending-title {
+  font-size: 1.1rem;
+  line-height: 1.35;
+  margin: 0 0 0.75rem;
+  color: #222;
+}
+.ikpr-landing-pending-email {
+  font-weight: 700;
+  word-break: break-all;
+}
+.ikpr-landing-pending-lead {
+  margin: 0;
+  line-height: 1.5;
+  color: #444;
+}
+.ikpr-landing-faq-heading {
+  font-size: 1.05rem;
+  margin: 1.5rem 0 0.4rem;
+  color: #222;
+  font-weight: 700;
+}
+.ikpr-landing-faq-intro {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  color: #555;
+  line-height: 1.5;
+}
+.ikpr-landing-faq {
+  margin-top: 0.75rem;
+}
+/* One light “card” for the whole list; rows separated by hairline dividers (FAQ UX). */
+.ikpr-landing-faq-panel {
+  background: #fafafa;
+  border: 1px solid #c5c5c5;
+  border-radius: 8px;
+  padding: 0 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.ikpr-landing-faq-item {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid #d4d4d4;
+}
+.ikpr-landing-faq-item:last-child {
+  border-bottom: none;
+}
+.ikpr-landing-faq-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.05rem 0.2rem;
+  min-height: 3.25rem;
+  box-sizing: border-box;
+  font-weight: 700;
+  font-size: 0.98rem;
+  cursor: pointer;
+  list-style: none;
+  color: #1a1a1a;
+  line-height: 1.35;
+}
+.ikpr-landing-faq-summary::-webkit-details-marker {
+  display: none;
+}
+.ikpr-landing-faq-summary::after {
+  content: '';
+  display: block;
+  flex-shrink: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.15rem;
+  border-right: 2px solid #5c5c5c;
+  border-bottom: 2px solid #5c5c5c;
+  transform: rotate(45deg);
+  transition: transform 0.2s ease, border-color 0.15s ease;
+}
+.ikpr-landing-faq-item[open] .ikpr-landing-faq-summary::after {
+  margin-top: 0.35rem;
+  transform: rotate(-135deg);
+}
+.ikpr-landing-faq-summary:hover {
+  color: #000;
+}
+.ikpr-landing-faq-summary:hover::after {
+  border-color: #333;
+}
+.ikpr-landing-faq-summary:focus {
+  outline: none;
+}
+.ikpr-landing-faq-summary:focus-visible {
+  outline: 2px solid #1565c0;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.ikpr-landing-faq-body {
+  padding: 0 2rem 1.2rem 0.2rem;
+  margin-top: -0.15rem;
+  border-top: none;
+  font-size: 0.94rem;
+  font-weight: 400;
+  line-height: 1.55;
+  color: #5c5c5c;
+}
+.ikpr-landing-faq-body p {
+  margin: 0;
+  max-width: 36rem;
+}
+.ikpr-landing-faq-body p + p {
+  margin-top: 0.65rem;
+}
 .ikpr-landing-stack { max-width: 42rem; margin: 0 auto; padding: 2rem 1.25rem 0; }
 .ikpr-landing-block {
   background: #e8e8e8;

@@ -48,9 +48,7 @@ $picture = isset($info['picture']) ? (string) $info['picture'] : '';
 
 try {
   $pdo = imagekpr_pdo();
-  if (!imagekpr_email_allowed($pdo, $email, $sub)) {
-    imagekpr_redirect_guest_login_error('forbidden', 2);
-  }
+  $allowed = imagekpr_email_allowed($pdo, $email, $sub);
 
   $adminCfg = defined('ADMIN_GOOGLE_SUB') && ADMIN_GOOGLE_SUB !== '' && $sub === ADMIN_GOOGLE_SUB;
   $st = $pdo->prepare('SELECT id, is_admin FROM users WHERE google_sub = ?');
@@ -77,6 +75,14 @@ try {
   $_SESSION['email'] = $email;
   $_SESSION['name'] = $name;
   $_SESSION['google_sub'] = $sub;
+
+  if (!$allowed) {
+    $em = strtolower(trim($email));
+    $reqIns = $pdo->prepare('INSERT IGNORE INTO email_access_requests (email, note) VALUES (?, ?)');
+    $reqIns->execute([$em, 'Requested via Google sign-in']);
+    $justQueued = $reqIns->rowCount() > 0;
+    imagekpr_redirect_html($justQueued ? 'index.php?submitted=1' : 'index.php', 2);
+  }
 } catch (Throwable $e) {
   imagekpr_redirect_guest_login_error('database', 2);
 }

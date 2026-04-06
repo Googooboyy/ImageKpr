@@ -189,7 +189,7 @@ $adminNavCurrent = 'allowlist';
 
     <section class="admin-config-section admin-config-panel" aria-labelledby="req-toggle-heading">
       <h2 id="req-toggle-heading">Access requests</h2>
-      <p class="admin-muted">When enabled, visitors can submit their email from the main sign-in page. Pending requests appear below; approving adds the address to the allowlist and removes the request.</p>
+      <p class="admin-muted">When enabled, visitors can submit their email from the main sign-in page. If the allowlist is not empty, anyone who signs in with Google while not yet allowed is also added here automatically (note: &quot;Requested via Google sign-in&quot;). Pending rows appear below; approving adds the address to the allowlist and removes the request.</p>
       <form method="post" action="allowlist.php" class="admin-toggle-form">
         <?php echo imagekpr_csrf_field(); ?>
         <input type="hidden" name="form_action" value="save_accept_requests">
