@@ -856,15 +856,28 @@
     }, slideshowState.intervalMs);
   }
 
+  function shuffleSlideshowSlidesInPlace() {
+    if (!slideshowState) return;
+    const a = slideshowState.slides;
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i];
+      a[i] = a[j];
+      a[j] = t;
+    }
+  }
+
   function slideshowAdvance(delta) {
     if (!slideshowState || slideshowState.transitioning) return false;
-    const { slides, autoloop, index } = slideshowState;
+    const { slides, autoloop, index, randomizeOnLoop } = slideshowState;
     let i = index + delta;
     if (i >= slides.length) {
       if (!autoloop) return false;
+      if (randomizeOnLoop) shuffleSlideshowSlidesInPlace();
       i = 0;
     } else if (i < 0) {
       if (!autoloop) return false;
+      if (randomizeOnLoop) shuffleSlideshowSlidesInPlace();
       i = slides.length - 1;
     }
     goToSlideshowSlide(i, false);
@@ -970,6 +983,7 @@
       auto: options.auto,
       intervalMs: options.intervalMs,
       autoloop: options.autoloop,
+      randomizeOnLoop: options.randomizeOnLoop,
       transition: options.transition,
       timerId: null,
       transitioning: false,
@@ -1070,6 +1084,7 @@
     if (isNaN(duration) || duration < 1) duration = 5;
     if (duration > 600) duration = 600;
     const autoloop = document.getElementById('slideshow-autoloop').checked;
+    const randomizeOnLoop = autoloop && document.getElementById('slideshow-randomize-loop').checked;
     const transition = document.getElementById('slideshow-trans-fly').checked ? 'fly' : 'diffuse';
     const lbEl = document.querySelector('input[name="slideshow-letterbox"]:checked');
     const lbKey = lbEl && Object.prototype.hasOwnProperty.call(SLIDESHOW_LETTERBOX, lbEl.value) ? lbEl.value : 'black';
@@ -1077,6 +1092,7 @@
       auto,
       intervalMs: duration * 1000,
       autoloop,
+      randomizeOnLoop,
       transition,
       letterboxColor: SLIDESHOW_LETTERBOX[lbKey],
     };
@@ -1088,6 +1104,13 @@
     const dur = document.getElementById('slideshow-duration');
     row.style.opacity = auto ? '1' : '0.45';
     dur.disabled = !auto;
+    const loopOn = document.getElementById('slideshow-autoloop').checked;
+    const randEl = document.getElementById('slideshow-randomize-loop');
+    const randLabel = document.getElementById('slideshow-randomize-loop-label');
+    if (randEl && randLabel) {
+      randEl.disabled = !loopOn;
+      randLabel.style.opacity = loopOn ? '1' : '0.45';
+    }
   }
 
   function startSlideshowFromForm() {
@@ -2881,6 +2904,7 @@
     document.querySelectorAll('input[name="slideshow-advance"]').forEach((el) => {
       el.addEventListener('change', syncSlideshowSettingsForm);
     });
+    document.getElementById('slideshow-autoloop').addEventListener('change', syncSlideshowSettingsForm);
     document.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
       const player = document.getElementById('slideshow-player');

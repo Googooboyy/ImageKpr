@@ -746,6 +746,10 @@ body.ikpr-landing { background: #fafafa; }
   margin-top: 0.2rem;
   flex-shrink: 0;
 }
+.slideshow-check-nested {
+  margin-left: 1.35rem;
+  margin-top: 0.15rem;
+}
 .slideshow-duration-row {
   margin-top: 0.65rem;
   padding-top: 0.65rem;

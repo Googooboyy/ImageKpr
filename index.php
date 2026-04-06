@@ -223,6 +223,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         </div>
       </fieldset>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-autoloop" checked> Loop (return to first after last)</label>
+      <label class="slideshow-check slideshow-check-nested" id="slideshow-randomize-loop-label"><input type="checkbox" id="slideshow-randomize-loop"> Randomize order each time the slideshow loops</label>
       <fieldset class="slideshow-fieldset">
         <legend>Transition</legend>
         <label class="slideshow-radio"><input type="radio" name="slideshow-transition" id="slideshow-trans-diffuse" value="diffuse" checked> Diffuse (crossfade)</label>
