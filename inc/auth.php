@@ -1,4 +1,20 @@
 <?php
+function imagekpr_debug_log(string $hypothesisId, string $location, string $message, array $data = [], string $runId = 'run1'): void
+{
+  // #region agent log
+  $payload = [
+    'sessionId' => 'b35048',
+    'runId' => $runId,
+    'hypothesisId' => $hypothesisId,
+    'location' => $location,
+    'message' => $message,
+    'data' => $data,
+    'timestamp' => (int) round(microtime(true) * 1000),
+  ];
+  @file_put_contents(dirname(__DIR__) . '/debug-b35048.log', json_encode($payload, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+  // #endregion
+}
+
 function imagekpr_ensure_config(): void
 {
   static $done = false;
@@ -39,6 +55,11 @@ function imagekpr_start_session(): void
   $headersFile = '';
   $headersLine = 0;
   if (headers_sent($headersFile, $headersLine)) {
+    imagekpr_debug_log('H4', 'inc/auth.php:imagekpr_start_session', 'headers already sent before session start', [
+      'headers_file' => $headersFile,
+      'headers_line' => $headersLine,
+      'script' => (string) ($_SERVER['SCRIPT_NAME'] ?? ''),
+    ]);
     return;
   }
   ini_set('session.use_strict_mode', '1');
@@ -67,17 +88,42 @@ function imagekpr_start_session(): void
   if (version_compare(PHP_VERSION, '7.3.0', '>=')) {
     ini_set('session.cookie_samesite', 'Lax');
   }
+  imagekpr_debug_log('H1', 'inc/auth.php:imagekpr_start_session', 'session ini prepared', [
+    'script' => (string) ($_SERVER['SCRIPT_NAME'] ?? ''),
+    'ttl_target' => $ttl,
+    'gc_maxlifetime' => (string) ini_get('session.gc_maxlifetime'),
+    'cookie_lifetime' => (string) ini_get('session.cookie_lifetime'),
+    'save_path' => (string) ini_get('session.save_path'),
+    'https' => $https ? 1 : 0,
+  ]);
 
   // First attempt: custom cookie name.
   session_name('ImageKprSESS');
   if (@session_start()) {
+    $cp = session_get_cookie_params();
+    imagekpr_debug_log('H2', 'inc/auth.php:imagekpr_start_session', 'session started with custom session name', [
+      'script' => (string) ($_SERVER['SCRIPT_NAME'] ?? ''),
+      'session_name' => (string) session_name(),
+      'session_id_len' => strlen((string) session_id()),
+      'cookie_lifetime_runtime' => isset($cp['lifetime']) ? (int) $cp['lifetime'] : -1,
+      'user_id_present' => isset($_SESSION['user_id']) ? 1 : 0,
+    ]);
     return;
   }
 
   // Fallback: host may reject renamed session cookie under custom rules.
   if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
     session_name('PHPSESSID');
-    @session_start();
+    $ok = @session_start();
+    $cp = session_get_cookie_params();
+    imagekpr_debug_log('H2', 'inc/auth.php:imagekpr_start_session', 'session fallback attempt', [
+      'script' => (string) ($_SERVER['SCRIPT_NAME'] ?? ''),
+      'fallback_ok' => $ok ? 1 : 0,
+      'session_name' => (string) session_name(),
+      'session_id_len' => strlen((string) session_id()),
+      'cookie_lifetime_runtime' => isset($cp['lifetime']) ? (int) $cp['lifetime'] : -1,
+      'user_id_present' => isset($_SESSION['user_id']) ? 1 : 0,
+    ]);
   }
 }
 function imagekpr_pdo(): PDO
@@ -177,12 +223,25 @@ function imagekpr_require_api_user(): void
   imagekpr_start_session();
   imagekpr_json_security_headers();
   if (session_status() !== PHP_SESSION_ACTIVE) {
+    imagekpr_debug_log('H3', 'inc/auth.php:imagekpr_require_api_user', 'session not active for API request', [
+      'script' => (string) ($_SERVER['SCRIPT_NAME'] ?? ''),
+      'session_status' => (int) session_status(),
+      'session_name' => (string) session_name(),
+      'session_id_len' => strlen((string) session_id()),
+    ]);
     http_response_code(500);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => 'Session unavailable', 'hint' => 'PHP session_start failed']);
     exit;
   }
   if (imagekpr_user_id() < 1) {
+    imagekpr_debug_log('H3', 'inc/auth.php:imagekpr_require_api_user', 'api unauthorized due to missing user_id', [
+      'script' => (string) ($_SERVER['SCRIPT_NAME'] ?? ''),
+      'session_name' => (string) session_name(),
+      'session_id_len' => strlen((string) session_id()),
+      'cookie_name_present' => isset($_COOKIE[session_name()]) ? 1 : 0,
+      'all_cookie_names' => array_keys($_COOKIE),
+    ]);
     http_response_code(401);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => 'Unauthorized', 'login' => 'index.php']);

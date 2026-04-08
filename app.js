@@ -22,9 +22,21 @@
   })();
 
   const API_BASE = 'api';
+  // #region agent log
+  function debugLog(hypothesisId, location, message, data, runId) {
+    fetch('http://127.0.0.1:7386/ingest/83463d4a-a660-47b7-b3f9-ab9626544831',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b35048'},body:JSON.stringify({sessionId:'b35048',runId:runId || 'run2',hypothesisId:hypothesisId,location:location,message:message,data:data || {},timestamp:Date.now()})}).catch(()=>{});
+  }
+  // #endregion
   const GRID_CARD_DRAG_MIME = 'application/x-imagekpr-grid-image';
 
   function redirectToLogin() {
+    // #region agent log
+    debugLog('H6', 'app.js:redirectToLogin', 'client redirecting to login', {
+      href: window.location.href,
+      hasImageKprSessCookie: document.cookie.indexOf('ImageKprSESS=') !== -1,
+      hasPhpSessCookie: document.cookie.indexOf('PHPSESSID=') !== -1
+    });
+    // #endregion
     window.location.href = 'index.php#login';
   }
 
@@ -1538,9 +1550,7 @@
           grid.innerHTML =
             '<p class="empty">No images yet. Upload some!</p>' +
             '<p class="empty" style="font-size:0.85rem;max-width:36rem;margin-left:auto;margin-right:auto;line-height:1.45">' +
-            'If the database already has rows, open <a href="' + API_BASE + '/whoami.php" target="_blank" rel="noopener">api/whoami.php</a> ' +
-            'and confirm <code>user_id</code> matches <code>images.user_id</code>. In DevTools → Network, <code>images.php</code> responses include ' +
-            'header <code>X-ImageKpr-User-Id</code>. Or set <code>IMAGEKPR_SHARE_NULL_USER_ROWS</code> in <code>config.php</code> temporarily if rows are still NULL.</p>';
+            'Use the upload area above, or drag and drop files onto it.</p>';
         }
       }
       if (append) return;
@@ -1653,8 +1663,8 @@
       if (!append && filtered.length === 0) {
         grid.innerHTML =
           '<p class="empty">No images in this folder view.</p>' +
-          '<p class="empty" style="font-size:0.85rem;max-width:36rem;margin-left:auto;margin-right:auto">Click <strong>All</strong> above, or open ' +
-          '<a href="' + API_BASE + '/whoami.php" target="_blank" rel="noopener">api/whoami.php</a> to verify your account.</p>';
+          '<p class="empty" style="font-size:0.85rem;max-width:36rem;margin-left:auto;margin-right:auto;line-height:1.45">' +
+          'Click <strong>All</strong> above to see your full library, or choose another folder.</p>';
       }
       document.getElementById('load-more').innerHTML = '';
       const imgs = grid.querySelectorAll('img[data-src]');
@@ -2648,6 +2658,14 @@
 
   function syncMaintenanceUiFromWhoami() {
     fetchJSON(API_BASE + '/whoami.php').then(d => {
+      // #region agent log
+      debugLog('H7', 'app.js:syncMaintenanceUiFromWhoami', 'whoami success', {
+        user_id: Number(d && d.user_id ? d.user_id : 0),
+        upload_size_mb: Number(d && d.upload_size_mb ? d.upload_size_mb : 0),
+        hasImageKprSessCookie: document.cookie.indexOf('ImageKprSESS=') !== -1,
+        hasPhpSessCookie: document.cookie.indexOf('PHPSESSID=') !== -1
+      });
+      // #endregion
       if (Number.isFinite(Number(d.upload_max_bytes)) && Number(d.upload_max_bytes) > 0) {
         MAX_UPLOAD = Number(d.upload_max_bytes);
       }
@@ -2672,7 +2690,16 @@
         document.body.classList.remove('ikpr-maintenance');
         document.querySelectorAll('.ikpr-maintenance-banner').forEach(el => el.remove());
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      // #region agent log
+      debugLog('H8', 'app.js:syncMaintenanceUiFromWhoami', 'whoami failed', {
+        message: err && err.message ? String(err.message) : 'unknown',
+        status: err && err.status ? Number(err.status) : 0,
+        hasImageKprSessCookie: document.cookie.indexOf('ImageKprSESS=') !== -1,
+        hasPhpSessCookie: document.cookie.indexOf('PHPSESSID=') !== -1
+      });
+      // #endregion
+    });
   }
 
   document.addEventListener('DOMContentLoaded', async () => {

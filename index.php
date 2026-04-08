@@ -26,6 +26,14 @@ if ($ikLoggedIn) {
 }
 
 if (!$ikLoggedIn) {
+  // #region agent log
+  imagekpr_debug_log('H5', 'index.php:guest-branch', 'index rendered as guest', [
+    'session_name' => (string) session_name(),
+    'session_id_len' => strlen((string) session_id()),
+    'cookie_name_present' => isset($_COOKIE[session_name()]) ? 1 : 0,
+    'all_cookie_names' => array_keys($_COOKIE),
+  ]);
+  // #endregion
   $ikMaintenance = imagekpr_maintenance_enabled();
   $ikMaintenanceMsg = $ikMaintenance ? imagekpr_maintenance_banner_text() : '';
   $ikLoginErrAllowed = imagekpr_guest_login_error_codes();
