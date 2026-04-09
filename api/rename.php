@@ -33,8 +33,8 @@ try {
   exit;
 }
 
-$dir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
-$baseUrl = rtrim(IMAGES_URL, '/') . '/';
+$dir = imagekpr_user_images_dir($uid) . DIRECTORY_SEPARATOR;
+$baseUrl = imagekpr_user_images_url($uid) . '/';
 
 $stmt = $pdo->prepare('SELECT id, filename, url FROM images WHERE id = ? AND user_id = ?');
 $stmt->execute([$id, $uid]);
@@ -51,7 +51,7 @@ $newExt = pathinfo($newFilename, PATHINFO_EXTENSION);
 if (!$newExt) $newExt = $ext;
 $newFn = sanitize($stem ?: pathinfo($oldFn, PATHINFO_FILENAME)) . '.' . $newExt;
 
-$oldPath = $dir . $oldFn;
+$oldPath = imagekpr_resolve_user_image_path($uid, $oldFn);
 $newPath = $dir . $newFn;
 
 if (!file_exists($oldPath)) {

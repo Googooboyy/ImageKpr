@@ -10,8 +10,8 @@ define('DB_NAME', 'db hostname here');
 define('DB_USER', 'db username here');
 define('DB_PASS', 'your password here');
 
-define('IMAGES_DIR', __DIR__ . '/images');
-define('IMAGES_URL', 'http://imagekpr.mar.sg/images');  // Use absolute URL for shareable links (e.g. http://imagekpr.mar.sg/images). Relative (e.g. /images) also works; copy will resolve to current origin.
+define('IMAGES_DIR', __DIR__ . '/images'); // User uploads are stored in per-user subfolders under this root, e.g. /images/{user_id}/filename.jpg
+define('IMAGES_URL', 'http://imagekpr.mar.sg/images');  // Base URL for uploads. App appends /{user_id}/filename.jpg. Relative (e.g. /images) also works.
 define('INBOX_DIR', __DIR__ . '/inbox');
 // Google OAuth (Phase 7). In Google Cloud Console, set redirect URI to your site callback, e.g.
 // https://your-domain.example/auth/google/callback.php

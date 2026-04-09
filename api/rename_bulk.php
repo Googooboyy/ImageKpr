@@ -42,8 +42,8 @@ try {
   exit;
 }
 
-$dir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
-$baseUrl = rtrim(IMAGES_URL, '/') . '/';
+$dir = imagekpr_user_images_dir($uid) . DIRECTORY_SEPARATOR;
+$baseUrl = imagekpr_user_images_url($uid) . '/';
 $results = [];
 $placeholders = implode(',', array_fill(0, count($ids), '?'));
 $params = array_merge($ids, [$uid]);
@@ -76,7 +76,7 @@ foreach ($rows as $row) {
     $newFn = pathinfo($newFn, PATHINFO_FILENAME) . '-' . $suffix . '.' . $ext;
     $newPath = $dir . $newFn;
   }
-  $oldPath = $dir . $oldFn;
+  $oldPath = imagekpr_resolve_user_image_path($uid, $oldFn);
   if (file_exists($oldPath) && @rename($oldPath, $newPath)) {
     $newUrl = $baseUrl . $newFn;
     $up = $pdo->prepare('UPDATE images SET filename = ?, url = ? WHERE id = ? AND user_id = ?');

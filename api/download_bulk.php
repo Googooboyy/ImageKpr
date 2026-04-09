@@ -39,13 +39,12 @@ $params = array_merge($ids, [$uid]);
 $stmt = $pdo->prepare("SELECT id, filename FROM images WHERE id IN ($placeholders) AND user_id = ?");
 $stmt->execute($params);
 
-$dir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
 $zip = new ZipArchive();
 $tmp = tempnam(sys_get_temp_dir(), 'img');
 $zip->open($tmp, ZipArchive::CREATE | ZipArchive::OVERWRITE);
 
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-  $path = $dir . $row['filename'];
+  $path = imagekpr_resolve_user_image_path($uid, (string) $row['filename']);
   if (file_exists($path)) {
     $zip->addFile($path, $row['filename']);
   }

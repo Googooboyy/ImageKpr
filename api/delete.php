@@ -48,7 +48,7 @@ if (!$filename || !$id) {
   exit;
 }
 
-$path = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR . $filename;
+$path = imagekpr_resolve_user_image_path($uid, $filename);
 if (file_exists($path) && !@unlink($path)) {
   echo json_encode(['success' => false, 'error' => 'Failed to delete file']);
   exit;

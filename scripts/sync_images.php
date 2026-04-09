@@ -13,6 +13,7 @@ if (!file_exists($root . '/config.php')) {
   exit(1);
 }
 require_once $root . '/config.php';
+require_once $root . '/inc/images_path.php';
 
 $syncUserId = null;
 $envUid = getenv('IMAGEKPR_SYNC_USER_ID');
@@ -30,7 +31,8 @@ if ($argc >= 2 && ctype_digit((string) $argv[1])) {
 
 $exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 $inboxDir = rtrim(INBOX_DIR, '/\\') . DIRECTORY_SEPARATOR;
-$imagesDir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
+$targetUserId = $syncUserId === null ? 0 : (int) $syncUserId;
+$imagesDir = imagekpr_ensure_user_images_dir($targetUserId) . DIRECTORY_SEPARATOR;
 $maxSize = 3 * 1024 * 1024;
 $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
@@ -102,7 +104,7 @@ foreach (scandir($inboxDir) as $f) {
   if (copy($path, $dest)) {
     @unlink($path);
     $info = @getimagesize($dest);
-    $url = rtrim(IMAGES_URL, '/') . '/' . $chosen;
+    $url = imagekpr_user_images_url($targetUserId) . '/' . $chosen;
     $st = $pdo->prepare('INSERT INTO images (filename, url, date_uploaded, size_bytes, width, height, tags, user_id) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?)');
     $st->execute([$chosen, $url, filesize($dest), $info[0] ?? null, $info[1] ?? null, '[]', $syncUserId]);
     $inDb[$chosen] = true;

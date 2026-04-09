@@ -34,7 +34,6 @@ try {
   exit;
 }
 
-$dir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
 $deleted = 0;
 $placeholders = implode(',', array_fill(0, count($ids), '?'));
 $params = array_merge($ids, [$uid]);
@@ -42,7 +41,7 @@ $sql = "SELECT id, filename FROM images WHERE id IN ($placeholders) AND user_id 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-  $path = $dir . $row['filename'];
+  $path = imagekpr_resolve_user_image_path($uid, (string) $row['filename']);
   if (file_exists($path)) @unlink($path);
   $del = $pdo->prepare('DELETE FROM images WHERE id = ? AND user_id = ?');
   $del->execute([$row['id'], $uid]);

@@ -122,7 +122,7 @@ foreach ($files as $file) {
   $ext = $ext ? preg_replace('/[^a-z0-9]/', '', strtolower($ext)) : 'jpg';
   $stem = pathinfo($baseName, PATHINFO_FILENAME) ?: 'image';
   $baseName = $stem . '.' . $ext;
-  $dir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
+  $dir = imagekpr_ensure_user_images_dir($uid) . DIRECTORY_SEPARATOR;
   $path = $dir . $baseName;
   $doReplace = in_array($baseName, $replaceNames);
   if ($doReplace && file_exists($path)) {
@@ -145,7 +145,7 @@ foreach ($files as $file) {
   $info = @getimagesize($path);
   $width = $info[0] ?? null;
   $height = $info[1] ?? null;
-  $url = rtrim(IMAGES_URL, '/') . '/' . $baseName;
+  $url = imagekpr_user_images_url($uid) . '/' . $baseName;
   $date = date('Y-m-d H:i:s');
   $tagsJson = json_encode([]);
   $stmt = $pdo->prepare('INSERT INTO images (filename, url, date_uploaded, size_bytes, width, height, tags, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');

@@ -27,7 +27,7 @@ A minimalistic image repository app for hosting and linking images. Built with L
 ## Quick Setup
 
 1. **Create database** via cPanel/phpMyAdmin and run `database.sql`
-2. **Copy config**: `cp config.example.php config.php` and fill in DB credentials, `IMAGES_DIR`, `IMAGES_URL`, `INBOX_DIR`
+2. **Copy config**: `cp config.example.php config.php` and fill in DB credentials, `IMAGES_DIR`, `IMAGES_URL`, `INBOX_DIR` (`IMAGES_DIR`/`IMAGES_URL` are roots; uploads are stored as `/images/{user_id}/filename`)
 3. **Set permissions**: Make `images/` and `inbox/` writable (755 or 775)
 4. **Point DocumentRoot** to the project root
 5. Ensure `upload_max_filesize` and `post_max_size` in php.ini are at least 3MB
@@ -67,6 +67,14 @@ A minimalistic image repository app for hosting and linking images. Built with L
 1. Drop images into `inbox/` via FTP or File Manager
 2. Dashboard shows "X images in inbox" — click **Import all**
 3. Or run from CLI: `php scripts/sync_images.php`
+
+## Per-User Image Folder Migration
+
+If you are upgrading from the old flat `/images` layout, run:
+
+`php scripts/migrate_to_user_folders.php`
+
+This moves files into `/images/{user_id}/` and updates `images.url` records.
 
 ## License
 

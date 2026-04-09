@@ -70,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
   }
 
-  $imagesDir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
+  $imagesDir = imagekpr_ensure_user_images_dir($uid) . DIRECTORY_SEPARATOR;
   $maxSize = 3 * 1024 * 1024;
   $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
@@ -173,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $tagsJson = json_encode($tags);
 
     $info = @getimagesize($dest);
-    $url = rtrim(IMAGES_URL, '/') . '/' . $baseName;
+    $url = imagekpr_user_images_url($uid) . '/' . $baseName;
     $stmt = $pdo->prepare('INSERT INTO images (filename, url, date_uploaded, size_bytes, width, height, tags, user_id) VALUES (?, ?, NOW(), ?, ?, ?, ?, ?)');
     $stmt->execute([$baseName, $url, filesize($dest), $info[0] ?? null, $info[1] ?? null, $tagsJson, $uid]);
     $importedIds[] = (int) $pdo->lastInsertId();

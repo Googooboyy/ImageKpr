@@ -261,7 +261,7 @@ function imagekpr_admin_purge_confirm_phrase(): string
 }
 
 /**
- * Remove all gallery images for the given users: unlink files under IMAGES_DIR, then DELETE rows.
+ * Remove all gallery images for the given users: unlink files from per-user image dirs, then DELETE rows.
  * Does not modify users, allowlist, or inbox.
  *
  * @param int[] $userIds
@@ -274,9 +274,8 @@ function imagekpr_admin_purge_gallery_for_users(PDO $pdo, array $userIds): array
   if ($userIds === []) {
     return ['rows_deleted' => 0, 'files_removed' => 0];
   }
-  $dir = rtrim(IMAGES_DIR, '/\\') . DIRECTORY_SEPARATOR;
   $placeholders = implode(',', array_fill(0, count($userIds), '?'));
-  $st = $pdo->prepare("SELECT id, filename FROM images WHERE user_id IN ($placeholders)");
+  $st = $pdo->prepare("SELECT id, filename, user_id FROM images WHERE user_id IN ($placeholders)");
   $st->execute($userIds);
   $filesRemoved = 0;
   while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
@@ -284,7 +283,7 @@ function imagekpr_admin_purge_gallery_for_users(PDO $pdo, array $userIds): array
     if ($fn === '' || $fn === '.' || $fn === '..') {
       continue;
     }
-    $path = $dir . $fn;
+    $path = imagekpr_resolve_user_image_path((int) $row['user_id'], $fn);
     if (is_file($path) && @unlink($path)) {
       $filesRemoved++;
     }
