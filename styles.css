@@ -726,6 +726,25 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
   margin-top: 1rem;
 }
 
+.ikpr-updates-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+}
+
+.ikpr-updates-pagination a {
+  text-decoration: none;
+  color: #1565c0;
+}
+
+.ikpr-updates-pagination a[aria-disabled="true"] {
+  pointer-events: none;
+  color: #8a8a8a;
+}
+
 .ikpr-contact-alert {
   background: #ffebee;
   border: 1px solid #ef9a9a;

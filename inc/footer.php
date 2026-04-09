@@ -7,11 +7,11 @@ function imagekpr_footer_config(): array
     'company_links' => [
       ['label' => 'Login', 'url' => '/'],
       ['label' => 'About', 'url' => '/about.php'],
+      ['label' => 'Updates', 'url' => '/updates.php'],
       ['label' => 'Use cases', 'url' => '/case-studies.php'],
       ['label' => 'Contact', 'url' => '/contact.php'],
     ],
     'resources_links' => [
-      ['label' => 'Updates', 'url' => '/updates.php'],
       ['label' => 'Knowledge base', 'url' => '/knowledge-base.php'],
       ['label' => 'Support', 'url' => '/support.php'],
     ],

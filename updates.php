@@ -2,7 +2,39 @@
 declare(strict_types=1);
 require_once __DIR__ . '/inc/updates_data.php';
 
-$posts = imagekpr_updates_sorted_desc();
+$perPage = 10;
+$page = isset($_GET['page']) ? (int) $_GET['page'] : 1;
+if ($page < 1) {
+  $page = 1;
+}
+$totalPosts = imagekpr_updates_count_published();
+$totalPages = max(1, (int) ceil($totalPosts / $perPage));
+if ($page > $totalPages) {
+  $page = $totalPages;
+}
+$offset = ($page - 1) * $perPage;
+$posts = imagekpr_updates_list_published($offset, $perPage);
+
+function imagekpr_updates_page_link(int $page): string
+{
+  return '/updates.php?page=' . max(1, $page);
+}
+
+function imagekpr_updates_render_pagination(int $page, int $totalPages): void
+{
+  if ($totalPages <= 1) {
+    return;
+  }
+  ?>
+  <nav class="ikpr-updates-pagination" aria-label="Updates pagination">
+    <a href="<?php echo htmlspecialchars(imagekpr_updates_page_link(1), ENT_QUOTES, 'UTF-8'); ?>"<?php echo $page === 1 ? ' aria-disabled="true"' : ''; ?>>First</a>
+    <a href="<?php echo htmlspecialchars(imagekpr_updates_page_link($page - 1), ENT_QUOTES, 'UTF-8'); ?>"<?php echo $page === 1 ? ' aria-disabled="true"' : ''; ?>>Previous</a>
+    <span>Page <?php echo (int) $page; ?> of <?php echo (int) $totalPages; ?></span>
+    <a href="<?php echo htmlspecialchars(imagekpr_updates_page_link($page + 1), ENT_QUOTES, 'UTF-8'); ?>"<?php echo $page === $totalPages ? ' aria-disabled="true"' : ''; ?>>Next</a>
+    <a href="<?php echo htmlspecialchars(imagekpr_updates_page_link($totalPages), ENT_QUOTES, 'UTF-8'); ?>"<?php echo $page === $totalPages ? ' aria-disabled="true"' : ''; ?>>Last</a>
+  </nav>
+  <?php
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -20,7 +52,7 @@ $posts = imagekpr_updates_sorted_desc();
   <main class="ikpr-doc-wrap">
     <h1>Updates</h1>
     <p class="ikpr-doc-lead">Product news, release notes, and operational notices for ImageKpr.</p>
-    <p><a href="/updates.xml">RSS feed</a></p>
+    <?php imagekpr_updates_render_pagination($page, $totalPages); ?>
 
     <?php if (empty($posts)) { ?>
       <p>No updates published yet.</p>
@@ -39,6 +71,7 @@ $posts = imagekpr_updates_sorted_desc();
         </article>
       <?php } ?>
     <?php } ?>
+    <?php imagekpr_updates_render_pagination($page, $totalPages); ?>
   </main>
   <?php
   require_once __DIR__ . '/inc/footer.php';

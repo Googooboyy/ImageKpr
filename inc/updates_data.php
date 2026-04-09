@@ -1,7 +1,8 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/auth.php';
 
-function imagekpr_updates_all(): array
+function imagekpr_updates_static_seed(): array
 {
   return [
     [
@@ -31,23 +32,93 @@ function imagekpr_updates_all(): array
   ];
 }
 
-function imagekpr_updates_find_by_slug(string $slug): ?array
+function imagekpr_updates_db_post_to_public(array $row): array
 {
-  foreach (imagekpr_updates_all() as $post) {
-    if (($post['slug'] ?? '') === $slug) {
-      return $post;
+  $bodyText = (string) ($row['body'] ?? '');
+  $parts = preg_split('/\R{2,}/', trim($bodyText));
+  $body = [];
+  if (is_array($parts)) {
+    foreach ($parts as $p) {
+      $p = trim((string) $p);
+      if ($p !== '') {
+        $body[] = $p;
+      }
     }
   }
-  return null;
+  $tags = [];
+  $tagsRaw = isset($row['tags_json']) ? (string) $row['tags_json'] : '';
+  if ($tagsRaw !== '') {
+    $decoded = json_decode($tagsRaw, true);
+    if (is_array($decoded)) {
+      foreach ($decoded as $t) {
+        $tv = trim((string) $t);
+        if ($tv !== '') {
+          $tags[] = $tv;
+        }
+      }
+    }
+  }
+
+  return [
+    'slug' => (string) ($row['slug'] ?? ''),
+    'title' => (string) ($row['title'] ?? ''),
+    'published_at' => (string) ($row['published_at'] ?? ''),
+    'summary' => (string) ($row['summary'] ?? ''),
+    'tags' => $tags,
+    'body' => $body,
+  ];
+}
+
+function imagekpr_updates_all(): array
+{
+  try {
+    $pdo = imagekpr_pdo();
+    $sql = 'SELECT slug, title, published_at, summary, body, tags_json
+      FROM updates_posts
+      WHERE status = "published"
+      ORDER BY published_at DESC, id DESC';
+    $rows = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    $out = [];
+    foreach ($rows as $row) {
+      $out[] = imagekpr_updates_db_post_to_public($row);
+    }
+    return $out;
+  } catch (Throwable $e) {
+    return imagekpr_updates_static_seed();
+  }
+}
+
+function imagekpr_updates_find_by_slug(string $slug): ?array
+{
+  $slug = trim($slug);
+  if ($slug === '') {
+    return null;
+  }
+  try {
+    $pdo = imagekpr_pdo();
+    $st = $pdo->prepare('SELECT slug, title, published_at, summary, body, tags_json
+      FROM updates_posts
+      WHERE status = "published" AND slug = ?
+      LIMIT 1');
+    $st->execute([$slug]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if ($row !== false) {
+      return imagekpr_updates_db_post_to_public($row);
+    }
+    return null;
+  } catch (Throwable $e) {
+    foreach (imagekpr_updates_static_seed() as $post) {
+      if (($post['slug'] ?? '') === $slug) {
+        return $post;
+      }
+    }
+    return null;
+  }
 }
 
 function imagekpr_updates_sorted_desc(): array
 {
-  $posts = imagekpr_updates_all();
-  usort($posts, static function (array $a, array $b): int {
-    return strcmp((string) ($b['published_at'] ?? ''), (string) ($a['published_at'] ?? ''));
-  });
-  return $posts;
+  return imagekpr_updates_all();
 }
 
 function imagekpr_updates_format_date(string $date): string
@@ -72,4 +143,39 @@ function imagekpr_updates_prev_next(string $slug): array
     }
   }
   return ['previous' => null, 'next' => null];
+}
+
+function imagekpr_updates_count_published(): int
+{
+  try {
+    $pdo = imagekpr_pdo();
+    return (int) $pdo->query('SELECT COUNT(*) FROM updates_posts WHERE status = "published"')->fetchColumn();
+  } catch (Throwable $e) {
+    return count(imagekpr_updates_static_seed());
+  }
+}
+
+function imagekpr_updates_list_published(int $offset, int $limit): array
+{
+  $offset = max(0, $offset);
+  $limit = max(1, min(100, $limit));
+  try {
+    $pdo = imagekpr_pdo();
+    $st = $pdo->prepare('SELECT slug, title, published_at, summary, body, tags_json
+      FROM updates_posts
+      WHERE status = "published"
+      ORDER BY published_at DESC, id DESC
+      LIMIT ? OFFSET ?');
+    $st->bindValue(1, $limit, PDO::PARAM_INT);
+    $st->bindValue(2, $offset, PDO::PARAM_INT);
+    $st->execute();
+    $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+    $out = [];
+    foreach ($rows as $row) {
+      $out[] = imagekpr_updates_db_post_to_public($row);
+    }
+    return $out;
+  } catch (Throwable $e) {
+    return array_slice(imagekpr_updates_static_seed(), $offset, $limit);
+  }
 }
