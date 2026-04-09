@@ -29,6 +29,7 @@ $ikRequestMsgs = [
   'csrf' => 'Your session expired. Please try submitting again.',
 ];
 $ikRequestMsg = $ikRequestMsgs[$ikRequestStatus] ?? '';
+$ikOpenRequestModal = $ikRequestMsg !== '';
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -45,7 +46,7 @@ $ikRequestMsg = $ikRequestMsgs[$ikRequestStatus] ?? '';
   <link rel="manifest" href="favicons/site.webmanifest">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body class="ikpr-landing<?php echo $ikMaintenance ? ' ikpr-maintenance' : ''; ?>">
+<body class="ikpr-landing<?php echo $ikMaintenance ? ' ikpr-maintenance' : ''; ?><?php echo $ikOpenRequestModal ? ' ikpr-request-modal-open' : ''; ?>">
   <?php if ($ikMaintenance) { ?>
   <div class="ikpr-maintenance-banner" role="alert"><?php echo htmlspecialchars($ikMaintenanceMsg, ENT_QUOTES, 'UTF-8'); ?></div>
   <?php } ?>
@@ -67,33 +68,93 @@ $ikRequestMsg = $ikRequestMsgs[$ikRequestStatus] ?? '';
     <section class="ikpr-landing-block ikpr-landing-login" id="login" aria-labelledby="ikpr-login-heading">
       <h2 id="ikpr-login-heading">Sign in</h2>
       <p>Already approved? Sign in with Google to open your library. New here? When access is restricted, signing in with Google adds your Google email to the review queue.</p>
-      <p><a class="ikpr-btn-google" href="auth/google/start.php">Continue with Google</a></p>
+      <div class="ikpr-landing-login-actions">
+        <a class="ikpr-btn-google" href="auth/google/start.php">Continue with Google</a>
+        <button type="button" class="ikpr-landing-btn-request-access" id="ikpr-request-access-open" aria-haspopup="dialog" aria-controls="ikpr-request-modal-panel" aria-expanded="<?php echo $ikOpenRequestModal ? 'true' : 'false'; ?>">Request early access</button>
+      </div>
       <p class="ikpr-landing-note">You will be redirected to Google to sign in.</p>
     </section>
 
-    <section class="ikpr-landing-block ikpr-landing-request" aria-labelledby="ikpr-request-heading">
-      <h2 id="ikpr-request-heading">Request early access</h2>
-      <p>Prefer not to use Google yet? Submit your work email and a short note. An administrator can approve you so you can sign in later.</p>
-      <?php if ($ikRequestMsg !== '' && $ikRequestStatus !== 'ok') { ?>
-      <p class="ikpr-landing-request-feedback<?php echo ($ikRequestStatus === 'duplicate' || $ikRequestStatus === 'already_allowed') ? ' ikpr-landing-request-feedback--ok' : ' ikpr-landing-request-feedback--err'; ?>" role="status"><?php echo htmlspecialchars($ikRequestMsg, ENT_QUOTES, 'UTF-8'); ?></p>
-      <?php } ?>
-      <?php if (!$ikAcceptRequests) { ?>
-      <p class="ikpr-landing-muted">The administrator is not accepting new requests at the moment.</p>
-      <?php } ?>
-      <form class="ikpr-landing-request-form" action="request_access.php" method="post" aria-label="Request early access">
-        <?php echo imagekpr_guest_csrf_field(); ?>
-        <label class="ikpr-landing-label" for="ikpr-request-email">Email</label>
-        <input type="email" id="ikpr-request-email" name="email" required autocomplete="email" placeholder="you@example.com" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>>
-        <label class="ikpr-landing-label" for="ikpr-request-note">Message (optional)</label>
-        <textarea id="ikpr-request-note" name="note" rows="3" maxlength="2000" placeholder="Tell us how you plan to use ImageKpr" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>></textarea>
-        <button type="submit" class="ikpr-landing-submit" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>>Submit</button>
-      </form>
-    </section>
+    <div class="ikpr-request-modal<?php echo $ikOpenRequestModal ? ' ikpr-request-modal--open' : ''; ?>" id="ikpr-request-modal" aria-hidden="<?php echo $ikOpenRequestModal ? 'false' : 'true'; ?>">
+      <div class="ikpr-request-modal__backdrop" tabindex="-1" aria-hidden="true" data-ikpr-request-close></div>
+      <div class="ikpr-request-modal__panel ikpr-landing-block ikpr-landing-request" id="ikpr-request-modal-panel" role="dialog" aria-modal="true" aria-labelledby="ikpr-request-heading" tabindex="-1">
+        <button type="button" class="ikpr-request-modal__close" aria-label="Close request form" data-ikpr-request-close>&times;</button>
+        <h2 id="ikpr-request-heading">Request early access</h2>
+        <p>Prefer not to use Google yet? Submit your work email and a short note. An administrator can approve you so you can sign in later.</p>
+        <?php if ($ikRequestMsg !== '' && $ikRequestStatus !== 'ok') { ?>
+        <p class="ikpr-landing-request-feedback<?php echo ($ikRequestStatus === 'duplicate' || $ikRequestStatus === 'already_allowed') ? ' ikpr-landing-request-feedback--ok' : ' ikpr-landing-request-feedback--err'; ?>" role="status"><?php echo htmlspecialchars($ikRequestMsg, ENT_QUOTES, 'UTF-8'); ?></p>
+        <?php } ?>
+        <?php if (!$ikAcceptRequests) { ?>
+        <p class="ikpr-landing-muted">The administrator is not accepting new requests at the moment.</p>
+        <?php } ?>
+        <form class="ikpr-landing-request-form" action="request_access.php" method="post" aria-label="Request early access">
+          <?php echo imagekpr_guest_csrf_field(); ?>
+          <label class="ikpr-landing-label" for="ikpr-request-email">Email</label>
+          <input type="email" id="ikpr-request-email" name="email" required autocomplete="email" placeholder="you@example.com" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>>
+          <label class="ikpr-landing-label" for="ikpr-request-note">Message (optional)</label>
+          <textarea id="ikpr-request-note" name="note" rows="3" maxlength="2000" placeholder="Tell us how you plan to use ImageKpr" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>></textarea>
+          <button type="submit" class="ikpr-landing-submit" <?php echo !$ikAcceptRequests ? 'disabled' : ''; ?>>Submit</button>
+        </form>
+      </div>
+    </div>
   </main>
 
   <?php
   require_once __DIR__ . '/footer.php';
   imagekpr_render_footer();
   ?>
+  <script>
+  (function () {
+    var modal = document.getElementById('ikpr-request-modal');
+    var panel = document.getElementById('ikpr-request-modal-panel');
+    var openBtn = document.getElementById('ikpr-request-access-open');
+    if (!modal || !panel || !openBtn) return;
+
+    var lastFocus = null;
+    var emailInput = document.getElementById('ikpr-request-email');
+
+    function setOpen(open) {
+      modal.classList.toggle('ikpr-request-modal--open', open);
+      modal.setAttribute('aria-hidden', open ? 'false' : 'true');
+      document.body.classList.toggle('ikpr-request-modal-open', open);
+      openBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        lastFocus = document.activeElement;
+        if (emailInput && !emailInput.disabled) {
+          emailInput.focus();
+        } else {
+          panel.focus();
+        }
+      } else if (lastFocus && typeof lastFocus.focus === 'function') {
+        lastFocus.focus();
+      }
+    }
+
+    openBtn.addEventListener('click', function () {
+      setOpen(true);
+    });
+
+    modal.addEventListener('click', function (e) {
+      if (e.target.closest('[data-ikpr-request-close]')) {
+        setOpen(false);
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modal.classList.contains('ikpr-request-modal--open')) {
+        e.preventDefault();
+        setOpen(false);
+      }
+    });
+
+    if (modal.classList.contains('ikpr-request-modal--open')) {
+      if (emailInput && !emailInput.disabled) {
+        emailInput.focus();
+      } else {
+        panel.focus();
+      }
+    }
+  })();
+  </script>
 </body>
 </html>

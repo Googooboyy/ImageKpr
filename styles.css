@@ -1044,6 +1044,104 @@ body.ikpr-landing { background: #fafafa; }
 .ikpr-landing-request-feedback--ok { color: #1b5e20; }
 .ikpr-landing-request-feedback--err { color: #c0392b; }
 .ikpr-landing-note { font-size: 0.85rem; opacity: 0.85; margin-top: 1rem !important; }
+.ikpr-landing-login-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-top: 1rem;
+}
+.ikpr-landing-login-actions .ikpr-btn-google {
+  margin-top: 0;
+}
+.ikpr-landing-btn-request-access {
+  margin-left: auto;
+  padding: 0.65rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #1565c0;
+  background: #fff;
+  color: #1565c0;
+  cursor: pointer;
+}
+.ikpr-landing-btn-request-access:hover {
+  background: #e3f2fd;
+}
+body.ikpr-request-modal-open {
+  overflow: hidden;
+}
+.ikpr-request-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  visibility: hidden;
+}
+.ikpr-request-modal--open {
+  pointer-events: auto;
+  visibility: visible;
+}
+.ikpr-request-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+.ikpr-request-modal--open .ikpr-request-modal__backdrop {
+  opacity: 1;
+}
+.ikpr-request-modal__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(100%, 24rem);
+  max-width: 100vw;
+  box-sizing: border-box;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 0;
+  margin-bottom: 0 !important;
+  border: none;
+  border-left: 1px solid #bbb;
+  box-shadow: -6px 0 28px rgba(0, 0, 0, 0.12);
+  transform: translateX(100%);
+  transition: transform 0.28s ease;
+  outline: none;
+}
+.ikpr-request-modal--open .ikpr-request-modal__panel {
+  transform: translateX(0);
+}
+.ikpr-request-modal__close {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #555;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.ikpr-request-modal__close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #222;
+}
+.ikpr-request-modal__panel > h2 {
+  padding-right: 2.5rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ikpr-request-modal__backdrop,
+  .ikpr-request-modal__panel {
+    transition: none;
+  }
+}
 .ikpr-btn-google {
   display: inline-block;
   margin-top: 1rem;

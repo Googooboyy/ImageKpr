@@ -8,5 +8,5 @@
         <li>Privacy-first — sign in with Google; only you can access your personal gallery.</li>
         <li>Bulk upload, organize and share private link images in one place.</li>
       </ul>
-      <p>Find out more <a href="/about.php">here</a>!</p>
+      <p>Find out more features <a href="/about.php">here</a>!</p>
     </section>
