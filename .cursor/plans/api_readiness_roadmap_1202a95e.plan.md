@@ -23,6 +23,9 @@ todos:
   - id: phase2-responses
     content: "Phase 2c: Standardize JSON response envelope across all 16 endpoints"
     status: pending
+  - id: phase2-image-url-contract
+    content: "Phase 2d: Define canonical image URL contract (opaque URL semantics + stable fields)"
+    status: pending
   - id: phase3-versioning
     content: "Phase 3a: Create `api/v1/` versioned directory with wrapper files"
     status: pending
@@ -31,6 +34,9 @@ todos:
     status: pending
   - id: phase4-docs
     content: "Phase 4: Write `docs/API.md` markdown reference with auth guide, endpoint reference, and examples"
+    status: pending
+  - id: phase4-url-migration-docs
+    content: "Phase 4b: Document per-user image path migration and legacy URL compatibility policy"
     status: pending
 isProject: false
 ---
@@ -48,6 +54,19 @@ ImageKpr already has **16 JSON endpoints** under `api/` that power the built-in 
 - **Rate limiting only on auth routes** — `api/`* endpoints are unprotected (`inc/rate_limit.php`)
 - **Inconsistent response format** — some endpoints return `{ error }`, others `{ success, error }`
 - **No API documentation** — no reference for external developers
+
+---
+
+## New Constraint: Per-User Image Paths
+
+The app now stores image files in **per-user folders** and persists URLs in the form `IMAGES_URL/{user_id}/{filename}` (instead of legacy flat paths):
+
+- Path helpers are centralized in `inc/images_path.php`
+- Upload/import/rename flows write per-user URLs (`api/upload.php`, `api/inbox.php`, `api/rename.php`, `api/rename_bulk.php`, `scripts/sync_images.php`)
+- There is migration tooling for old files (`scripts/migrate_to_user_folders.php`)
+- Server-side file operations include legacy fallback lookup, but old public flat HTTP links may still need a compatibility decision
+
+This does not change the token-auth approach, but it does require an explicit API URL contract so third-party clients do not construct paths manually.
 
 ---
 
@@ -174,6 +193,18 @@ Error responses:
 
 Files to audit: `api/images.php`, `api/stats.php`, `api/whoami.php`, `api/upload.php`, `api/delete.php`, `api/delete_bulk.php`, `api/tags.php`, `api/rename.php`, `api/rename_bulk.php`, `api/download_bulk.php`, `api/folders.php`, `api/inbox.php`, `api/inbox_preview.php`, `api/check_duplicates.php`.
 
+### 2d. Define canonical image URL contract
+
+Lock down how image locations are represented in API responses:
+
+- Treat returned image URLs as **opaque** values (clients must not build `/images/...` paths themselves)
+- Keep a stable field contract in v1:
+  - `url` (canonical public image URL)
+  - optional explicit aliases (e.g. `image_url`) if needed for SDK clarity
+  - `filename` as metadata only, not URL-construction input
+- Ensure all image-returning endpoints follow the same contract (`images.php`, `upload.php`, `inbox.php`, rename flows)
+- Decide and implement legacy flat URL compatibility strategy during migration window (rewrite/symlink/redirect vs no support)
+
 ---
 
 ## Phase 3: API Versioning
@@ -224,7 +255,16 @@ Create `docs/API.md` with:
 - Example requests (curl, JavaScript fetch, Python requests)
 - Changelog section for version history
 
-### 4b. Error code catalog
+### 4b. URL migration and compatibility docs
+
+Document the image-path transition and integration rules:
+
+- Explain that image URLs are now per-user (`/images/{user_id}/{filename}` pattern may evolve; clients treat URL as opaque)
+- Provide migration guidance for integrators that cached old flat URLs
+- Publish the legacy URL compatibility policy and timeline (if any)
+- Add examples for server, browser, and mobile consumers showing URL usage without path concatenation
+
+### 4c. Error code catalog
 
 Define machine-readable error codes (`unauthorized`, `rate_limited`, `invalid_input`, `not_found`, `quota_exceeded`, etc.) used consistently across all endpoints.
 

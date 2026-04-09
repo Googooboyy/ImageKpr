@@ -287,5 +287,9 @@ $adminNavCurrent = 'config';
 
     <p class="admin-muted admin-config-section" style="margin-top:1.5rem">Email allowlist and access requests are managed on <a href="allowlist.php">Allowlist</a>.</p>
   </div>
+  <?php
+  require_once __DIR__ . '/../inc/footer.php';
+  imagekpr_render_footer(['context' => 'dashboard']);
+  ?>
 </body>
 </html>

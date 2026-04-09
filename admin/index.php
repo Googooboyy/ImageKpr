@@ -723,5 +723,9 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
       });
     })();
   </script>
+  <?php
+  require_once __DIR__ . '/../inc/footer.php';
+  imagekpr_render_footer(['context' => 'dashboard']);
+  ?>
 </body>
 </html>

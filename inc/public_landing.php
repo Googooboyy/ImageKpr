@@ -91,8 +91,9 @@ $ikRequestMsg = $ikRequestMsgs[$ikRequestStatus] ?? '';
     </section>
   </main>
 
-  <footer class="credits-footer">
-    © 2026 <a href="https://mar.sg" target="_blank" rel="noopener noreferrer">Mar.sg</a>
-  </footer>
+  <?php
+  require_once __DIR__ . '/footer.php';
+  imagekpr_render_footer();
+  ?>
 </body>
 </html>

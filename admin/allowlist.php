@@ -275,5 +275,9 @@ $adminNavCurrent = 'allowlist';
       <?php } ?>
     </section>
   </div>
+  <?php
+  require_once __DIR__ . '/../inc/footer.php';
+  imagekpr_render_footer(['context' => 'dashboard']);
+  ?>
 </body>
 </html>

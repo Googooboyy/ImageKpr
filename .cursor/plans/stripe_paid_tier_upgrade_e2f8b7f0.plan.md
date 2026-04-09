@@ -6,10 +6,10 @@ todos:
     content: "Phase 0a: Create migration SQL adding disk_filename column to images, backfill existing rows, add unique index."
     status: pending
   - id: phase0a-helpers
-    content: "Phase 0a: Add imagekpr_image_url() and imagekpr_disk_filename() helpers in inc/auth.php (or new inc/image_helpers.php)."
+    content: "Phase 0a: Add imagekpr_user_image_url() and imagekpr_disk_filename() helpers in inc/images_path.php (or new inc/image_helpers.php)."
     status: pending
   - id: phase0a-upload
-    content: "Phase 0a: Update api/upload.php to generate UUID disk filenames on insert; store both filename (display) and disk_filename (disk); build url from disk_filename."
+    content: "Phase 0a: Update api/upload.php to generate UUID disk filenames on insert in user-scoped folders; store both filename (display) and disk_filename (disk); build url from user_id + disk_filename."
     status: pending
   - id: phase0a-inbox
     content: "Phase 0a: Update api/inbox.php to generate UUID disk filenames on import."
@@ -21,7 +21,7 @@ todos:
     content: "Phase 0a: Update api/delete.php, api/delete_bulk.php, and inc/admin.php purge to use disk_filename for unlink."
     status: pending
   - id: phase0a-download-images
-    content: "Phase 0a: Update api/download_bulk.php (zip entry = display name, disk read = UUID) and api/images.php (return url from disk_filename)."
+    content: "Phase 0a: Update api/download_bulk.php (zip entry = display name, disk read = user-scoped UUID) and api/images.php (return user-scoped url from disk_filename)."
     status: pending
   - id: phase0a-sync-script
     content: "Phase 0a: Update scripts/sync_images.php to generate UUID disk filenames."
@@ -120,8 +120,8 @@ isProject: false
 | Tier (customer-facing name) | Internal key (API / metadata) | `upload_size_mb` (per file) | Total storage      | `storage_quota_bytes` (decimal) | Max images (cap) | Shared dashboard max images (per dashboard) | Notes                                                                                                                                                                                               |
 | --------------------------- | ----------------------------- | --------------------------- | ------------------ | ------------------------------- | ---------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Free                        | `free`                        | 3                           | 50 MiB             | 52428800                        | 50               | 20                                          | Default for new signups; no Stripe.                                                                                                                                                                 |
-| Silver                      | `silver`                      | 10                          | 200 MiB            | 307200000                       | 100              | 50                                          | Paid subscription starts from this tier onwards.                                                                                                                                                    |
-| Gold                        | `gold`                        | 100                         | 1000 MiB (~1 GiB)  | 1048576000                      | 500              | Unlimited                                   | Highest self-serve upload tier (100 MB/file).                                                                                                                                                       |
+| Silver                      | `silver`                      | 10                          | 1500 MiB           | 307200000                       | 200              | 50                                          | Paid subscription starts from this tier onwards.                                                                                                                                                    |
+| Gold                        | `gold`                        | 100                         | 1000 MiB (~1 GiB)  | 1048576000                      | 1000             | Unlimited                                   | Highest self-serve upload tier (100 MB/file).                                                                                                                                                       |
 | Pro (white-label)           | `pro`                         | *Dedicated instance*        | *Per SOW / deploy* | *Per contract*                  | *Per deploy*     | *N/A (single-tenant)*                       | **Not a SaaS seat.** New server + white-label ImageKpr for one client; **no tier distinction** on their instance. Stripe: typically **one-time** Price for listed package; actual scope in **SOW**. |
 
 
@@ -198,11 +198,11 @@ The numbered **phases** stay as the technical sequence. **Stages** are how you s
 
 ### Problem
 
-Images are stored on disk using their human-readable filename (`vacation.jpg`) and served at a guessable static URL (`/images/vacation.jpg`). Anyone who guesses or learns a filename can fetch it without authentication.
+Images are currently stored in per-user folders and served at predictable URLs like `/images/{user_id}/vacation.jpg`. Even with user scoping, filenames are still human-readable and guessable once a path leaks.
 
 ### Solution
 
-Store every image on disk under a **random opaque name** (e.g. `a3f8c1e97b2d4e5a9c0f1d2e3f4a5b6c.jpg`). The original display name stays in the DB `filename` column for the UI. A new `disk_filename` column holds the actual file on disk.
+Keep the existing per-user folder layout, but store each image file under a **random opaque name** (e.g. `a3f8c1e97b2d4e5a9c0f1d2e3f4a5b6c.jpg`) inside that user's folder. The original display name stays in DB `filename` for UI; new `disk_filename` stores the physical filename on disk.
 
 ### DB migration
 
@@ -214,23 +214,23 @@ New file: `migrations/phase0a_uuid_disk_filename.sql`
 
 ### Helper functions
 
-Add to `inc/auth.php` (or new `inc/image_helpers.php`):
+Add to `inc/images_path.php` (or new `inc/image_helpers.php`):
 
 - `imagekpr_disk_filename(string $ext): string` -- generates `bin2hex(random_bytes(16)) . '.' . $ext`
-- `imagekpr_image_url(string $diskFilename): string` -- returns `IMAGES_URL . '/' . $diskFilename`
+- `imagekpr_user_image_url(int $userId, string $diskFilename): string` -- returns `imagekpr_user_images_url($userId) . '/' . $diskFilename`
 
-All endpoints call these instead of hand-building paths.
+All endpoints call these alongside existing `imagekpr_user_images_dir()` / `imagekpr_user_images_url()` helpers instead of hand-building paths.
 
 ### Files changed
 
-- **[api/upload.php](api/upload.php)** -- On insert: generate UUID disk name via helper, `move_uploaded_file` to UUID path, INSERT both `filename` (display) and `disk_filename` (disk), build `url` from `disk_filename`.
-- **[api/inbox.php](api/inbox.php)** -- Same pattern for inbox import: `copy()` to UUID disk path.
+- **[api/upload.php](api/upload.php)** -- On insert: generate UUID disk name via helper, `move_uploaded_file` to user-scoped UUID path (`/images/{uid}/{uuid.ext}`), INSERT both `filename` (display) and `disk_filename` (disk), build `url` from `user_id + disk_filename`.
+- **[api/inbox.php](api/inbox.php)** -- Same pattern for inbox import: `copy()` to user-scoped UUID path.
 - **[api/rename.php](api/rename.php)** -- Simplifies to a pure DB UPDATE of `filename` only. No filesystem `rename()`. URL stays based on `disk_filename` and does not change.
 - **[api/rename_bulk.php](api/rename_bulk.php)** -- Same simplification.
 - **[api/delete.php](api/delete.php)** -- Uses `disk_filename` for the `unlink()` path.
 - **[api/delete_bulk.php](api/delete_bulk.php)** -- Same.
-- **[api/download_bulk.php](api/download_bulk.php)** -- Reads file from `disk_filename` path on disk, but names the zip entry with the display `filename`.
-- **[api/images.php](api/images.php)** -- SELECT includes `disk_filename`; returned `url` is built from it.
+- **[api/download_bulk.php](api/download_bulk.php)** -- Reads file from user-scoped `disk_filename` path on disk, but names the zip entry with display `filename`.
+- **[api/images.php](api/images.php)** -- SELECT includes `disk_filename`; returned `url` is built via user-scoped URL helper.
 - **[scripts/sync_images.php](scripts/sync_images.php)** -- Generates UUID disk filenames on import.
 - **[inc/admin.php](inc/admin.php)** -- `imagekpr_admin_purge_gallery_for_users()` uses `disk_filename` for `unlink()`.
 
@@ -242,6 +242,7 @@ New file: `scripts/migrate_uuid_filenames.php`
 - For each: generates UUID name, `rename()` file on disk, UPDATE DB row (`disk_filename`, `url`)
 - Supports `--dry-run` (prints planned renames, no action)
 - Idempotent: skips rows already migrated
+- Prerequisite: per-user folder migration is already in place (`scripts/migrate_to_user_folders.php`) or this script must detect both flat and user-scoped layouts safely.
 
 ### Frontend JS
 
@@ -249,7 +250,7 @@ Minimal change. `app.js` already uses `img.url` for `<img src>` and `img.filenam
 
 ### Backward compatibility
 
-- Old bookmarked URLs (`/images/photo.jpg`) will 404 after running the migration script. This is intentional -- those URLs should no longer resolve.
+- Old bookmarked URLs that reference original filenames (including `/images/{user_id}/photo.jpg`) will 404 after UUID migration. This is intentional -- filename-based URLs should no longer resolve.
 - `.htaccess` rules for `images/` directory (PHP engine off, caching headers) remain unchanged.
 
 ---
