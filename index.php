@@ -81,7 +81,9 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
   <header class="hero">
     <div class="hero-row">
       <div class="logo" aria-hidden="true">
-        <img src="assets/imagekpr-logo.png" alt="ImageKpr" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <video autoplay muted playsinline preload="auto" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <source src="assets/video-folder-logo-animations_6s.mp4" type="video/mp4">
+        </video>
         <span class="logo-fallback">ImageKpr</span>
       </div>
       <div class="upload-zone" id="upload-zone">
