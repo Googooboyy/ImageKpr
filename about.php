@@ -16,9 +16,15 @@ declare(strict_types=1);
   ?>
   <main class="ikpr-doc-wrap">
     <h1>About ImageKpr</h1>
-    <p class="ikpr-doc-lead">It's like a second brain for your favourite images.</p>
     <p class="ikpr-doc-lead">ImageKpr is a personal image repository for professionals that need to quickly upload, organize, find, and share images.</p>
-
+    <ul>
+        <li>Privacy-first — sign in with Google; only you can access your personal gallery.</li>
+        <li>Bulk upload, organize and share private link images in one place.</li>
+        <li>Share private image links -- but only if you want to.</li>
+        <li>Folders and tags to keep your collection tidy.</li>
+        <li>Search your library; run slideshows and presentations.</li>
+        <li>Zip batches of images and download for distribution.</li>
+      </ul>
     <h2>What It Is Built For</h2>
     <ul>
       <li>Keeping a shared image library easy to navigate through folders, tags, and search.</li>
