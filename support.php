@@ -10,6 +10,10 @@ declare(strict_types=1);
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="ikpr-doc-page">
+  <?php
+  require_once __DIR__ . '/inc/page_hero.php';
+  imagekpr_render_page_hero();
+  ?>
   <main class="ikpr-doc-wrap">
     <h1>Support</h1>
     <p class="ikpr-doc-lead">Help for account access, upload problems, and operational troubleshooting.</p>

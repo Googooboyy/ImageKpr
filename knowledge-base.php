@@ -10,6 +10,10 @@ declare(strict_types=1);
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="ikpr-doc-page">
+  <?php
+  require_once __DIR__ . '/inc/page_hero.php';
+  imagekpr_render_page_hero();
+  ?>
   <main class="ikpr-doc-wrap">
     <h1>Knowledge Base</h1>
     <p class="ikpr-doc-lead">Operational guidance for getting the most from ImageKpr.</p>
@@ -36,10 +40,6 @@ declare(strict_types=1);
       <li>Use folder conventions to make recurring share bundles predictable.</li>
     </ul>
 
-    <h2>Admin and Access</h2>
-    <p>Admin routes support allowlist management, request review, configuration controls, storage quotas, and upload-tier controls.</p>
-
-    <p class="ikpr-doc-note">For infrastructure setup details, also review `README.md` in the project root.</p>
   </main>
   <?php
   require_once __DIR__ . '/inc/footer.php';

@@ -10,6 +10,10 @@ declare(strict_types=1);
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="ikpr-doc-page">
+  <?php
+  require_once __DIR__ . '/inc/page_hero.php';
+  imagekpr_render_page_hero();
+  ?>
   <main class="ikpr-doc-wrap">
     <h1>Terms of Use</h1>
     <p class="ikpr-doc-lead">These terms describe expected usage and responsibilities for ImageKpr users.</p>
@@ -33,7 +37,6 @@ declare(strict_types=1);
     <h2>Limitation</h2>
     <p>Service is provided on an as-is basis according to your deployment and hosting environment.</p>
 
-    <p class="ikpr-doc-note">Not legal advice. Replace this draft with counsel-approved terms before public release.</p>
   </main>
   <?php
   require_once __DIR__ . '/inc/footer.php';

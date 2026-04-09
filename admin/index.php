@@ -434,6 +434,14 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></title>
+  <link rel="apple-touch-icon" sizes="180x180" href="../favicons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="../favicons/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../favicons/favicon-16x16.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="../favicons/android-chrome-192x192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="../favicons/android-chrome-512x512.png">
+  <link rel="shortcut icon" href="../favicons/favicon.ico">
+  <link rel="icon" type="image/x-icon" sizes="192x192" href="../favicons/favicon-192x192.ico">
+  <link rel="manifest" href="../favicons/site.webmanifest">
   <link rel="stylesheet" href="../styles.css">
   <style>
     .admin-wrap { max-width: min(1240px, calc(100vw - 1.5rem)); margin: 0 auto; padding: 1rem 0.75rem 2rem; box-sizing: border-box; }

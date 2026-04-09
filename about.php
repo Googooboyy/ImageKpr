@@ -10,9 +10,14 @@ declare(strict_types=1);
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="ikpr-doc-page">
+  <?php
+  require_once __DIR__ . '/inc/page_hero.php';
+  imagekpr_render_page_hero();
+  ?>
   <main class="ikpr-doc-wrap">
     <h1>About ImageKpr</h1>
-    <p class="ikpr-doc-lead">ImageKpr is a practical image repository for teams that need to upload, organize, find, and share images without the overhead of a heavy DAM platform.</p>
+    <p class="ikpr-doc-lead">It's like a second brain for your favourite images.</p>
+    <p class="ikpr-doc-lead">ImageKpr is a personal image repository for professionals that need to quickly upload, organize, find, and share images.</p>
 
     <h2>What It Is Built For</h2>
     <ul>

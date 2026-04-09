@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>ImageKpr Updates</title>
+    <link>https://imagekpr.mar.sg/updates.php</link>
+    <description>Product updates, release notes, and operational notices for ImageKpr.</description>
+    <language>en-us</language>
+    <lastBuildDate>Fri, 10 Apr 2026 00:00:00 +0000</lastBuildDate>
+    <item>
+      <title>Platform reliability and bulk workflow updates</title>
+      <link>https://imagekpr.mar.sg/update.php?slug=2026-04-platform-reliability-and-bulk-workflow-updates</link>
+      <guid>https://imagekpr.mar.sg/update.php?slug=2026-04-platform-reliability-and-bulk-workflow-updates</guid>
+      <pubDate>Fri, 10 Apr 2026 00:00:00 +0000</pubDate>
+      <description>Improved stability for high-volume actions and clearer operational feedback in key workflows.</description>
+    </item>
+    <item>
+      <title>Footer and information pages are now live</title>
+      <link>https://imagekpr.mar.sg/update.php?slug=2026-04-footer-and-information-pages-live</link>
+      <guid>https://imagekpr.mar.sg/update.php?slug=2026-04-footer-and-information-pages-live</guid>
+      <pubDate>Fri, 10 Apr 2026 00:00:00 +0000</pubDate>
+      <description>Added a global footer and launched structured public pages for company, resources, and legal information.</description>
+    </item>
+  </channel>
+</rss>

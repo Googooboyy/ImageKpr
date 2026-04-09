@@ -10,6 +10,10 @@ declare(strict_types=1);
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="ikpr-doc-page">
+  <?php
+  require_once __DIR__ . '/inc/page_hero.php';
+  imagekpr_render_page_hero();
+  ?>
   <main class="ikpr-doc-wrap">
     <h1>Case Studies</h1>
     <p class="ikpr-doc-lead">Representative examples of how teams use ImageKpr to simplify image operations and reduce delivery friction.</p>

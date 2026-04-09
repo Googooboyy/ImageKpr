@@ -35,3 +35,8 @@ define('ADMIN_GOOGLE_SUB', '');
 // Phase 12+: default quota cap, share-null, maintenance/read-only, and API bulk limits are in Admin → Config.
 // Email allowlist, pending access requests, and “accept requests” toggle are in Admin → Allowlist (app_settings,
 // email_allowlist, email_access_requests — run migrations/phase14_access_requests.sql for the requests table).
+
+// Public contact form (contact.php): recipient for PHP mail(). Required for the form to send.
+// define('CONTACT_TO_EMAIL', 'you@example.com');
+// Optional: From address for outgoing mail (must be allowed by your host; otherwise CONTACT_TO_EMAIL is used).
+// define('CONTACT_FROM_EMAIL', 'noreply@imagekpr.mar.sg');

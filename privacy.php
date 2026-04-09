@@ -10,6 +10,10 @@ declare(strict_types=1);
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="ikpr-doc-page">
+  <?php
+  require_once __DIR__ . '/inc/page_hero.php';
+  imagekpr_render_page_hero();
+  ?>
   <main class="ikpr-doc-wrap">
     <h1>Privacy Notice</h1>
     <p class="ikpr-doc-lead">This page describes how ImageKpr handles account and usage data at a high level.</p>
@@ -34,7 +38,6 @@ declare(strict_types=1);
     <h2>Your Controls</h2>
     <p>If you need data updates or deletions, contact your administrator or support contact listed on the Contact page.</p>
 
-    <p class="ikpr-doc-note">Not legal advice. Replace this draft with counsel-approved privacy terms for production use.</p>
   </main>
   <?php
   require_once __DIR__ . '/inc/footer.php';

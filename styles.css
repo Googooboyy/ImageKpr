@@ -545,9 +545,18 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
 
 .ikpr-site-footer-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(3, max-content);
+  gap: 100px;
+  justify-content: start;
+  align-items: start;
   padding: 1.5rem 2rem;
+}
+
+@media (max-width: 600px) {
+  .ikpr-site-footer-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
 }
 
 .ikpr-site-footer-col h3 {
@@ -589,6 +598,11 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
   color: #5b5b5b;
   font-size: 0.85rem;
   line-height: 1.5;
+}
+
+.ikpr-site-footer-login-row {
+  margin: 0.55rem 0 0;
+  font-size: 0.95rem;
 }
 
 .ikpr-site-footer-newsletter {
@@ -642,6 +656,28 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
   color: #222;
 }
 
+.ikpr-page-hero {
+  width: 100%;
+  background: #f5f5f5;
+  border-top: 1px solid #e8e8e8;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.ikpr-page-hero-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.ikpr-page-hero-inner img {
+  width: min(500px, 100%);
+  height: auto;
+  display: block;
+}
+
 .ikpr-doc-wrap {
   max-width: 860px;
   margin: 0 auto;
@@ -690,6 +726,69 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
   margin-top: 1rem;
 }
 
+.ikpr-contact-alert {
+  background: #ffebee;
+  border: 1px solid #ef9a9a;
+  color: #b71c1c;
+  padding: 0.65rem 0.85rem;
+  border-radius: 6px;
+  margin: 0 0 1rem;
+}
+
+.ikpr-contact-form {
+  max-width: 36rem;
+  margin: 0 0 1.5rem;
+}
+
+.ikpr-contact-honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.ikpr-contact-label {
+  display: block;
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.ikpr-contact-input,
+.ikpr-contact-textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0.45rem 0.55rem;
+  font: inherit;
+  border: 1px solid #aaa;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.ikpr-contact-textarea {
+  resize: vertical;
+  min-height: 8rem;
+}
+
+.ikpr-contact-submit {
+  margin-top: 1rem;
+  padding: 0.5rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px solid #0d47a1;
+  background: #1565c0;
+  color: #fff;
+}
+
+.ikpr-contact-submit:hover {
+  background: #0d47a1;
+}
+
 /* Public landing (guests on index.php) — structural blocks; polish later */
 body.ikpr-landing { background: #fafafa; }
 .ikpr-landing-hero {
@@ -715,7 +814,7 @@ body.ikpr-landing { background: #fafafa; }
 }
 .ikpr-landing-hero-title img {
   display: block;
-  width: min(605px, 100%);
+  width: min(500px, 100%);
   height: auto;
   flex-shrink: 0;
 }
