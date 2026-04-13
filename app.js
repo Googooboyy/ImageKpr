@@ -815,6 +815,12 @@
     green: '#2e7d32',
     blue: '#1565c0',
   };
+  const SLIDESHOW_INTERVAL_MS_MIN = 1000;
+  const SLIDESHOW_INTERVAL_MS_MAX = 600 * 1000;
+
+  function clampSlideshowIntervalMs(ms) {
+    return Math.max(SLIDESHOW_INTERVAL_MS_MIN, Math.min(SLIDESHOW_INTERVAL_MS_MAX, ms));
+  }
 
   /** Viewport rect of the drawn bitmap for object-fit:contain in stage (not the img element box, which is full-bleed). */
   function slideshowContainedImageRect(imgEl, stageEl) {
@@ -839,6 +845,22 @@
     el.textContent = (slideshowState.index + 1) + ' / ' + slideshowState.slides.length;
   }
 
+  function updateSlideshowFilenameCaption() {
+    const cap = document.getElementById('slideshow-filename-caption');
+    if (!cap || !slideshowState) return;
+    if (!slideshowState.showFilename) {
+      cap.hidden = true;
+      cap.setAttribute('aria-hidden', 'true');
+      cap.textContent = '';
+      return;
+    }
+    const slide = slideshowState.slides[slideshowState.index];
+    const name = slide && slide.filename ? String(slide.filename) : '';
+    cap.textContent = name;
+    cap.hidden = !name;
+    cap.setAttribute('aria-hidden', name ? 'false' : 'true');
+  }
+
   function clearSlideshowTimer() {
     if (slideshowState && slideshowState.timerId != null) {
       clearInterval(slideshowState.timerId);
@@ -847,7 +869,7 @@
   }
 
   function armSlideshowAutoTimer() {
-    if (!slideshowState || !slideshowState.auto) return;
+    if (!slideshowState || !slideshowState.auto || slideshowState.paused) return;
     clearSlideshowTimer();
     slideshowState.timerId = setInterval(() => {
       if (!slideshowState || slideshowState.transitioning) return;
@@ -905,6 +927,7 @@
       };
       img.addEventListener('load', onLoad);
       updateSlideshowCounter();
+      updateSlideshowFilenameCaption();
     };
 
     if (instant) {
@@ -962,6 +985,12 @@
       img.removeAttribute('src');
       img.removeAttribute('alt');
     }
+    const cap = document.getElementById('slideshow-filename-caption');
+    if (cap) {
+      cap.textContent = '';
+      cap.hidden = true;
+      cap.setAttribute('aria-hidden', 'true');
+    }
     if (player) {
       const stageEl = player.querySelector('.slideshow-stage');
       if (stageEl) stageEl.style.backgroundColor = '';
@@ -981,10 +1010,12 @@
       slides,
       index: 0,
       auto: options.auto,
-      intervalMs: options.intervalMs,
+      intervalMs: clampSlideshowIntervalMs(options.intervalMs),
       autoloop: options.autoloop,
       randomizeOnLoop: options.randomizeOnLoop,
       transition: options.transition,
+      showFilename: !!options.showFilename,
+      paused: false,
       timerId: null,
       transitioning: false,
     };
@@ -1029,19 +1060,42 @@
         closeSlideshowPlayer();
         return;
       }
+      if (slideshowState.auto) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          slideshowState.paused = !slideshowState.paused;
+          if (slideshowState.paused) clearSlideshowTimer();
+          else armSlideshowAutoTimer();
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          slideshowState.intervalMs = clampSlideshowIntervalMs(slideshowState.intervalMs + 1000);
+          if (!slideshowState.paused) armSlideshowAutoTimer();
+          showToast('Interval: ' + (slideshowState.intervalMs / 1000) + ' s', false);
+          return;
+        }
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          slideshowState.intervalMs = clampSlideshowIntervalMs(slideshowState.intervalMs - 1000);
+          if (!slideshowState.paused) armSlideshowAutoTimer();
+          showToast('Interval: ' + (slideshowState.intervalMs / 1000) + ' s', false);
+          return;
+        }
+      }
       if (e.key === ' ' || e.key === 'Spacebar') {
         e.preventDefault();
-        if (slideshowAdvance(1) && slideshowState.auto) armSlideshowAutoTimer();
+        if (slideshowAdvance(1) && slideshowState.auto && !slideshowState.paused) armSlideshowAutoTimer();
         return;
       }
       if (e.key === 'ArrowRight') {
         e.preventDefault();
-        if (slideshowAdvance(1) && slideshowState.auto) armSlideshowAutoTimer();
+        if (slideshowAdvance(1) && slideshowState.auto && !slideshowState.paused) armSlideshowAutoTimer();
         return;
       }
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        if (slideshowAdvance(-1) && slideshowState.auto) armSlideshowAutoTimer();
+        if (slideshowAdvance(-1) && slideshowState.auto && !slideshowState.paused) armSlideshowAutoTimer();
       }
     };
     document.addEventListener('keydown', slideshowState.onKeyDown, true);
@@ -1095,6 +1149,7 @@
       randomizeOnLoop,
       transition,
       letterboxColor: SLIDESHOW_LETTERBOX[lbKey],
+      showFilename: !!(document.getElementById('slideshow-show-filename') || {}).checked,
     };
   }
 

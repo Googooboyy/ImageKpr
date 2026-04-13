@@ -517,7 +517,7 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
 .inbox-import-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
 .inbox-import-count { font-size: 0.875rem; color: #666; }
 
-.toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; z-index: 1001; }
+.toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; z-index: 1100; }
 .toast-prominent { padding: 1rem 2rem; font-size: 1.1rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 
 .credits-footer { text-align: center; padding: 2rem; color: #666; font-size: 0.875rem; border-top: 1px solid #eee; margin-top: 2rem; }
@@ -1478,6 +1478,25 @@ body.ikpr-request-modal-open {
   background: rgba(0, 0, 0, 0.55);
   color: #fff;
   font-size: 0.8rem;
+  pointer-events: none;
+}
+.slideshow-filename-caption {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  max-width: min(90vw, 42rem);
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
 }
 /* Themed actions: tags (light green), folders (light blue), delete (red) */

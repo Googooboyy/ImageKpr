@@ -260,6 +260,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
           <input type="number" id="slideshow-duration" min="1" max="600" value="5" step="1" class="slideshow-duration-input">
         </div>
       </fieldset>
+      <label class="slideshow-check"><input type="checkbox" id="slideshow-show-filename"> Show filename at bottom (subtle)</label>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-autoloop" checked> Loop (return to first after last)</label>
       <label class="slideshow-check slideshow-check-nested" id="slideshow-randomize-loop-label"><input type="checkbox" id="slideshow-randomize-loop"> Randomize order each time the slideshow loops</label>
       <fieldset class="slideshow-fieldset">
@@ -276,7 +277,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-green" value="green"> Green</label>
         <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-blue" value="blue"> Blue</label>
       </fieldset>
-      <p class="slideshow-settings-hint">Exit: click outside the picture, the × button, or press Esc.</p>
+      <p class="slideshow-settings-hint">Exit: click outside the picture, the × button, or press Esc. Auto: Enter pauses or resumes; ↑ / ↓ change seconds per slide.</p>
       <div class="slideshow-settings-actions">
         <button type="button" id="slideshow-start" class="slideshow-btn-primary">Start slideshow</button>
         <button type="button" id="slideshow-settings-cancel">Cancel</button>
@@ -287,6 +288,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
   <div id="slideshow-player" class="slideshow-player" hidden aria-hidden="true">
     <button type="button" class="slideshow-exit" id="slideshow-exit-btn" aria-label="Exit slideshow">×</button>
     <div class="slideshow-counter" id="slideshow-counter" aria-live="polite"></div>
+    <div class="slideshow-filename-caption" id="slideshow-filename-caption" hidden aria-hidden="true"></div>
     <div class="slideshow-stage">
       <div class="slideshow-player-bg" id="slideshow-player-bg" aria-hidden="true"></div>
       <img id="slideshow-img" class="slideshow-img" src="" alt="">
