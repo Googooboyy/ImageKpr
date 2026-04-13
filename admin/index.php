@@ -226,6 +226,149 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_u
   exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'apply_saas_tier') {
+  if (!imagekpr_csrf_verify()) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Security token invalid. Try again.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $targetId = (int) ($_POST['user_id'] ?? 0);
+  $tier = (string) ($_POST['saas_tier'] ?? '');
+  $ref = imagekpr_plan_tier_storage_reference();
+  if ($targetId < 1 || !isset($ref[$tier])) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Invalid user or SaaS tier.'];
+    header('Location: index.php', true, 303);
+    exit;
+  }
+  $stOld = $pdo->prepare('SELECT id, email, storage_quota_bytes, upload_size_mb, upload_tier_downgraded_at FROM users WHERE id = ? LIMIT 1');
+  $stOld->execute([$targetId]);
+  $oldRow = $stOld->fetch(PDO::FETCH_ASSOC);
+  if ($oldRow === false) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'User not found.'];
+    header('Location: index.php', true, 303);
+    exit;
+  }
+  $newBytes = (int) $ref[$tier]['bytes'];
+  $newMb = (int) $ref[$tier]['upload_mb'];
+  $oldMb = imagekpr_normalize_upload_size_mb($oldRow['upload_size_mb'] ?? 3);
+  $oldDown = isset($oldRow['upload_tier_downgraded_at']) ? (string) $oldRow['upload_tier_downgraded_at'] : null;
+  if ($oldDown !== null && trim($oldDown) === '') {
+    $oldDown = null;
+  }
+  $newDown = $oldDown;
+  if ($newMb < $oldMb) {
+    $newDown = date('Y-m-d H:i:s');
+  } elseif ($newMb > $oldMb) {
+    $newDown = null;
+  }
+  $up = $pdo->prepare('UPDATE users SET storage_quota_bytes = ?, upload_size_mb = ?, upload_tier_downgraded_at = ? WHERE id = ?');
+  $up->execute([$newBytes, $newMb, $newDown, $targetId]);
+  imagekpr_admin_audit_log($pdo, $actorId, 'user_saas_tier_applied', [
+    'target_user_id' => $targetId,
+    'target_email' => $oldRow['email'],
+    'saas_tier' => $tier,
+    'new_storage_quota_bytes' => $newBytes,
+    'new_upload_size_mb' => $newMb,
+    'old_storage_quota_bytes' => $oldRow['storage_quota_bytes'],
+    'old_upload_size_mb' => $oldMb,
+  ]);
+  $suffix = ($newMb < $oldMb) ? ' Upload grace starts now (30 days).' : '';
+  $_SESSION['admin_flash'] = ['type' => 'ok', 'msg' => 'Applied ' . $ref[$tier]['label'] . ' preset for ' . $oldRow['email'] . '.' . $suffix];
+  $redir = 'index.php';
+  $q = $_GET;
+  if (!empty($q)) {
+    $redir .= '?' . http_build_query($q);
+  }
+  header('Location: ' . $redir, true, 303);
+  exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_apply_saas_tier') {
+  if (!imagekpr_csrf_verify()) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Security token invalid. Try again.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $rawIds = $_POST['bulk_user_ids'] ?? [];
+  if (!is_array($rawIds)) {
+    $rawIds = [];
+  }
+  $ids = [];
+  foreach ($rawIds as $v) {
+    $ids[] = (int) $v;
+  }
+  $ids = array_values(array_unique(array_filter($ids, static fn ($x) => $x > 0)));
+  if ($ids === []) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Select at least one user.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $tier = (string) ($_POST['bulk_saas_tier'] ?? '');
+  $ref = imagekpr_plan_tier_storage_reference();
+  if (!isset($ref[$tier])) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Invalid SaaS tier.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $newBytes = (int) $ref[$tier]['bytes'];
+  $newMb = (int) $ref[$tier]['upload_mb'];
+  $stOld = $pdo->prepare('SELECT id, email, upload_size_mb, upload_tier_downgraded_at FROM users WHERE id = ? LIMIT 1');
+  $up = $pdo->prepare('UPDATE users SET storage_quota_bytes = ?, upload_size_mb = ?, upload_tier_downgraded_at = ? WHERE id = ?');
+  foreach ($ids as $tid) {
+    $stOld->execute([$tid]);
+    $oldRow = $stOld->fetch(PDO::FETCH_ASSOC);
+    if ($oldRow === false) {
+      continue;
+    }
+    $oldMb = imagekpr_normalize_upload_size_mb($oldRow['upload_size_mb'] ?? 3);
+    $oldDown = isset($oldRow['upload_tier_downgraded_at']) ? (string) $oldRow['upload_tier_downgraded_at'] : null;
+    if ($oldDown !== null && trim($oldDown) === '') {
+      $oldDown = null;
+    }
+    $newDown = $oldDown;
+    if ($newMb < $oldMb) {
+      $newDown = date('Y-m-d H:i:s');
+    } elseif ($newMb > $oldMb) {
+      $newDown = null;
+    }
+    $up->execute([$newBytes, $newMb, $newDown, $tid]);
+  }
+  imagekpr_admin_audit_log($pdo, $actorId, 'bulk_saas_tier_applied', [
+    'target_user_ids' => $ids,
+    'saas_tier' => $tier,
+    'new_storage_quota_bytes' => $newBytes,
+    'new_upload_size_mb' => $newMb,
+  ]);
+  $_SESSION['admin_flash'] = ['type' => 'ok', 'msg' => 'Applied ' . $ref[$tier]['label'] . ' preset to ' . count($ids) . ' user(s).'];
+  $redir = 'index.php';
+  $q = $_GET;
+  if (!empty($q)) {
+    $redir .= '?' . http_build_query($q);
+  }
+  header('Location: ' . $redir, true, 303);
+  exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_set_upload_tier') {
   if (!imagekpr_csrf_verify()) {
     $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Security token invalid. Try again.'];
@@ -478,6 +621,10 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     table.admin-users .admin-col-login { width: 10%; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 0.78rem; }
     table.admin-users .admin-col-days { width: 4rem; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
     table.admin-users .admin-col-admin { width: 2.5rem; white-space: nowrap; text-align: center; }
+    table.admin-users .admin-col-plan { width: 6.75rem; min-width: 6rem; font-size: 0.75rem; line-height: 1.25; }
+    table.admin-users .admin-tier-match { font-weight: 600; margin-bottom: 0.3rem; word-break: break-word; }
+    table.admin-users .admin-preset-form { display: flex; flex-direction: column; gap: 0.2rem; align-items: stretch; }
+    table.admin-users .admin-preset-form button { font-size: 0.68rem; padding: 0.12rem 0.25rem; cursor: pointer; }
     table.admin-users .admin-col-quota { width: 11rem; min-width: 8.5rem; }
     .admin-over { color: #c62828; font-weight: 600; }
     .admin-quota-form { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
@@ -552,8 +699,11 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     echo $d === null ? 'none (unlimited)' : htmlspecialchars(imagekpr_format_bytes($d), ENT_QUOTES, 'UTF-8');
     ?> — set <span class="admin-mono">DEFAULT_STORAGE_QUOTA_BYTES</span> in <span class="admin-mono">config.php</span> if needed.</p>
 
-    <?php $uploadTiers = imagekpr_allowed_upload_size_tiers_mb(); ?>
-    <p class="admin-muted"><strong>SaaS tier matrix</strong> (plan doc — upload tier, storage bytes, image caps, shared-dashboard caps; server enforcement may lag Phase 3): <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
+    <?php
+    $uploadTiers = imagekpr_allowed_upload_size_tiers_mb();
+    $saasRef = imagekpr_plan_tier_storage_reference();
+    ?>
+    <p class="admin-muted"><strong>SaaS tier matrix</strong> (reference — upload MB, total storage, image caps, shared-dashboard caps). Use <strong>Plan preset</strong> below to apply Free/Silver/Gold storage + upload limits together: <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
     <p class="admin-muted"><?php echo imagekpr_admin_html_plan_matrix_pro_blurb(); ?></p>
 
     <form class="admin-search" method="get" action="index.php">
@@ -589,7 +739,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
           <legend>Bulk quota (selected rows)</legend>
           <label><input type="radio" name="bulk_quota_mode" value="default" checked> Site default</label>
           <label><input type="radio" name="bulk_quota_mode" value="unlimited"> Unlimited</label>
-          <label><input type="radio" name="bulk_quota_mode" value="custom"> GB <input type="number" name="bulk_quota_gb" min="0.001" step="any" value="10"></label>
+          <label title="Binary GiB; 50 = 50 GiB not 50 MB"><input type="radio" name="bulk_quota_mode" value="custom"> GiB <input type="number" name="bulk_quota_gb" min="0.001" step="any" value="10"></label>
         </fieldset>
         <button type="submit" name="action" value="bulk_set_quota">Apply quota to selected</button>
       </div>
@@ -601,6 +751,21 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
           <?php } ?>
         </fieldset>
         <button type="submit" name="action" value="bulk_set_upload_tier">Apply upload tier to selected</button>
+      </div>
+      <div class="admin-bulk-row">
+        <fieldset>
+          <legend>Bulk SaaS preset (selected rows)</legend>
+          <?php
+          $firstSaas = true;
+          foreach ($saasRef as $sk => $stier) {
+            ?>
+          <label><input type="radio" name="bulk_saas_tier" value="<?php echo htmlspecialchars((string) $sk, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $firstSaas ? ' checked' : ''; ?>><?php echo htmlspecialchars((string) $stier['label'], ENT_QUOTES, 'UTF-8'); ?></label>
+            <?php
+            $firstSaas = false;
+          }
+          ?>
+        </fieldset>
+        <button type="submit" name="action" value="bulk_apply_saas_tier">Apply preset to selected</button>
       </div>
       <fieldset class="admin-bulk-purge">
         <legend>Purge gallery only (destructive)</legend>
@@ -624,6 +789,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
             <th class="admin-col-days" title="Whole days since first successful sign-in (account created)">1st access<br><span class="admin-th-sub">days ago</span></th>
             <th class="admin-col-days" title="Whole days since last sign-in (— if never)">Last access<br><span class="admin-th-sub">days ago</span></th>
             <th class="admin-col-admin"><?php echo admin_sort_link('admin', 'Admin', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-plan" title="Match = exact storage cap + upload MB vs matrix; preset applies both">Plan preset<br><span class="admin-th-sub">matrix match</span></th>
             <th class="admin-col-quota">Set quota</th>
             <th class="admin-col-quota"><?php echo admin_sort_link('upl', 'Set upload tier', $sort, $dir, $qSearch); ?></th>
           </tr>
@@ -655,6 +821,14 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
               $tierDownAt = null;
             }
             $tierGraceExpired = imagekpr_upload_tier_grace_expired($tierDownAt);
+            $tierKey = imagekpr_infer_saas_tier_preset_match($dbq, $uploadMb);
+            if ($tierKey === null) {
+              $tierMatchLabel = 'Unlimited';
+            } elseif ($tierKey === 'custom') {
+              $tierMatchLabel = 'Custom';
+            } else {
+              $tierMatchLabel = (string) ($saasRef[$tierKey]['label'] ?? $tierKey);
+            }
             ?>
             <tr>
               <td class="admin-col-cb"><input type="checkbox" class="admin-user-cb" form="bulkUserForm" name="bulk_user_ids[]" value="<?php echo (int) $r['id']; ?>" aria-label="Select <?php echo htmlspecialchars((string) $r['email'], ENT_QUOTES, 'UTF-8'); ?>"></td>
@@ -685,6 +859,22 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
             echo $dl !== null ? (string) (int) $dl : '—';
             ?></td>
               <td class="admin-col-admin"><?php echo (int) $r['is_admin'] ? 'Yes' : ''; ?></td>
+              <td class="admin-col-plan">
+                <div class="admin-tier-match"><?php echo htmlspecialchars($tierMatchLabel, ENT_QUOTES, 'UTF-8'); ?></div>
+                <form class="admin-preset-form" method="post" action="index.php<?php
+            $hiddenQ = array_filter(['q' => $qSearch !== '' ? $qSearch : null, 'sort' => $sort !== 'email' ? $sort : null, 'dir' => $dir !== 'ASC' ? strtolower($dir) : null]);
+            if (!empty($hiddenQ)) {
+              echo '?' . htmlspecialchars(http_build_query($hiddenQ), ENT_QUOTES, 'UTF-8');
+            }
+            ?>">
+                  <?php echo imagekpr_csrf_field(); ?>
+                  <input type="hidden" name="action" value="apply_saas_tier">
+                  <input type="hidden" name="user_id" value="<?php echo (int) $r['id']; ?>">
+                  <?php foreach ($saasRef as $psk => $pt) { ?>
+                  <button type="submit" name="saas_tier" value="<?php echo htmlspecialchars((string) $psk, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $pt['label'], ENT_QUOTES, 'UTF-8'); ?></button>
+                  <?php } ?>
+                </form>
+              </td>
               <td class="admin-col-quota">
                 <form class="admin-quota-form" method="post" action="index.php<?php
             $hiddenQ = array_filter(['q' => $qSearch !== '' ? $qSearch : null, 'sort' => $sort !== 'email' ? $sort : null, 'dir' => $dir !== 'ASC' ? strtolower($dir) : null]);
@@ -697,7 +887,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
                   <input type="hidden" name="user_id" value="<?php echo (int) $r['id']; ?>">
                   <label title="Use site default quota from config / Admin Config"><input type="radio" name="quota_mode" value="default" <?php echo $dbq === null ? 'checked' : ''; ?>> Default</label>
                   <label title="No storage cap"><input type="radio" name="quota_mode" value="unlimited" <?php echo $dbq === 0 ? 'checked' : ''; ?>> Unlimited</label>
-                  <label title="Custom cap in gigabytes"><input type="radio" name="quota_mode" value="custom" <?php echo $dbq !== null && $dbq > 0 ? 'checked' : ''; ?>> GB <input type="number" name="quota_gb" min="0.001" step="any" value="<?php echo htmlspecialchars($customGb, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Gigabytes"></label>
+                  <label title="Custom cap in binary gigabytes (GiB). 50 here = 50 GiB, not 50 MB — use Free preset or ~0.047 for 50 MB."><input type="radio" name="quota_mode" value="custom" <?php echo $dbq !== null && $dbq > 0 ? 'checked' : ''; ?>> GiB <input type="number" name="quota_gb" min="0.001" step="any" value="<?php echo htmlspecialchars($customGb, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Cap in binary gigabytes (GiB)"></label>
                   <button type="submit">Save</button>
                 </form>
               </td>

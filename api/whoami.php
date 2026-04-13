@@ -19,6 +19,22 @@ try {
 } catch (Throwable $e) {
   // Keep safe defaults if DB read fails.
 }
+
+$quotaPayload = [
+  'effective_bytes' => null,
+  'unlimited' => true,
+  'remaining_bytes' => null,
+  'used_bytes' => 0,
+];
+try {
+  if (!isset($pdo)) {
+    $pdo = imagekpr_pdo();
+  }
+  $quotaPayload = imagekpr_user_storage_quota_status($pdo, (int) imagekpr_user_id());
+} catch (Throwable $e) {
+  // Omit detailed quota if DB unavailable (maintenance path already handled upload tier).
+}
+
 echo json_encode([
   'user_id' => imagekpr_user_id(),
   'email' => isset($_SESSION['email']) ? (string) $_SESSION['email'] : null,
@@ -30,4 +46,8 @@ echo json_encode([
   'upload_tier_downgraded_at' => $uploadTierDowngradedAt,
   'upload_grace_days' => imagekpr_upload_tier_grace_days(),
   'upload_grace_expired' => imagekpr_upload_tier_grace_expired($uploadTierDowngradedAt),
+  'storage_quota_effective_bytes' => imagekpr_json_byte_string($quotaPayload['effective_bytes']),
+  'storage_quota_unlimited' => $quotaPayload['unlimited'],
+  'storage_remaining_bytes' => imagekpr_json_byte_string($quotaPayload['remaining_bytes']),
+  'storage_quota_used_bytes' => imagekpr_json_byte_string($quotaPayload['used_bytes']),
 ], JSON_UNESCAPED_UNICODE);

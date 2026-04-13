@@ -89,7 +89,8 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <div id="upload-progress" class="upload-progress" hidden></div>
       </div>
       <div class="user-session-bar">
-        <span class="user-session-email" title="<?php echo htmlspecialchars($ikEmail, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($ikName !== '' ? $ikName : $ikEmail, ENT_QUOTES, 'UTF-8'); ?></span>
+        <a href="account.php" class="user-session-email user-session-profile-link" title="Account &amp; profile — <?php echo htmlspecialchars($ikEmail, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($ikName !== '' ? $ikName : $ikEmail, ENT_QUOTES, 'UTF-8'); ?></a>
+        <span class="user-session-profile-hint" aria-hidden="true">Profile</span>
         <div class="user-session-actions">
           <?php if (!empty($ikIsAdmin)) { ?>
           <a href="admin/index.php" class="user-session-logout">Admin</a>

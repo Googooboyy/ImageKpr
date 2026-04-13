@@ -73,7 +73,19 @@ try {
   unset($_SESSION['ik_guest_login_error']);
   $_SESSION['user_id'] = $uid;
   $_SESSION['email'] = $email;
-  $_SESSION['name'] = $name;
+  $_SESSION['name'] = $name !== '' ? $name : $email;
+  try {
+    $stName = $pdo->prepare('SELECT display_name, name FROM users WHERE id = ? LIMIT 1');
+    $stName->execute([$uid]);
+    $nameRow = $stName->fetch(PDO::FETCH_ASSOC) ?: [];
+    $_SESSION['name'] = imagekpr_user_header_display_label(
+      isset($nameRow['display_name']) ? (string) $nameRow['display_name'] : null,
+      isset($nameRow['name']) ? (string) $nameRow['name'] : $name,
+      $email
+    );
+  } catch (Throwable $e) {
+    // Older schema without display_name: keep Google / email label above.
+  }
   $_SESSION['google_sub'] = $sub;
 
   if (!$allowed) {

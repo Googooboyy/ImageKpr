@@ -250,3 +250,47 @@ function imagekpr_guest_csrf_verify(): bool
   $sess = $_SESSION['ikpr_guest_csrf'] ?? '';
   return is_string($sess) && $sess !== '' && is_string($t) && hash_equals($sess, $t);
 }
+
+/** CSRF for signed-in app forms (e.g. account profile). */
+function imagekpr_app_csrf_token(): string
+{
+  imagekpr_start_session();
+  if (empty($_SESSION['ikpr_app_csrf']) || !is_string($_SESSION['ikpr_app_csrf'])) {
+    try {
+      $_SESSION['ikpr_app_csrf'] = bin2hex(random_bytes(32));
+    } catch (Throwable $e) {
+      $_SESSION['ikpr_app_csrf'] = bin2hex(openssl_random_pseudo_bytes(32));
+    }
+  }
+  return $_SESSION['ikpr_app_csrf'];
+}
+
+function imagekpr_app_csrf_field(): string
+{
+  return '<input type="hidden" name="app_csrf" value="' . htmlspecialchars(imagekpr_app_csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
+}
+
+function imagekpr_app_csrf_verify(): bool
+{
+  imagekpr_start_session();
+  $t = $_POST['app_csrf'] ?? '';
+  $sess = $_SESSION['ikpr_app_csrf'] ?? '';
+  return is_string($sess) && $sess !== '' && is_string($t) && hash_equals($sess, $t);
+}
+
+/**
+ * Label shown in the header: custom display_name, else account name (e.g. Google), else email.
+ */
+function imagekpr_user_header_display_label(?string $displayName, ?string $accountName, string $email): string
+{
+  $d = trim((string) $displayName);
+  if ($d !== '') {
+    return $d;
+  }
+  $n = trim((string) $accountName);
+  if ($n !== '') {
+    return $n;
+  }
+  $e = trim($email);
+  return $e !== '' ? $e : 'Account';
+}

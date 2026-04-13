@@ -98,6 +98,9 @@ function imagekpr_site_default_quota_from_settings(): ?int
   if ($raw === '' || $raw === '0') {
     return null;
   }
+  if (!ctype_digit($raw)) {
+    return null;
+  }
   $n = (int) $raw;
   return $n > 0 ? $n : null;
 }

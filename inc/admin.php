@@ -87,19 +87,48 @@ function imagekpr_csrf_verify(): bool
   return is_string($sess) && $sess !== '' && is_string($t) && hash_equals($sess, $t);
 }
 
-/** Site default quota (bytes) when user row has NULL storage_quota_bytes; null = no default cap. */
+/**
+ * Site default quota (bytes) when user row has NULL storage_quota_bytes; null = no default cap (unlimited).
+ * If app_settings has the key: use that value only (positive digits). Empty / 0 / invalid there means unlimited,
+ * not config.php — so Admin Config is authoritative once saved.
+ */
 function imagekpr_default_storage_quota_bytes(): ?int
 {
   imagekpr_ensure_config();
-  $fromDb = imagekpr_site_default_quota_from_settings();
   if (ImageKprAppSettings::has('default_storage_quota_bytes')) {
-    return $fromDb;
+    return imagekpr_site_default_quota_from_settings();
   }
   if (!defined('DEFAULT_STORAGE_QUOTA_BYTES')) {
     return null;
   }
   $v = (int) DEFAULT_STORAGE_QUOTA_BYTES;
   return $v > 0 ? $v : null;
+}
+
+/**
+ * Storage line for main app status hint; uses same byte formatter as admin so caps match Config/Users.
+ *
+ * @param array{effective_bytes: ?int, unlimited: bool, remaining_bytes: ?int, used_bytes: int} $quotaStatus
+ */
+function imagekpr_stats_storage_hint_line(int $totalLibraryBytes, array $quotaStatus): string
+{
+  if (!empty($quotaStatus['unlimited'])) {
+    return imagekpr_format_bytes($totalLibraryBytes) . ' in library — no storage cap';
+  }
+  $eff = $quotaStatus['effective_bytes'] ?? null;
+  if ($eff === null || $eff < 1) {
+    return imagekpr_format_bytes($totalLibraryBytes) . ' in library — no storage cap';
+  }
+  $used = max(0, (int) ($quotaStatus['used_bytes'] ?? 0));
+  $rem = $quotaStatus['remaining_bytes'];
+  $remInt = $rem === null ? max(0, (int) $eff - $used) : max(0, (int) $rem);
+
+  return imagekpr_format_bytes($used)
+    . ' / '
+    . imagekpr_format_bytes((int) $eff)
+    . ' storage ('
+    . imagekpr_format_bytes($remInt)
+    . ' left)';
 }
 
 /**
@@ -131,6 +160,16 @@ function imagekpr_days_since_mysql_datetime(?string $mysqlDt): ?int
     return null;
   }
   return max(0, (int) floor((time() - $ts) / 86400));
+}
+
+/** Encode byte counts for JSON so clients never coerce BIGINT via float (always decimal string). */
+function imagekpr_json_byte_string(?int $bytes): ?string
+{
+  if ($bytes === null) {
+    return null;
+  }
+
+  return (string) $bytes;
 }
 
 function imagekpr_format_bytes(int $bytes): string
@@ -205,6 +244,58 @@ function imagekpr_plan_tier_storage_reference(): array
     $out[$k] = ['label' => $r['label'], 'bytes' => $r['storage_bytes'], 'upload_mb' => $r['upload_mb']];
   }
   return $out;
+}
+
+/**
+ * Match effective storage cap + upload tier to a SaaS preset (exact bytes and MB).
+ *
+ * @return string|null Preset key free|silver|gold, 'custom' if capped but no match, null if unlimited.
+ */
+function imagekpr_infer_saas_tier_preset_match(?int $storageQuotaColumn, int $uploadMb): ?string
+{
+  $uploadMb = imagekpr_normalize_upload_size_mb($uploadMb);
+  $dbq = $storageQuotaColumn;
+  $eff = imagekpr_effective_quota_bytes($dbq === null ? null : (int) $dbq);
+  if ($eff === null) {
+    return null;
+  }
+  foreach (imagekpr_plan_tier_storage_reference() as $key => $t) {
+    if ((int) $t['bytes'] === $eff && (int) $t['upload_mb'] === $uploadMb) {
+      return (string) $key;
+    }
+  }
+  return 'custom';
+}
+
+/**
+ * Storage quota status for the signed-in API user (same used-bytes basis as upload/inbox enforcement).
+ *
+ * @return array{effective_bytes: ?int, unlimited: bool, remaining_bytes: ?int, used_bytes: int}
+ */
+function imagekpr_user_storage_quota_status(PDO $pdo, int $userId): array
+{
+  if ($userId < 1) {
+    return ['effective_bytes' => null, 'unlimited' => true, 'remaining_bytes' => null, 'used_bytes' => 0];
+  }
+  $st = $pdo->prepare('SELECT storage_quota_bytes FROM users WHERE id = ? LIMIT 1');
+  $st->execute([$userId]);
+  $row = $st->fetch(PDO::FETCH_ASSOC);
+  if ($row === false) {
+    return ['effective_bytes' => null, 'unlimited' => true, 'remaining_bytes' => null, 'used_bytes' => 0];
+  }
+  $dbq = $row['storage_quota_bytes'];
+  $dbq = $dbq === null ? null : (int) $dbq;
+  $eff = imagekpr_effective_quota_bytes($dbq);
+  $unlimited = $eff === null;
+  $used = imagekpr_user_storage_used($pdo, $userId);
+  $remaining = $unlimited ? null : max(0, $eff - $used);
+
+  return [
+    'effective_bytes' => $eff,
+    'unlimited' => $unlimited,
+    'remaining_bytes' => $remaining,
+    'used_bytes' => $used,
+  ];
 }
 
 /** HTML fragment: Free/Silver/Gold line for admin help text. */

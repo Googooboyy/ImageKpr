@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../inc/auth.php';
+require_once __DIR__ . '/../inc/admin.php';
 imagekpr_require_api_user();
 $uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
@@ -40,9 +41,17 @@ foreach ($last10 as &$row) {
   }
 }
 
+$quotaStatus = imagekpr_user_storage_quota_status($pdo, $uidInt);
+$storageHintLine = imagekpr_stats_storage_hint_line($totalStorageBytes, $quotaStatus);
+
 echo json_encode([
   'total_images' => $totalImages,
   'total_storage_bytes' => $totalStorageBytes,
   'total_storage_gb' => $totalStorageGb,
+  'storage_hint_line' => $storageHintLine,
+  'storage_quota_effective_bytes' => imagekpr_json_byte_string($quotaStatus['effective_bytes']),
+  'storage_quota_unlimited' => $quotaStatus['unlimited'],
+  'storage_remaining_bytes' => imagekpr_json_byte_string($quotaStatus['remaining_bytes']),
+  'storage_quota_used_bytes' => imagekpr_json_byte_string($quotaStatus['used_bytes']),
   'last_10' => $last10,
 ]);

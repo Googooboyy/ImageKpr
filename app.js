@@ -28,6 +28,69 @@
     window.location.href = 'index.php#login';
   }
 
+  /** Parse quota byte fields from API (number or decimal string; avoids float coercion). */
+  function parseQuotaBytesJson(val) {
+    if (val == null || val === '') return null;
+    if (typeof val === 'number' && Number.isFinite(val)) return Math.trunc(val);
+    const s = String(val).trim();
+    if (/^\d+$/.test(s) && typeof BigInt !== 'undefined') {
+      try {
+        const bi = BigInt(s);
+        const lim = BigInt(Number.MAX_SAFE_INTEGER);
+        if (bi > lim) return Number.MAX_SAFE_INTEGER;
+        return Number(bi);
+      } catch (_) {
+        return null;
+      }
+    }
+    if (/^\d+$/.test(s)) return parseInt(s, 10);
+    const n = Number(s);
+    return Number.isFinite(n) ? Math.trunc(n) : null;
+  }
+
+  /** Human-readable size for hint banner (aligned with server-side tier display). */
+  function formatBytesHint(bytes) {
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n < 0) return '0 B';
+    if (n < 1024) return n + ' B';
+    const units = ['KB', 'MB', 'GB', 'TB'];
+    let v = n;
+    let i = 0;
+    while (v >= 1024 && i < units.length - 1) {
+      v /= 1024;
+      i++;
+    }
+    const dec = i >= 2 ? 2 : 1;
+    const rounded = Math.round(v * Math.pow(10, dec)) / Math.pow(10, dec);
+    return rounded + ' ' + units[i];
+  }
+
+  /** Remaining bytes under cap; uses API remaining or effective − used. */
+  function storageRemainingBytesFromStats(stats) {
+    const remRaw = stats.storage_remaining_bytes;
+    if (remRaw != null && Number.isFinite(Number(remRaw))) {
+      return Math.max(0, Math.trunc(Number(remRaw)));
+    }
+    const eff = stats.storage_quota_effective_bytes;
+    const used = stats.storage_quota_used_bytes ?? 0;
+    if (eff != null && Number.isFinite(Number(eff)) && Number.isFinite(Number(used))) {
+      return Math.max(0, Math.trunc(Number(eff)) - Math.trunc(Number(used)));
+    }
+    return null;
+  }
+
+  /** True when less than 10% of the storage cap is still free (capped accounts only). */
+  function isStorageLowUnderTenPercent(stats) {
+    if (!stats._quotaReady || stats.storage_quota_unlimited) return false;
+    const eff = stats.storage_quota_effective_bytes;
+    if (eff == null || !Number.isFinite(Number(eff))) return false;
+    const effN = Math.trunc(Number(eff));
+    if (effN < 1) return false;
+    const rem = storageRemainingBytesFromStats(stats);
+    if (rem == null || !Number.isFinite(rem)) return false;
+    return rem * 10 < effN;
+  }
+
   function fetchJSON(url) {
     return fetch(url, { credentials: 'same-origin' }).then(r => {
       const status = r.status;
@@ -1870,6 +1933,11 @@
       }
       try {
         const d = JSON.parse(xhr.responseText);
+        if (xhr.status === 507 && d.quota) {
+          loadStats();
+          showToast(d.error || 'Storage quota exceeded', true);
+          return;
+        }
         if (d.success !== false) {
           showToast('Uploaded');
           const ids = extractUploadedIds(d);
@@ -2458,6 +2526,7 @@
               refreshGrid(false);
             });
           } else {
+            if (data.quota) loadStats();
             showToast(data.error || 'Import failed', true);
           }
         }).catch(() => showToast('Import failed'));
@@ -2474,7 +2543,16 @@
     showInboxImportModal();
   }
 
-  let cachedStats = { total_images: '—', total_storage_gb: '—' };
+  let cachedStats = {
+    total_images: '—',
+    total_storage_gb: '—',
+    _quotaReady: false,
+    storage_hint_line: null,
+    storage_quota_unlimited: true,
+    storage_quota_effective_bytes: null,
+    storage_remaining_bytes: null,
+    storage_quota_used_bytes: 0
+  };
 
   function updateHintBanner() {
     const hintEl = document.getElementById('user-hint-text');
@@ -2487,8 +2565,19 @@
     else if (filterVal === UNCATEGORIZED_FILTER) folderLabel = 'Uncategorized';
     else if (filterVal) folderLabel = filterVal;
     const tagLabel = gridState.tagFilter ? "tags '" + gridState.tagFilter + "'" : 'no tags selected';
-    const storageLabel = cachedStats.total_storage_gb + ' GB';
-    hintEl.textContent = "Showing '" + gridState.total + "' images from '" + folderLabel + "' | " + storageLabel + " storage used | with " + tagLabel;
+    const lowStorage = isStorageLowUnderTenPercent(cachedStats);
+    const parts = ["Showing '" + gridState.total + "' images from '" + folderLabel + "'"];
+    if (lowStorage) {
+      const rem = storageRemainingBytesFromStats(cachedStats);
+      parts.push(
+        'Storage almost full — less than 10% of your space is free ('
+          + formatBytesHint(rem != null ? rem : 0)
+          + ' left). See Account for usage and upgrade options.'
+      );
+    }
+    parts.push('with ' + tagLabel);
+    hintEl.textContent = parts.join(' | ');
+    hintEl.classList.toggle('user-hint-text--low-storage', lowStorage);
   }
 
   function loadStats() {
@@ -2496,10 +2585,18 @@
     fetchJSON(API_BASE + '/stats.php?t=' + Date.now()).then(data => {
       cachedStats.total_images = data.total_images != null ? data.total_images : '—';
       cachedStats.total_storage_gb = data.total_storage_gb != null ? data.total_storage_gb : '0.00';
+      cachedStats.storage_hint_line = typeof data.storage_hint_line === 'string' && data.storage_hint_line !== '' ? data.storage_hint_line : null;
+      cachedStats.storage_quota_unlimited = data.storage_quota_unlimited === true;
+      cachedStats.storage_quota_effective_bytes = parseQuotaBytesJson(data.storage_quota_effective_bytes);
+      cachedStats.storage_remaining_bytes = parseQuotaBytesJson(data.storage_remaining_bytes);
+      cachedStats.storage_quota_used_bytes = parseQuotaBytesJson(data.storage_quota_used_bytes) ?? 0;
+      cachedStats._quotaReady = true;
       updateHintBanner();
     }).catch(() => {
       cachedStats.total_images = '—';
       cachedStats.total_storage_gb = '—';
+      cachedStats.storage_hint_line = null;
+      cachedStats._quotaReady = false;
       updateHintBanner();
     });
   }

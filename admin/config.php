@@ -207,6 +207,7 @@ $adminNavCurrent = 'config';
           <input type="text" name="default_storage_quota_bytes" value="<?php echo $defQ !== null ? htmlspecialchars((string) $defQ, ENT_QUOTES, 'UTF-8') : ''; ?>" placeholder="empty = use DEFAULT_STORAGE_QUOTA_BYTES in config.php if set">
         </label>
         <p class="admin-muted">Use <span class="admin-mono">0</span> or clear and save a separate time to mean unlimited site default. Empty field removes the DB override.</p>
+        <p class="admin-muted">Free tier total library is <span class="admin-mono">52428800</span> bytes (50&nbsp;MiB). On <a href="index.php">Users</a>, custom “GiB” caps use <strong>binary gigabytes</strong>: entering <span class="admin-mono">50</span> there means 50&nbsp;GiB, not 50&nbsp;MB — use the <strong>Free</strong> plan preset or ~<span class="admin-mono">0.047</span> GiB for 50&nbsp;MiB.</p>
         <p class="admin-muted"><strong>Stripe / SaaS tier matrix</strong> (reference when setting per-user byte caps on <a href="index.php">Users</a>): <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
         <p class="admin-muted"><?php echo imagekpr_admin_html_plan_matrix_pro_blurb(); ?></p>
       </div>
