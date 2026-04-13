@@ -1206,6 +1206,13 @@ body.ikpr-request-modal-open {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.user-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+  justify-content: flex-end;
+}
 .user-session-logout {
   color: #1565c0;
   text-decoration: none;
@@ -1637,4 +1644,634 @@ body.ikpr-request-modal-open {
   margin-top: 0.35rem;
   padding: 0.35rem 0.75rem;
   font-size: 0.875rem;
+}
+
+/* --- Pricing preview (/pricing.php) --- */
+.ikpr-pricing-page {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.ikpr-pricing-main {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 2.5rem;
+}
+
+.ikpr-pricing-intro {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.ikpr-pricing-intro h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.85rem;
+  font-weight: 700;
+  color: #111;
+}
+
+.ikpr-pricing-intro-lead {
+  margin: 0 auto;
+  max-width: 36rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #555;
+}
+
+.ikpr-pricing-intro-note {
+  margin: 0.75rem auto 0;
+  max-width: 36rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #888;
+}
+
+.ikpr-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  align-items: stretch;
+  gap: 1.25rem;
+}
+
+@media (min-width: 1100px) {
+  .ikpr-pricing-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .ikpr-pricing-grid {
+    grid-template-columns: 1fr;
+    max-width: 22rem;
+    margin: 0 auto;
+  }
+}
+
+.ikpr-pricing-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1.5rem 1.15rem 1.35rem;
+  background: #fff;
+  color: #000;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.ikpr-pricing-card--featured {
+  background: linear-gradient(135deg, #1e3a8a 0%, #10b981 100%);
+  color: #fff;
+  box-shadow: 0 14px 40px rgba(30, 58, 138, 0.35), 0 4px 12px rgba(16, 185, 129, 0.2);
+}
+
+.ikpr-pricing-card--pro {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06), 0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+.ikpr-pricing-pro-tagline {
+  margin: -0.15rem 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #475569;
+  text-transform: uppercase;
+}
+
+.ikpr-pricing-icon {
+  color: currentColor;
+  opacity: 0.92;
+  margin-bottom: 0.35rem;
+}
+
+.ikpr-pricing-tier {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.ikpr-pricing-price {
+  margin-bottom: 1rem;
+  line-height: 1.2;
+}
+
+.ikpr-pricing-dollar {
+  font-size: 0.95rem;
+  font-weight: 600;
+  vertical-align: super;
+  margin-right: 0.05em;
+}
+
+.ikpr-pricing-amount {
+  font-size: 2.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.ikpr-pricing-period {
+  display: inline-block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+  margin-left: 0.15rem;
+}
+
+.ikpr-pricing-card--featured .ikpr-pricing-period {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.ikpr-pricing-annual {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #444;
+}
+
+.ikpr-pricing-card--featured .ikpr-pricing-annual {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.ikpr-pricing-price--once {
+  margin-bottom: 1rem;
+}
+
+.ikpr-pricing-period--once {
+  display: block;
+  margin-top: 0.35rem;
+  margin-left: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.35;
+}
+
+.ikpr-pricing-annual--inline {
+  display: inline;
+  font-weight: 500;
+  font-size: 0.78rem;
+  color: #555;
+}
+
+.ikpr-pricing-pro-renewal {
+  display: block;
+  margin-top: 0.45rem;
+  max-width: 16rem;
+  margin-left: auto;
+  margin-right: auto;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: #475569;
+}
+
+.ikpr-pricing-laptop {
+  width: 100%;
+  max-width: 200px;
+  margin: 0 auto 1rem;
+}
+
+.ikpr-pricing-laptop-lid {
+  background: linear-gradient(180deg, #c4c4c4 0%, #9a9a9a 100%);
+  border-radius: 10px 10px 4px 4px;
+  padding: 6px 6px 5px;
+}
+
+.ikpr-pricing-laptop-bezel {
+  background: #1a1a1a;
+  border-radius: 6px;
+  padding: 5px;
+}
+
+.ikpr-pricing-card--featured .ikpr-pricing-laptop-lid {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.12) 100%);
+}
+
+.ikpr-pricing-card--featured .ikpr-pricing-laptop-bezel {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.ikpr-pricing-laptop-screen-inner {
+  background: linear-gradient(145deg, #e8eef5 0%, #d8dee8 100%);
+  border-radius: 3px;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  display: flex;
+  flex-direction: column;
+}
+
+.ikpr-pricing-card--featured .ikpr-pricing-laptop-screen-inner {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.95) 0%, rgba(226, 232, 240, 0.9) 100%);
+}
+
+.ikpr-pricing-ui-bar {
+  height: 14%;
+  min-height: 10px;
+  background: linear-gradient(90deg, #64748b 0%, #475569 100%);
+  flex-shrink: 0;
+}
+
+.ikpr-pricing-ui-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6%;
+  padding: 8% 7%;
+}
+
+.ikpr-pricing-ui-slide {
+  flex: 1;
+  background: linear-gradient(135deg, #93c5fd 0%, #3b82f6 55%, #1d4ed8 100%);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.ikpr-pricing-ui-thumbs {
+  display: flex;
+  gap: 5%;
+  height: 18%;
+  min-height: 8px;
+}
+
+.ikpr-pricing-ui-thumbs span {
+  flex: 1;
+  background: #94a3b8;
+  border-radius: 2px;
+  opacity: 0.85;
+}
+
+.ikpr-pricing-laptop-chassis {
+  height: 7px;
+  margin: 0 12% 0;
+  background: linear-gradient(180deg, #8a8a8a 0%, #6b6b6b 100%);
+  border-radius: 0 0 4px 4px;
+}
+
+.ikpr-pricing-card--featured .ikpr-pricing-laptop-chassis {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(0, 0, 0, 0.15) 100%);
+}
+
+.ikpr-pricing-features-title {
+  margin: 0 0 0.65rem;
+  font-size: 1rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ikpr-pricing-features-title--sub {
+  margin-top: 0.85rem;
+  font-size: 0.88rem;
+  text-decoration: none;
+  color: inherit;
+  opacity: 0.92;
+}
+
+.ikpr-pricing-card--featured .ikpr-pricing-features-title--sub {
+  opacity: 0.95;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.ikpr-pricing-features {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  width: 100%;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.ikpr-pricing-card--pro .ikpr-pricing-features:last-of-type {
+  margin-bottom: 0;
+}
+
+.ikpr-pricing-features--compact {
+  margin-bottom: 0.85rem;
+  font-size: 0.8rem;
+}
+
+.ikpr-pricing-features--compact .ikpr-pricing-feat {
+  margin-bottom: 0.28rem;
+}
+
+.ikpr-pricing-feat {
+  margin: 0 0 0.35rem;
+}
+
+.ikpr-pricing-feat:last-child {
+  margin-bottom: 0;
+}
+
+.ikpr-pricing-feat--neg {
+  color: #d93025;
+}
+
+.ikpr-pricing-feat--pos {
+  color: #28a745;
+}
+
+.ikpr-pricing-card--featured .ikpr-pricing-feat--neg {
+  color: #fca5a5;
+}
+
+.ikpr-pricing-card--featured .ikpr-pricing-feat--pos.ikpr-pricing-feat--bright {
+  color: #86efac;
+  font-weight: 600;
+}
+
+.ikpr-pricing-cta {
+  display: inline-block;
+  margin-top: auto;
+  padding: 0.55rem 1.6rem;
+  border-radius: 999px;
+  background: #000;
+  color: #fff !important;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ikpr-pricing-cta:hover {
+  opacity: 0.92;
+  transform: scale(1.02);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.ikpr-pricing-cta:active {
+  transform: scale(0.99);
+}
+
+.ikpr-pricing-cta--on-dark {
+  background: #fff;
+  color: #000 !important;
+}
+
+.ikpr-pricing-cta--on-dark:hover {
+  box-shadow: 0 4px 18px rgba(255, 255, 255, 0.35);
+}
+
+/* --- Marketing layout (features.php, case-studies.php) --- */
+.ikpr-features-page .ikpr-features-main,
+.ikpr-case-studies-page .ikpr-features-main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 1rem;
+}
+
+.ikpr-case-studies-note {
+  max-width: 42rem;
+  margin: -0.5rem auto 2rem;
+}
+
+/* Case studies — muted sage / light green (distinct from Features blue) */
+.ikpr-case-studies-page .ikpr-features-spotlight-icon {
+  background: #e3efe6;
+  color: #2f5d3a;
+}
+
+.ikpr-case-studies-page .ikpr-features-cta {
+  background: #e0ede3;
+  color: #1a4d28 !important;
+  border-color: #a8c9b2;
+}
+
+.ikpr-case-studies-page .ikpr-features-cta:hover {
+  background: #d2e6d7;
+  border-color: #92b89e;
+}
+
+.ikpr-case-studies-page .ikpr-features-cta--primary {
+  background: #3a6b47;
+  border-color: #3a6b47;
+  color: #fff !important;
+}
+
+.ikpr-case-studies-page .ikpr-features-cta--primary:hover {
+  background: #2f5a3a;
+  border-color: #2f5a3a;
+}
+
+.ikpr-case-studies-page .ikpr-features-copy a:not(.ikpr-features-cta) {
+  color: #2d6a3a;
+}
+
+.ikpr-case-studies-page .ikpr-features-copy a:not(.ikpr-features-cta):hover {
+  color: #1f4d28;
+}
+
+.ikpr-case-studies-page .ikpr-features-media-frame {
+  border-color: #c8ddd0;
+  background: #f2f7f3;
+}
+
+.ikpr-case-studies-page .ikpr-features-bottom-cta {
+  background: #fafcf9;
+  border-color: #d0e3d4;
+}
+
+.ikpr-case-studies-page .ikpr-doc-note.ikpr-case-studies-note {
+  background: #f0f6f1;
+  border-color: #c5dcc8;
+  color: #3a4a3d;
+}
+
+.ikpr-features-hero {
+  text-align: center;
+  max-width: 40rem;
+  margin: 0 auto 2rem;
+}
+
+.ikpr-features-hero h1 {
+  margin: 0 0 0.75rem;
+  font-size: clamp(1.65rem, 4vw, 2.15rem);
+  line-height: 1.2;
+  color: #1a1a1a;
+}
+
+.ikpr-features-hero-lead {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: #4b4b4b;
+}
+
+.ikpr-features-spotlight {
+  margin-bottom: 2.5rem;
+}
+
+.ikpr-features-spotlight-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.ikpr-features-spotlight-card {
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  padding: 1.1rem 1rem 1.15rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.ikpr-features-spotlight-card h3 {
+  margin: 0.35rem 0 0.4rem;
+  font-size: 1.02rem;
+  color: #222;
+}
+
+.ikpr-features-spotlight-card p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #555;
+}
+
+.ikpr-features-spotlight-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 8px;
+  background: #eef3f9;
+  color: #1565c0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ikpr-features-section-title {
+  text-align: center;
+  margin: 0 0 1.75rem;
+  font-size: 1.5rem;
+  color: #1a1a1a;
+}
+
+.ikpr-features-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  align-items: center;
+  margin-bottom: 2.75rem;
+}
+
+@media (min-width: 860px) {
+  .ikpr-features-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 2.25rem;
+  }
+
+  .ikpr-features-row--flip .ikpr-features-copy {
+    order: 2;
+  }
+
+  .ikpr-features-row--flip .ikpr-features-media {
+    order: 1;
+  }
+}
+
+.ikpr-features-copy h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.28rem;
+  color: #1a1a1a;
+}
+
+.ikpr-features-copy p {
+  margin: 0 0 0.65rem;
+  line-height: 1.6;
+  color: #3f3f3f;
+}
+
+.ikpr-features-copy ul {
+  margin: 0 0 1rem;
+  padding-left: 1.2rem;
+  color: #3f3f3f;
+  line-height: 1.55;
+}
+
+.ikpr-features-copy li + li {
+  margin-top: 0.35rem;
+}
+
+.ikpr-features-copy a {
+  color: #1565c0;
+}
+
+.ikpr-features-cta {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0.5rem 1.35rem;
+  border-radius: 999px;
+  background: #e8eef5;
+  color: #0d47a1 !important;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid #c5d5e8;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.ikpr-features-cta:hover {
+  background: #dbe6f2;
+  border-color: #a8bdd9;
+}
+
+.ikpr-features-cta:active {
+  transform: scale(0.99);
+}
+
+.ikpr-features-cta--primary {
+  background: #1565c0;
+  color: #fff !important;
+  border-color: #1565c0;
+}
+
+.ikpr-features-cta--primary:hover {
+  background: #0d47a1;
+  border-color: #0d47a1;
+}
+
+.ikpr-features-media {
+  margin: 0;
+}
+
+.ikpr-features-media-frame {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #dde4ec;
+  background: #f0f4f8;
+  box-shadow: 0 4px 18px rgba(15, 35, 55, 0.08);
+}
+
+.ikpr-features-media-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.ikpr-features-bottom-cta {
+  text-align: center;
+  max-width: 32rem;
+  margin: 0 auto 2rem;
+  padding: 1.75rem 1rem;
+  background: #fff;
+  border: 1px solid #e8e8e8;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.ikpr-features-bottom-cta h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+  color: #1a1a1a;
+}
+
+.ikpr-features-bottom-cta p {
+  margin: 0 0 1rem;
+  color: #4b4b4b;
+  line-height: 1.55;
 }

@@ -148,18 +148,102 @@ function imagekpr_format_bytes(int $bytes): string
   return round($v, $u >= 2 ? 2 : 1) . ' ' . $units[$u];
 }
 
-/** Allowed per-image upload size tiers (MB). */
+/** Allowed per-image upload size tiers (MB). Align with Stripe tier matrix (Free 3, Silver 10, Gold 50). */
 function imagekpr_allowed_upload_size_tiers_mb(): array
 {
-  return [3, 10, 100];
+  return [3, 10, 50];
+}
+
+/**
+ * Full product tier matrix for admin/marketing alignment (Stripe plan doc). Not applied automatically.
+ *
+ * @return array<string, array<string, mixed>>
+ */
+function imagekpr_plan_tier_matrix_reference(): array
+{
+  return [
+    'free' => [
+      'label' => 'Free',
+      'upload_mb' => 3,
+      'storage_bytes' => 52428800,
+      'max_images' => 100,
+      'shared_dashboard_cap' => 20,
+    ],
+    'silver' => [
+      'label' => 'Silver',
+      'upload_mb' => 10,
+      'storage_bytes' => 209715200,
+      'max_images' => 200,
+      'shared_dashboard_cap' => 40,
+    ],
+    'gold' => [
+      'label' => 'Gold',
+      'upload_mb' => 50,
+      'storage_bytes' => 1048576000,
+      'max_images' => 1000,
+      'shared_dashboard_cap' => 200,
+    ],
+    'pro' => [
+      'label' => 'Pro',
+      'storage_bytes' => 20971520000,
+      'commercial_note' => 'S$999 list per 3-year license; renewal at end of term',
+    ],
+  ];
+}
+
+/**
+ * SaaS tiers only — storage + upload for quick lookups.
+ *
+ * @return array<string, array{label:string, bytes:int, upload_mb:int}>
+ */
+function imagekpr_plan_tier_storage_reference(): array
+{
+  $m = imagekpr_plan_tier_matrix_reference();
+  $out = [];
+  foreach (['free', 'silver', 'gold'] as $k) {
+    $r = $m[$k];
+    $out[$k] = ['label' => $r['label'], 'bytes' => $r['storage_bytes'], 'upload_mb' => $r['upload_mb']];
+  }
+  return $out;
+}
+
+/** HTML fragment: Free/Silver/Gold line for admin help text. */
+function imagekpr_admin_html_plan_matrix_saas_blurb(): string
+{
+  $m = imagekpr_plan_tier_matrix_reference();
+  $chunks = [];
+  foreach (['free', 'silver', 'gold'] as $k) {
+    $r = $m[$k];
+    $chunks[] =
+      '<strong>' . htmlspecialchars((string) $r['label'], ENT_QUOTES, 'UTF-8') . '</strong>: '
+      . (int) $r['upload_mb'] . 'MB/file · '
+      . htmlspecialchars(imagekpr_format_bytes((int) $r['storage_bytes']), ENT_QUOTES, 'UTF-8')
+      . ' (<span class="admin-mono">' . (int) $r['storage_bytes'] . '</span> B) · max '
+      . (int) $r['max_images'] . ' images · shared dashboard max '
+      . (int) $r['shared_dashboard_cap'] . ' images/dashboard';
+  }
+  return implode('; ', $chunks);
+}
+
+/** HTML fragment: Pro (dedicated) line for admin help text. */
+function imagekpr_admin_html_plan_matrix_pro_blurb(): string
+{
+  $p = imagekpr_plan_tier_matrix_reference()['pro'];
+  $b = (int) $p['storage_bytes'];
+  $note = htmlspecialchars((string) $p['commercial_note'], ENT_QUOTES, 'UTF-8');
+  return '<strong>' . htmlspecialchars((string) $p['label'], ENT_QUOTES, 'UTF-8') . '</strong> (dedicated white-label, maximum features): '
+    . 'not a seat on this shared multi-tenant app. Reference storage '
+    . htmlspecialchars(imagekpr_format_bytes($b), ENT_QUOTES, 'UTF-8')
+    . ' (<span class="admin-mono">' . $b . '</span> B); unlimited library images &amp; shared-dashboard selection on the dedicated instance. '
+    . $note . ' (Stripe: one-time or invoice per contract).';
 }
 
 /** Normalize requested tier to a safe supported value (defaults to 3MB). */
 function imagekpr_normalize_upload_size_mb($raw): int
 {
   $v = (int) $raw;
-  if ($v === 30) {
-    $v = 100;
+  if ($v === 100) {
+    $v = 50;
   }
   return in_array($v, imagekpr_allowed_upload_size_tiers_mb(), true) ? $v : 3;
 }

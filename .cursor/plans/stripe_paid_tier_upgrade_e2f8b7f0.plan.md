@@ -1,6 +1,6 @@
 ---
 name: stripe_paid_tier_upgrade
-overview: "Security hardening (Phase 0: UUID opaque image storage + upload DoS protection) followed by Stripe Checkout + webhooks so users can self-upgrade across FREE/SILVER/GOLD on the shared SaaS; PRO is a separate white-label / dedicated-server offering (not a SaaS seat tier). Entitlement sync for upload size, caps, quotas on the multi-tenant app; Admin tracking for subscriptions and Pro sales handoff."
+overview: "Security hardening (Phase 0: UUID opaque image storage + upload DoS protection) followed by Stripe Checkout + webhooks so users can self-upgrade across FREE/SILVER/GOLD on the shared SaaS; PRO is maximum-features white-label on a dedicated server (SGD 999 / 3-year license, renewal at term end—not a SaaS seat tier). Entitlement sync for upload size, caps, quotas on the multi-tenant app; Admin tracking for subscriptions and Pro sales handoff."
 todos:
   - id: phase0a-migration-sql
     content: "Phase 0a: Create migration SQL adding disk_filename column to images, backfill existing rows, add unique index."
@@ -33,7 +33,7 @@ todos:
     content: "Phase 0a: Update app.js rename response handling to keep existing url when only filename (display name) changes."
     status: pending
   - id: phase0b-htaccess
-    content: "Phase 0b: Add LimitRequestBody (aligned with max 100MB tier) to .htaccess."
+    content: "Phase 0b: Add LimitRequestBody (aligned with max 50MB tier) to .htaccess."
     status: pending
   - id: phase0b-upload-rate-limit
     content: "Phase 0b: Add per-user and per-IP rate limits to api/upload.php using existing imagekpr_rate_limit()."
@@ -54,7 +54,7 @@ todos:
     content: "Phase 1: Add Stripe config keys to config.example.php and config.php."
     status: pending
   - id: phase1-tier-allowlist
-    content: "Phase 1: Update imagekpr_allowed_upload_size_tiers_mb to [3, 10, 100] in inc/admin.php."
+    content: "Phase 1: Update imagekpr_allowed_upload_size_tiers_mb to [3, 10, 50] in inc/admin.php."
     status: pending
   - id: phase1-js-refactor
     content: "Phase 1: Extract upload.js and slideshow.js from app.js (pure reorganization, no behavior changes)."
@@ -98,7 +98,7 @@ todos:
 isProject: false
 ---
 
-# ImageKpr -- Security Hardening + Stripe Paid Tiers
+# ractImageKpr -- Security Hardening + Stripe Paid Tiers
 
 ## Tier specification matrix (source of truth — edit here)
 
@@ -106,43 +106,39 @@ isProject: false
 
 **Conventions**
 
-- **Per-file limit** maps to `users.upload_size_mb` (MiB). Allowed values in app code today: **3, 10, 100** only (see `[inc/admin.php](inc/admin.php)` `imagekpr_allowed_upload_size_tiers_mb()`). If you introduce a new upload step, extend that allowlist and migrations.
+- **Per-file limit** maps to `users.upload_size_mb` (MiB). Allowed values in app code today: **3, 10, 50** only (see `[inc/admin.php](inc/admin.php)` `imagekpr_allowed_upload_size_tiers_mb()`). If you introduce a new upload step, extend that allowlist and migrations.
 - **Total storage** maps to `users.storage_quota_bytes` (binary bytes). Use the **Bytes (decimal)** column for config/constants, or compute as `MiB * 1024 * 1024`.
 - **Max images** is the optional **account-wide** image count cap planned for Phase 3 (total images in library), not the shared-dashboard column.
 - **Shared dashboard images (per dashboard):** Max **selected images on a single** shared dashboard ([Shared Dashboard feature](shared_dashboard_feature_6fe7f508.plan.md)). The limit is **per dashboard**, not pooled across dashboards — e.g. on Free, two dashboards with 20 different images each is valid.
 - **Silver / Gold** are **subscriptions** sold as **monthly** and **yearly** Stripe Prices (same entitlements for both intervals; different Price IDs). Checkout and webhooks must accept either interval for each tier.
-- **Pro (white-label)** is **not** a higher tier **on the shared ImageKpr app**. It is a **services / productized delivery**: you **duplicate ImageKpr** for one client on a **dedicated new server**, **white-labeled** for them. Marketing angle: e.g. **“white-labeled personal image repo”** — the buyer wants **their own** stack, **not** multi-tenant SaaS next to other users. On that dedicated instance there is **no Free/Silver/Gold ladder** (single-tenant; limits are whatever you configure at deploy or in contract). Stripe may still expose a **one-time** (or milestone) Price as a **deposit / listed package**; fulfillment is **off-platform** (provisioning, DNS, branding). The **Entitlements** row for `pro` below is for **CRM / admin / marketing consistency** — it does **not** mean a Pro customer’s library lives in the same DB as public SaaS users unless you intentionally run a hybrid (usually you do not).
+- **Pro (white-label)** is **not** a higher tier **on the shared ImageKpr app**. It targets buyers who want **maximum features** on **their own** stack: **duplicate ImageKpr** for one client on a **dedicated new server**, **white-labeled** for them. **Commercial shape:** **SGD 999** for a **3-year** license term, with **license renewal** at end of term (contract/SOW). On that dedicated instance there is **no Free/Silver/Gold ladder** (single-tenant; entitlements per matrix row below). Stripe may use a **one-time** or invoiced **payment** for the term, or equivalent—**not** a monthly SaaS subscription like Silver/Gold. Fulfillment is **off-platform** (provisioning, DNS, branding). The **Entitlements** row for `pro` below is for **CRM / admin / marketing consistency** — it does **not** mean a Pro customer’s library lives in the same DB as public SaaS users unless you intentionally run a hybrid (usually you do not).
 - **Pro — detail later:** Full Pro playbook (sales, SOW, provisioning, and **feature-set differences per dedicated instance** vs stock ImageKpr) is **out of scope** for Phases 0–6 here. Treat Pro as **listed + payment capture** (and minimal admin/CRM hooks if needed) until **Stripe on the shared SaaS is successful**; then spec Pro delivery in a **separate plan**.
 
 ### Entitlements (product → database fields)
 
 
-| Tier (customer-facing name) | Internal key (API / metadata) | `upload_size_mb` (per file) | Total storage      | `storage_quota_bytes` (decimal) | Max images (cap) | Shared dashboard max images (per dashboard) | Notes                                                                                                                                                                                               |
-| --------------------------- | ----------------------------- | --------------------------- | ------------------ | ------------------------------- | ---------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Free                        | `free`                        | 3                           | 50 MiB             | 52428800                        | 50               | 20                                          | Default for new signups; no Stripe.                                                                                                                                                                 |
-| Silver                      | `silver`                      | 10                          | 1500 MiB           | 307200000                       | 200              | 50                                          | Paid subscription starts from this tier onwards.                                                                                                                                                    |
-| Gold                        | `gold`                        | 100                         | 1000 MiB (~1 GiB)  | 1048576000                      | 1000             | Unlimited                                   | Highest self-serve upload tier (100 MB/file).                                                                                                                                                       |
-| Pro (white-label)           | `pro`                         | *Dedicated instance*        | *Per SOW / deploy* | *Per contract*                  | *Per deploy*     | *N/A (single-tenant)*                       | **Not a SaaS seat.** New server + white-label ImageKpr for one client; **no tier distinction** on their instance. Stripe: typically **one-time** Price for listed package; actual scope in **SOW**. |
+| Tier (customer-facing name) | Internal key (API / metadata) | `upload_size_mb` (per file) | Total storage | `storage_quota_bytes` (decimal) | Max images (cap) | Shared dashboard max images (per dashboard) | Notes                                                                                            |
+| --------------------------- | ----------------------------- | --------------------------- | ------------- | ------------------------------- | ---------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Free                        | `free`                        | 3                           | 50 MiB        | 52428800                        | 100              | 20                                          | Default for new signups; no Stripe.                                                              |
+| Silver                      | `silver`                      | 10                          | 200 MiB       | 209715200                       | 200              | 40                                          | Paid subscription starts from this tier onwards.                                                 |
+| Gold                        | `gold`                        | 50                          | 1 GiB         | 1048576000                      | 1000             | 200                                         | Highest self-serve upload tier (50 MB/file).                                                     |
+| Pro (white-label)           | `pro`                         | *Dedicated instance*        | *20 GiB*      | 20971520000                     | *unlimited*      | *unlimited*                                 | **3-yr contract.** New server + white-label ImageKpr; **no tier distinction** on their instance. |
 
-
-**Downgrade behavior (upload tier):** Existing app behavior: lowering `upload_size_mb` sets `upload_tier_downgraded_at`; **30 days** grace before the smaller per-file limit applies in API enforcement (`imagekpr_upload_tier_grace_days()`). Align messaging on Account / billing-policy if you change that number.
-
-### Stripe catalog (paste Price IDs when created)
 
 **Subscriptions (Silver, Gold):** Create **two** recurring Prices per tier — **monthly** and **yearly** — in Stripe (same Product or separate Products; your choice). Same internal key `silver` or `gold` on each Price metadata; webhook maps **each** Price ID to the same entitlement row.
 
-**Pro:** Exactly **one** one-time Price (per currency/region if needed) for the **white-label / dedicated deployment** product — **payment** mode, not subscription. (Large deals may still be invoiced outside Stripe; the catalog Price can represent a standard package or deposit.) Do **not** map Pro to `upload_size_mb` on the **shared** SaaS unless you explicitly sell a rare “hosted Pro” variant. **Per-instance feature differences** and full fulfillment workflow are **deferred** until after SaaS Stripe is stable (see convention **Pro — detail later** above).
+**Pro:** List **SGD 999** per **3-year** license term (renewal at end of term). In Stripe, model as **one-time** or **invoice** payment for the contract term—not Silver/Gold-style recurring subscription unless you deliberately add a renewal SKU. (Large deals may still be invoiced outside Stripe.) Do **not** map Pro to `upload_size_mb` on the **shared** SaaS unless you explicitly sell a rare “hosted Pro” variant. **Per-instance feature differences** and full fulfillment workflow are **deferred** until after SaaS Stripe is stable (see convention **Pro — detail later** above).
 
 **List price (SGD)** — optional column for documentation, UX copy, and internal notes. **Stripe remains the source of truth** for what is charged (amount + currency are on each Price in Dashboard). Keep this column in sync when you change prices in Stripe.
 
 
-| Tier   | Payment cadence   | Stripe mode  | Suggested Price metadata `tier` | List price (SGD, optional) | Test Price ID (`price_...`) | Live Price ID (`price_...`) |
-| ------ | ----------------- | ------------ | ------------------------------- | -------------------------- | --------------------------- | --------------------------- |
-| Silver | Monthly           | Subscription | `silver`                        | 2.99                       |                             |                             |
-| Silver | Yearly            | Subscription | `silver`                        | 29.9                       |                             |                             |
-| Gold   | Monthly           | Subscription | `gold`                          | 9.99                       |                             |                             |
-| Gold   | Yearly            | Subscription | `gold`                          | 99.9                       |                             |                             |
-| Pro    | **One-time only** | **One-time** | `pro`                           | 999                        |                             |                             |
+| Tier   | Payment cadence  | Stripe mode  | Suggested Price metadata `tier` | List price (SGD, optional) | Test Price ID (`price_...`) | Live Price ID (`price_...`) |
+| ------ | ---------------- | ------------ | ------------------------------- | -------------------------- | --------------------------- | --------------------------- |
+| Silver | Monthly          | Subscription | `silver`                        | 2.99                       |                             |                             |
+| Silver | Yearly           | Subscription | `silver`                        | 29.9                       |                             |                             |
+| Gold   | Monthly          | Subscription | `gold`                          | 9.99                       |                             |                             |
+| Gold   | Yearly           | Subscription | `gold`                          | 99.9                       |                             |                             |
+| Pro    | **3-year term**  | **One-time / invoice** (not monthly SaaS) | `pro`                           | 999 (per term)             |                             |                             |
 
 
 ### Quick edit checklist
@@ -150,14 +146,14 @@ isProject: false
 1. Change **Entitlements** table (storage, upload MB, account max images, **shared dashboard per-dashboard** image cap).
 2. If `upload_size_mb` values change set: update `imagekpr_allowed_upload_size_tiers_mb()` and any admin UI copy.
 3. If storage changes: ensure Phase 3 enforcement and default for new subscribers use the new `storage_quota_bytes`.
-4. Fill **Stripe catalog** Price IDs (Test then Live): **four** subscription lines (Silver monthly/yearly, Gold monthly/yearly) plus **one** Pro one-time line; keep webhook mapping in sync. Optionally fill **List price (SGD)** (must match Stripe).
+4. Fill **Stripe catalog** Price IDs (Test then Live): **four** subscription lines (Silver monthly/yearly, Gold monthly/yearly) plus **Pro** (e.g. one-time or invoice for **SGD 999** / **3-year** term); keep webhook mapping in sync. Optionally fill **List price (SGD)** (must match Stripe).
 5. Grep the repo for old numbers in UX copy (`account.php`, `billing-policy.php`, terms, marketing).
 
 ### Related roadmaps (coordination)
 
 These plans do **not** change the Stripe technical phases below, but implementation order should avoid contradictions.
 
-- **[Shared Dashboard](shared_dashboard_feature_6fe7f508.plan.md)** — Per-dashboard image limits apply to the **shared SaaS** (Free 20, Silver 50, Gold unlimited). **Pro (white-label)** customers are on a **separate deployment**; cap rules there are **deploy-time / contract**, not this matrix’s Pro row. Paid-only behavior on SaaS uses an **interim** proxy: `upload_size_mb >= 10` so **Silver and Gold** count as paid (Free remains `3`). When billing columns and **plan tier** exist, replace `imagekpr_user_is_paid()` and enforce dashboard caps from **plan tier** for SaaS users only.
+- **[Shared Dashboard](shared_dashboard_feature_6fe7f508.plan.md)** — Per-dashboard image limits apply to the **shared SaaS** (Free 20, Silver 40, Gold 200 — see Entitlements table above). **Pro (white-label)** customers are on a **separate deployment**; cap rules there are **deploy-time / contract**, not this matrix’s Pro row. Paid-only behavior on SaaS uses an **interim** proxy: `upload_size_mb >= 10` so **Silver and Gold** count as paid (Free remains `3`). When billing columns and **plan tier** exist, replace `imagekpr_user_is_paid()` and enforce dashboard caps from **plan tier** for SaaS users only.
 - **[API Readiness](api_readiness_roadmap_1202a95e.plan.md)** — Phase 3 of this Stripe plan extends `**whoami`** with tier and usage; if external PAT + CORS access is live by then, reflect new fields in `**docs/API.md`** (API roadmap Phase 4). Any new billing endpoints (`create-checkout-session`, webhooks, etc.) should follow the same **session vs Bearer** rules and rate limiting as the rest of `api/*` (especially if called from a separate origin). Webhooks stay **server-to-server** (Stripe signature), not PAT-authenticated.
 
 ---
@@ -265,7 +261,7 @@ In [.htaccess](.htaccess), add:
 LimitRequestBody 104857600
 ```
 
-Rejects oversized requests before PHP starts. Aligned with the max upload tier (100MB).
+Rejects oversized requests before PHP starts. Aligned with the max upload tier (50MB).
 
 ### 2. Per-user upload rate limit
 
@@ -310,7 +306,7 @@ Do this in **Test mode** first so Price IDs and webhook secrets can be copied in
 
 - **Products** -- Create one Product per sellable line matching the **Stripe catalog** table in the Tier specification matrix (top of this doc). Names can change later; stable **metadata** on Product or Price (e.g. `tier: silver`) helps webhook code stay maintainable.
 - **Recurring Prices** -- For SILVER/GOLD (or equivalent): create **Subscription** prices (monthly and/or yearly if both are offered). Each gets a **Price ID** (`price_...`) for `config.php`.
-- **One-time Price** -- For PRO (or contract): create a **one-time** Price linked to its Product; record its **Price ID** separately from subscriptions.
+- **Pro contract Price** -- For PRO (**SGD 999** / **3-year** term): create a **one-time** or **invoice** Price (or equivalent) linked to its Product; record its **Price ID** separately from subscriptions; handle **renewal** as a new sale/term when appropriate.
 - **Copy Price IDs** -- Store test Price IDs in a secure note or env template until `config.example.php` documents the exact variable names (Phase 1).
 
 ### Customer portal
@@ -346,7 +342,7 @@ Do this in **Test mode** first so Price IDs and webhook secrets can be copied in
 - Initialize Composer, install Stripe PHP SDK
 - DB migrations: billing columns on `users`, new `billing_membership_periods` and `billing_events` tables
 - Add Stripe keys to `config.example.php` and `config.php`
-- Update `imagekpr_allowed_upload_size_tiers_mb` to `[3, 10, 100]`
+- Update `imagekpr_allowed_upload_size_tiers_mb` to `[3, 10, 50]`
 - Extract `upload.js` and `slideshow.js` from `app.js` (pure reorg)
 
 ### Phase 2: Checkout + webhooks

@@ -207,6 +207,8 @@ $adminNavCurrent = 'config';
           <input type="text" name="default_storage_quota_bytes" value="<?php echo $defQ !== null ? htmlspecialchars((string) $defQ, ENT_QUOTES, 'UTF-8') : ''; ?>" placeholder="empty = use DEFAULT_STORAGE_QUOTA_BYTES in config.php if set">
         </label>
         <p class="admin-muted">Use <span class="admin-mono">0</span> or clear and save a separate time to mean unlimited site default. Empty field removes the DB override.</p>
+        <p class="admin-muted"><strong>Stripe / SaaS tier matrix</strong> (reference when setting per-user byte caps on <a href="index.php">Users</a>): <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
+        <p class="admin-muted"><?php echo imagekpr_admin_html_plan_matrix_pro_blurb(); ?></p>
       </div>
 
       <div class="admin-config-panel">

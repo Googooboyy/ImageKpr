@@ -552,6 +552,10 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     echo $d === null ? 'none (unlimited)' : htmlspecialchars(imagekpr_format_bytes($d), ENT_QUOTES, 'UTF-8');
     ?> — set <span class="admin-mono">DEFAULT_STORAGE_QUOTA_BYTES</span> in <span class="admin-mono">config.php</span> if needed.</p>
 
+    <?php $uploadTiers = imagekpr_allowed_upload_size_tiers_mb(); ?>
+    <p class="admin-muted"><strong>SaaS tier matrix</strong> (plan doc — upload tier, storage bytes, image caps, shared-dashboard caps; server enforcement may lag Phase 3): <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
+    <p class="admin-muted"><?php echo imagekpr_admin_html_plan_matrix_pro_blurb(); ?></p>
+
     <form class="admin-search" method="get" action="index.php">
       <?php if ($sort !== 'email') { ?><input type="hidden" name="sort" value="<?php echo htmlspecialchars($sort, ENT_QUOTES, 'UTF-8'); ?>"><?php } ?>
       <?php if ($dir !== 'ASC') { ?><input type="hidden" name="dir" value="<?php echo htmlspecialchars(strtolower($dir), ENT_QUOTES, 'UTF-8'); ?>"><?php } ?>
@@ -592,9 +596,9 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
       <div class="admin-bulk-row">
         <fieldset>
           <legend>Bulk upload tier (selected rows)</legend>
-          <label><input type="radio" name="bulk_upload_size_mb" value="3" checked> 3MB</label>
-          <label><input type="radio" name="bulk_upload_size_mb" value="10"> 10MB</label>
-          <label><input type="radio" name="bulk_upload_size_mb" value="100"> 100MB</label>
+          <?php foreach ($uploadTiers as $idx => $mb) { ?>
+          <label><input type="radio" name="bulk_upload_size_mb" value="<?php echo (int) $mb; ?>"<?php echo $idx === 0 ? ' checked' : ''; ?>><?php echo (int) $mb; ?>MB</label>
+          <?php } ?>
         </fieldset>
         <button type="submit" name="action" value="bulk_set_upload_tier">Apply upload tier to selected</button>
       </div>
@@ -707,9 +711,9 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
                   <?php echo imagekpr_csrf_field(); ?>
                   <input type="hidden" name="action" value="set_upload_tier">
                   <input type="hidden" name="user_id" value="<?php echo (int) $r['id']; ?>">
-                  <label><input type="radio" name="upload_size_mb" value="3" <?php echo $uploadMb === 3 ? 'checked' : ''; ?>> 3MB</label>
-                  <label><input type="radio" name="upload_size_mb" value="10" <?php echo $uploadMb === 10 ? 'checked' : ''; ?>> 10MB</label>
-                  <label><input type="radio" name="upload_size_mb" value="100" <?php echo $uploadMb === 100 ? 'checked' : ''; ?>> 100MB</label>
+                  <?php foreach ($uploadTiers as $mb) { ?>
+                  <label><input type="radio" name="upload_size_mb" value="<?php echo (int) $mb; ?>" <?php echo $uploadMb === $mb ? 'checked' : ''; ?>><?php echo (int) $mb; ?>MB</label>
+                  <?php } ?>
                   <?php if ($tierDownAt) { ?>
                     <span class="admin-muted"><?php echo $tierGraceExpired ? 'Grace expired' : ('Grace until ' . htmlspecialchars(date('Y-m-d', strtotime($tierDownAt . ' +30 days')), ENT_QUOTES, 'UTF-8')); ?></span>
                   <?php } ?>

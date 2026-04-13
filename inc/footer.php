@@ -7,6 +7,8 @@ function imagekpr_footer_config(): array
     'company_links' => [
       ['label' => 'Login', 'url' => '/'],
       ['label' => 'About', 'url' => '/about.php'],
+      ['label' => 'Features', 'url' => '/features.php'],
+      ['label' => 'Pricing', 'url' => '/pricing.php'],
       ['label' => 'Contact', 'url' => '/contact.php'],
       ['label' => 'Updates', 'url' => '/updates.php'],
     ],
