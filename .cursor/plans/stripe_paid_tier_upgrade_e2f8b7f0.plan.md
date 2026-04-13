@@ -142,7 +142,7 @@ isProject: false
 | Silver | Yearly            | Subscription | `silver`                        | 29.9                       |                             |                             |
 | Gold   | Monthly           | Subscription | `gold`                          | 9.99                       |                             |                             |
 | Gold   | Yearly            | Subscription | `gold`                          | 99.9                       |                             |                             |
-| Pro    | **One-time only** | **One-time** | `pro`                           | 1999                       |                             |                             |
+| Pro    | **One-time only** | **One-time** | `pro`                           | 999                        |                             |                             |
 
 
 ### Quick edit checklist
