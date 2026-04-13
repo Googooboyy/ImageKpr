@@ -29,7 +29,7 @@ declare(strict_types=1);
     <ul>
       <li>Keeping a shared image library easy to navigate through folders, tags, and search.</li>
       <li>Moving fast with drag-and-drop uploads, bulk actions, and copyable links.</li>
-      <li>Supporting a lightweight workflow for agencies, content teams, and operations teams.</li>
+      <li>Supporting a lightweight workflow for agencies, marketers, and day-to-day operations.</li>
     </ul>
 
     <h2>Core Product Principles</h2>
@@ -38,9 +38,9 @@ declare(strict_types=1);
     <h3>2. Clarity over complexity</h3>
     <p>The UI favors obvious controls and clear feedback, with plain language for actions and system states.</p>
     <h3>3. Controlled sharing</h3>
-    <p>Sign-in and allowlist controls exist so teams can decide who gets access while still collaborating quickly.</p>
+    <p>Sign-in and allowlist controls let you choose who has access without slowing down everyday collaboration.</p>
 
-    <h2>How Teams Use It</h2>
+    <h2>Typical use cases</h2>
     <ul>
       <li>Marketing operations libraries for campaign assets.</li>
       <li>Internal repositories for social, blog, and email imagery.</li>

@@ -22,21 +22,9 @@
   })();
 
   const API_BASE = 'api';
-  // #region agent log
-  function debugLog(hypothesisId, location, message, data, runId) {
-    fetch('http://127.0.0.1:7386/ingest/83463d4a-a660-47b7-b3f9-ab9626544831',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'b35048'},body:JSON.stringify({sessionId:'b35048',runId:runId || 'run2',hypothesisId:hypothesisId,location:location,message:message,data:data || {},timestamp:Date.now()})}).catch(()=>{});
-  }
-  // #endregion
   const GRID_CARD_DRAG_MIME = 'application/x-imagekpr-grid-image';
 
   function redirectToLogin() {
-    // #region agent log
-    debugLog('H6', 'app.js:redirectToLogin', 'client redirecting to login', {
-      href: window.location.href,
-      hasImageKprSessCookie: document.cookie.indexOf('ImageKprSESS=') !== -1,
-      hasPhpSessCookie: document.cookie.indexOf('PHPSESSID=') !== -1
-    });
-    // #endregion
     window.location.href = 'index.php#login';
   }
 
@@ -2658,14 +2646,6 @@
 
   function syncMaintenanceUiFromWhoami() {
     fetchJSON(API_BASE + '/whoami.php').then(d => {
-      // #region agent log
-      debugLog('H7', 'app.js:syncMaintenanceUiFromWhoami', 'whoami success', {
-        user_id: Number(d && d.user_id ? d.user_id : 0),
-        upload_size_mb: Number(d && d.upload_size_mb ? d.upload_size_mb : 0),
-        hasImageKprSessCookie: document.cookie.indexOf('ImageKprSESS=') !== -1,
-        hasPhpSessCookie: document.cookie.indexOf('PHPSESSID=') !== -1
-      });
-      // #endregion
       if (Number.isFinite(Number(d.upload_max_bytes)) && Number(d.upload_max_bytes) > 0) {
         MAX_UPLOAD = Number(d.upload_max_bytes);
       }
@@ -2690,16 +2670,7 @@
         document.body.classList.remove('ikpr-maintenance');
         document.querySelectorAll('.ikpr-maintenance-banner').forEach(el => el.remove());
       }
-    }).catch((err) => {
-      // #region agent log
-      debugLog('H8', 'app.js:syncMaintenanceUiFromWhoami', 'whoami failed', {
-        message: err && err.message ? String(err.message) : 'unknown',
-        status: err && err.status ? Number(err.status) : 0,
-        hasImageKprSessCookie: document.cookie.indexOf('ImageKprSESS=') !== -1,
-        hasPhpSessCookie: document.cookie.indexOf('PHPSESSID=') !== -1
-      });
-      // #endregion
-    });
+    }).catch(() => {});
   }
 
   document.addEventListener('DOMContentLoaded', async () => {
@@ -2881,10 +2852,28 @@
     document.getElementById('modal-manage-folders').addEventListener('click', openManageFoldersImageDialog);
     document.getElementById('modal-download').addEventListener('click', () => {
       const img = document.getElementById('modal-img');
-      const a = document.createElement('a');
-      a.href = img.src;
-      a.download = img.alt || 'image';
-      a.click();
+      const filename = img.alt || 'image';
+      const src = img.src.replace(/^http:\/\//i, 'https://');
+      fetch(src)
+        .then(r => r.blob())
+        .then(blob => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        })
+        .catch(err => {
+          const a = document.createElement('a');
+          a.href = src;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+        });
     });
     const modalFullscreenBtn = document.getElementById('modal-fullscreen-btn');
     if (modalFullscreenBtn) modalFullscreenBtn.addEventListener('click', openModalFullscreen);
