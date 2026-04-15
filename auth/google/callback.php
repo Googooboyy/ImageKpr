@@ -40,6 +40,10 @@ $info = imagekpr_http_get_json('https://openidconnect.googleapis.com/v1/userinfo
 if (!$info || empty($info['sub']) || empty($info['email'])) {
   imagekpr_redirect_guest_login_error('userinfo', 2);
 }
+$emailVerified = $info['email_verified'] ?? false;
+if ($emailVerified !== true && $emailVerified !== 'true' && $emailVerified !== 1 && $emailVerified !== '1') {
+  imagekpr_redirect_guest_login_error('userinfo', 2);
+}
 
 $sub = $info['sub'];
 $email = $info['email'];
@@ -48,6 +52,8 @@ $picture = isset($info['picture']) ? (string) $info['picture'] : '';
 
 try {
   $pdo = imagekpr_pdo();
+  $allowlistEnforced = imagekpr_allowlist_enforcement_enabled();
+  $emailNormalized = strtolower(trim((string) $email));
   $allowed = imagekpr_email_allowed($pdo, $email, $sub);
 
   $adminCfg = defined('ADMIN_GOOGLE_SUB') && ADMIN_GOOGLE_SUB !== '' && $sub === ADMIN_GOOGLE_SUB;
@@ -88,10 +94,14 @@ try {
   }
   $_SESSION['google_sub'] = $sub;
 
+  if (!$allowlistEnforced && $emailNormalized !== '') {
+    $autoAllow = $pdo->prepare('INSERT IGNORE INTO email_allowlist (email) VALUES (?)');
+    $autoAllow->execute([$emailNormalized]);
+  }
+
   if (!$allowed) {
-    $em = strtolower(trim($email));
     $reqIns = $pdo->prepare('INSERT IGNORE INTO email_access_requests (email, note) VALUES (?, ?)');
-    $reqIns->execute([$em, 'Requested via Google sign-in']);
+    $reqIns->execute([$emailNormalized, 'Requested via Google sign-in']);
     $justQueued = $reqIns->rowCount() > 0;
     imagekpr_redirect_html($justQueued ? 'index.php?submitted=1' : 'index.php', 2);
   }

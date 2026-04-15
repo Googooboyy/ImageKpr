@@ -86,6 +86,15 @@ function imagekpr_accept_access_requests_enabled(): bool
   return ImageKprAppSettings::get('accept_access_requests') === '1';
 }
 
+/** When true, access checks enforce email_allowlist membership for non-admin users. */
+function imagekpr_allowlist_enforcement_enabled(): bool
+{
+  if (!ImageKprAppSettings::has('enforce_allowlist')) {
+    return true;
+  }
+  return ImageKprAppSettings::get('enforce_allowlist') === '1';
+}
+
 /**
  * @return int|null Positive cap, or null = unlimited site default
  */

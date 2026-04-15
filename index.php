@@ -273,6 +273,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
       </fieldset>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-show-filename"> Show filename at bottom (subtle)</label>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-fill-image"> Fill image (cover screen, crop overflow)</label>
+      <label class="slideshow-check"><input type="checkbox" id="slideshow-show-controller"> Show mini controller tray on start</label>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-autoloop" checked> Loop (return to first after last)</label>
       <label class="slideshow-check slideshow-check-nested" id="slideshow-randomize-loop-label"><input type="checkbox" id="slideshow-randomize-loop"> Randomize order each time the slideshow loops</label>
       <fieldset class="slideshow-fieldset">
@@ -289,7 +290,16 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-green" value="green"> Green</label>
         <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-blue" value="blue"> Blue</label>
       </fieldset>
-      <p class="slideshow-settings-hint">Exit: click outside the picture, the × button, or press Esc. Auto: P pauses or resumes; ↑ / ↓ change seconds per slide. Press F during slideshow to toggle Fill image. When Fill image is on, use mouse wheel to pan the cropped image.</p>
+      <div class="slideshow-settings-hint" aria-label="Slideshow keyboard help">
+        <div>Exit: click outside the picture, the × button, or press Esc.</div>
+        <div>M/A switches Manual/Auto.</div>
+        <div>P pauses/resumes in Auto mode.</div>
+        <div>↑ / ↓ changes seconds per slide.</div>
+        <div>F toggles Fill image.</div>
+        <div>L toggles Loop.</div>
+        <div>C shows/hides the mini controller tray.</div>
+        <div>When Fill image is on, use mouse wheel to pan the cropped image.</div>
+      </div>
       <div class="slideshow-settings-actions">
         <button type="button" id="slideshow-start" class="slideshow-btn-primary">Start slideshow</button>
         <button type="button" id="slideshow-settings-cancel">Cancel</button>
@@ -301,6 +311,36 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
     <button type="button" class="slideshow-exit" id="slideshow-exit-btn" aria-label="Exit slideshow">×</button>
     <div class="slideshow-counter" id="slideshow-counter" aria-live="polite"></div>
     <div class="slideshow-filename-caption" id="slideshow-filename-caption" hidden aria-hidden="true"></div>
+    <div id="slideshow-mini-controller" class="slideshow-mini-controller" hidden aria-hidden="true">
+      <button type="button" class="ss-ctrl-pill ss-ctrl-close" id="ss-ctrl-close" data-active="false" title="Hide controller">×</button>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-manual" data-active="false" title="Manual mode (M)">MAN</button>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-auto" data-active="false" title="Auto mode (A)">AUTO</button>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-loop" data-active="false" title="Loop (L)">LOOP</button>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-rand" data-active="false" title="Randomize on each loop">RAND</button>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-pause" data-active="false" title="Pause / resume (P)">PAUSE</button>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-fill" data-active="false" title="Fill image (F)">FILL</button>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-interval-dec" data-active="false" title="Decrease interval">-1s</button>
+      <span class="ss-ctrl-pill ss-ctrl-readout" id="ss-ctrl-interval-value" aria-live="polite">5s</span>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-interval-inc" data-active="false" title="Increase interval">+1s</button>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-transition" data-active="false" title="Transition">TRANS</button>
+      <button type="button" class="ss-ctrl-pill ss-ctrl-color" id="ss-ctrl-lb-black" data-letterbox="black" data-active="false" title="Letterbox black" aria-label="Letterbox black"></button>
+      <button type="button" class="ss-ctrl-pill ss-ctrl-color" id="ss-ctrl-lb-white" data-letterbox="white" data-active="false" title="Letterbox white" aria-label="Letterbox white"></button>
+      <button type="button" class="ss-ctrl-pill ss-ctrl-color" id="ss-ctrl-lb-red" data-letterbox="red" data-active="false" title="Letterbox red" aria-label="Letterbox red"></button>
+      <button type="button" class="ss-ctrl-pill ss-ctrl-color" id="ss-ctrl-lb-green" data-letterbox="green" data-active="false" title="Letterbox green" aria-label="Letterbox green"></button>
+      <button type="button" class="ss-ctrl-pill ss-ctrl-color" id="ss-ctrl-lb-blue" data-letterbox="blue" data-active="false" title="Letterbox blue" aria-label="Letterbox blue"></button>
+    </div>
+    <button type="button" id="slideshow-mini-launcher" class="slideshow-mini-launcher" hidden aria-hidden="true" title="Show controller tray" aria-label="Show controller tray">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="7.2" y="2.5" width="9.6" height="19" rx="3.1" ry="3.1"></rect>
+        <circle cx="12" cy="7.3" r="1.5"></circle>
+        <circle cx="9.7" cy="11.4" r="1"></circle>
+        <circle cx="12" cy="11.4" r="1"></circle>
+        <circle cx="14.3" cy="11.4" r="1"></circle>
+        <circle cx="9.7" cy="14.5" r="1"></circle>
+        <circle cx="12" cy="14.5" r="1"></circle>
+        <circle cx="14.3" cy="14.5" r="1"></circle>
+      </svg>
+    </button>
     <div class="slideshow-stage">
       <div class="slideshow-player-bg" id="slideshow-player-bg" aria-hidden="true"></div>
       <img id="slideshow-img" class="slideshow-img" src="" alt="">

@@ -137,6 +137,9 @@ function imagekpr_email_allowed(PDO $pdo, string $email, string $googleSub): boo
   if (defined('ADMIN_GOOGLE_SUB') && ADMIN_GOOGLE_SUB !== '' && $googleSub === ADMIN_GOOGLE_SUB) {
     return true;
   }
+  if (!imagekpr_allowlist_enforcement_enabled()) {
+    return true;
+  }
   $n = (int) $pdo->query('SELECT COUNT(*) FROM email_allowlist')->fetchColumn();
   if ($n === 0) {
     return true;
@@ -157,6 +160,9 @@ function imagekpr_user_has_app_access(PDO $pdo): bool
   }
   $googleSub = isset($_SESSION['google_sub']) ? (string) $_SESSION['google_sub'] : '';
   if (defined('ADMIN_GOOGLE_SUB') && ADMIN_GOOGLE_SUB !== '' && $googleSub === ADMIN_GOOGLE_SUB) {
+    return true;
+  }
+  if (!imagekpr_allowlist_enforcement_enabled()) {
     return true;
   }
   $n = (int) $pdo->query('SELECT COUNT(*) FROM email_allowlist')->fetchColumn();

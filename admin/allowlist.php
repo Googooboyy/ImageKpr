@@ -27,6 +27,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     imagekpr_admin_allowlist_redirect();
   }
 
+  if ($act === 'save_allowlist_enforcement') {
+    $enforce = !empty($_POST['enforce_allowlist']) ? '1' : '0';
+    ImageKprAppSettings::upsert($pdo, 'enforce_allowlist', $enforce);
+    imagekpr_admin_audit_log($pdo, $actorId, 'allowlist_enforcement_toggle', ['enforce' => $enforce]);
+    $_SESSION['admin_flash'] = ['type' => 'ok', 'msg' => $enforce === '1' ? 'Allowlist enforcement enabled. Only listed emails may access the app.' : 'Allowlist enforcement disabled. Any Google account can access the app; successful sign-ins are auto-added to the allowlist.'];
+    imagekpr_admin_allowlist_redirect();
+  }
+
   if ($act === 'allowlist_add') {
     $em = strtolower(trim((string) ($_POST['allow_email'] ?? '')));
     if ($em === '' || !filter_var($em, FILTER_VALIDATE_EMAIL)) {
@@ -120,6 +128,7 @@ unset($_SESSION['admin_flash']);
 
 ImageKprAppSettings::bust();
 $acceptRequestsChecked = imagekpr_accept_access_requests_enabled();
+$allowlistEnforcementChecked = imagekpr_allowlist_enforcement_enabled();
 
 $allowRows = $pdo->query('SELECT id, email, created_at FROM email_allowlist ORDER BY email ASC')->fetchAll(PDO::FETCH_ASSOC);
 $allowCount = (int) $pdo->query('SELECT COUNT(*) FROM email_allowlist')->fetchColumn();
@@ -221,6 +230,22 @@ $adminNavCurrent = 'allowlist';
       </div>
     </section>
 
+    <section class="admin-config-section admin-config-panel admin-collapsible" aria-labelledby="enforce-heading" data-collapsible-key="allowlist_enforcement">
+      <div class="admin-collapsible-head">
+        <h2 id="enforce-heading">Allowlist enforcement</h2>
+        <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+      </div>
+      <div class="admin-collapsible-body">
+        <p class="admin-muted">When enforcement is disabled, any Google account can access the app even if this allowlist already has entries. Successful sign-ins are auto-added to the allowlist so you can later re-enable enforcement without locking out beta users.</p>
+        <form method="post" action="allowlist.php" class="admin-toggle-form">
+          <?php echo imagekpr_csrf_field(); ?>
+          <input type="hidden" name="form_action" value="save_allowlist_enforcement">
+          <label class="block"><input type="checkbox" name="enforce_allowlist" value="1" <?php echo $allowlistEnforcementChecked ? 'checked' : ''; ?>> Enforce allowlist for app access</label>
+          <button type="submit">Save</button>
+        </form>
+      </div>
+    </section>
+
     <section class="admin-config-section admin-config-panel admin-collapsible" aria-labelledby="pending-heading" data-collapsible-key="allowlist_pending_requests">
       <div class="admin-collapsible-head">
         <h2 id="pending-heading">Pending requests</h2>
@@ -269,8 +294,8 @@ $adminNavCurrent = 'allowlist';
         <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
       </div>
       <div class="admin-collapsible-body">
-        <?php if ($allowOpen) { ?>
-          <p class="admin-muted"><strong>Open signup:</strong> the allowlist is empty, so any Google account can sign in (subject to OAuth). Add emails below to restrict access.</p>
+        <?php if (!$allowlistEnforcementChecked || $allowOpen) { ?>
+          <p class="admin-muted"><strong>Open signup:</strong> <?php echo !$allowlistEnforcementChecked ? 'allowlist enforcement is disabled, so any Google account can sign in (and is auto-added here after successful sign-in).' : 'the allowlist is empty, so any Google account can sign in (subject to OAuth).'; ?> Add emails below to prepare for restricted mode.</p>
         <?php } else { ?>
           <p class="admin-muted"><strong>Restricted:</strong> only listed emails may sign in (<?php echo (int) $allowCount; ?> entr<?php echo $allowCount === 1 ? 'y' : 'ies'; ?>).</p>
         <?php } ?>
