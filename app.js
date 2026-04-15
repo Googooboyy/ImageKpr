@@ -924,6 +924,82 @@
     cap.setAttribute('aria-hidden', name ? 'false' : 'true');
   }
 
+  function applySlideshowImageFit() {
+    const img = document.getElementById('slideshow-img');
+    if (!img || !slideshowState) return;
+    img.style.objectFit = slideshowState.fillImage ? 'cover' : 'contain';
+    if (!slideshowState.fillImage) {
+      img.style.objectPosition = 'center';
+      return;
+    }
+    applySlideshowImagePan();
+  }
+
+  function getSlideshowCoverPanLimits() {
+    if (!slideshowState || !slideshowState.stageEl) return { maxX: 0, maxY: 0 };
+    const img = document.getElementById('slideshow-img');
+    if (!img) return { maxX: 0, maxY: 0 };
+    const nw = img.naturalWidth;
+    const nh = img.naturalHeight;
+    if (!nw || !nh) return { maxX: 0, maxY: 0 };
+    const rect = slideshowState.stageEl.getBoundingClientRect();
+    const cw = rect.width;
+    const ch = rect.height;
+    if (!cw || !ch) return { maxX: 0, maxY: 0 };
+    const scale = Math.max(cw / nw, ch / nh);
+    const dw = nw * scale;
+    const dh = nh * scale;
+    return {
+      maxX: Math.max(0, (dw - cw) / 2),
+      maxY: Math.max(0, (dh - ch) / 2),
+    };
+  }
+
+  function applySlideshowImagePan() {
+    const img = document.getElementById('slideshow-img');
+    if (!img || !slideshowState) return;
+    if (!slideshowState.fillImage) {
+      slideshowState.panX = 0;
+      slideshowState.panY = 0;
+      img.style.objectPosition = 'center';
+      return;
+    }
+    const limits = getSlideshowCoverPanLimits();
+    const panX = Math.max(-limits.maxX, Math.min(limits.maxX, slideshowState.panX || 0));
+    const panY = Math.max(-limits.maxY, Math.min(limits.maxY, slideshowState.panY || 0));
+    slideshowState.panX = panX;
+    slideshowState.panY = panY;
+    img.style.objectPosition = 'calc(50% + ' + panX + 'px) calc(50% + ' + panY + 'px)';
+  }
+
+  function resetSlideshowImagePan() {
+    if (!slideshowState) return;
+    slideshowState.panX = 0;
+    slideshowState.panY = 0;
+    applySlideshowImagePan();
+  }
+
+  function panSlideshowImageFromWheel(e) {
+    if (!slideshowState || !slideshowState.fillImage) return;
+    const limits = getSlideshowCoverPanLimits();
+    if (limits.maxX <= 0 && limits.maxY <= 0) return;
+    let panDeltaX = 0;
+    let panDeltaY = 0;
+    if (limits.maxX > 0 && limits.maxY > 0) {
+      panDeltaX = e.deltaX;
+      panDeltaY = e.deltaY;
+    } else if (limits.maxY > 0) {
+      panDeltaY = e.deltaY;
+    } else {
+      panDeltaX = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    }
+    if (!panDeltaX && !panDeltaY) return;
+    e.preventDefault();
+    slideshowState.panX = (slideshowState.panX || 0) - panDeltaX;
+    slideshowState.panY = (slideshowState.panY || 0) - panDeltaY;
+    applySlideshowImagePan();
+  }
+
   function clearSlideshowTimer() {
     if (slideshowState && slideshowState.timerId != null) {
       clearInterval(slideshowState.timerId);
@@ -983,10 +1059,13 @@
 
     const applySlide = () => {
       slideshowState.index = newIndex;
+      slideshowState.panX = 0;
+      slideshowState.panY = 0;
       img.src = slide.url;
       img.alt = slide.filename || '';
       const onLoad = () => {
         img.removeEventListener('load', onLoad);
+        applySlideshowImagePan();
       };
       img.addEventListener('load', onLoad);
       updateSlideshowCounter();
@@ -1038,6 +1117,9 @@
       if (slideshowState.stageClickHandler && st) {
         st.removeEventListener('click', slideshowState.stageClickHandler);
       }
+      if (slideshowState.stageWheelHandler && st) {
+        st.removeEventListener('wheel', slideshowState.stageWheelHandler);
+      }
     }
     const player = document.getElementById('slideshow-player');
     const img = document.getElementById('slideshow-img');
@@ -1045,6 +1127,8 @@
     if (exitBtn) exitBtn.onclick = null;
     if (img) {
       img.classList.remove('ss-diffuse-out', 'ss-diffuse-in', 'ss-fly-out', 'ss-fly-in');
+      img.style.objectFit = '';
+      img.style.objectPosition = '';
       img.removeAttribute('src');
       img.removeAttribute('alt');
     }
@@ -1078,6 +1162,11 @@
       randomizeOnLoop: options.randomizeOnLoop,
       transition: options.transition,
       showFilename: !!options.showFilename,
+      fillImage: !!options.fillImage,
+      stageEl: null,
+      panX: 0,
+      panY: 0,
+      stageWheelHandler: null,
       paused: false,
       timerId: null,
       transitioning: false,
@@ -1088,10 +1177,12 @@
     const exitBtn = document.getElementById('slideshow-exit-btn');
     const letterbox = options.letterboxColor || SLIDESHOW_LETTERBOX.black;
     const stage = player.querySelector('.slideshow-stage');
+    slideshowState.stageEl = stage || null;
     if (player) {
       if (stage) stage.style.backgroundColor = letterbox;
       player.style.backgroundColor = letterbox;
     }
+    applySlideshowImageFit();
 
     exitBtn.hidden = false;
 
@@ -1104,6 +1195,7 @@
     if (stage) {
       slideshowState.stageClickHandler = (e) => {
         if (!slideshowState) return;
+        if (slideshowState.fillImage) return;
         const imgEl = document.getElementById('slideshow-img');
         const st = document.querySelector('#slideshow-player .slideshow-stage');
         if (!imgEl || !st) return;
@@ -1114,6 +1206,8 @@
         closeSlideshowPlayer();
       };
       stage.addEventListener('click', slideshowState.stageClickHandler);
+      slideshowState.stageWheelHandler = (e) => panSlideshowImageFromWheel(e);
+      stage.addEventListener('wheel', slideshowState.stageWheelHandler, { passive: false });
     }
 
     slideshowState.onKeyDown = (e) => {
@@ -1124,11 +1218,12 @@
         return;
       }
       if (slideshowState.auto) {
-        if (e.key === 'Enter') {
+        if (e.key === 'p' || e.key === 'P') {
           e.preventDefault();
           slideshowState.paused = !slideshowState.paused;
           if (slideshowState.paused) clearSlideshowTimer();
           else armSlideshowAutoTimer();
+          showToast(slideshowState.paused ? 'Slideshow paused' : 'Slideshow resumed', false);
           return;
         }
         if (e.key === 'ArrowUp') {
@@ -1159,6 +1254,16 @@
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         if (slideshowAdvance(-1) && slideshowState.auto && !slideshowState.paused) armSlideshowAutoTimer();
+        return;
+      }
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        slideshowState.fillImage = !slideshowState.fillImage;
+        if (!slideshowState.fillImage) {
+          resetSlideshowImagePan();
+        }
+        applySlideshowImageFit();
+        showToast(slideshowState.fillImage ? 'Fill image: ON' : 'Fill image: OFF', false);
       }
     };
     document.addEventListener('keydown', slideshowState.onKeyDown, true);
@@ -1213,6 +1318,7 @@
       transition,
       letterboxColor: SLIDESHOW_LETTERBOX[lbKey],
       showFilename: !!(document.getElementById('slideshow-show-filename') || {}).checked,
+      fillImage: !!(document.getElementById('slideshow-fill-image') || {}).checked,
     };
   }
 

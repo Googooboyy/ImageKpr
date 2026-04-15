@@ -435,6 +435,12 @@ function imagekpr_admin_purge_confirm_phrase(): string
   return 'DELETE GALLERY IMAGES';
 }
 
+/** Phrase admin must type exactly (after trim) to confirm bulk user deletion; comparison is case-insensitive. */
+function imagekpr_admin_delete_users_confirm_phrase(): string
+{
+  return 'DELETE USER ACCOUNTS';
+}
+
 /**
  * Remove all gallery images for the given users: unlink files from per-user image dirs, then DELETE rows.
  * Does not modify users, allowlist, or inbox.
@@ -467,6 +473,126 @@ function imagekpr_admin_purge_gallery_for_users(PDO $pdo, array $userIds): array
   $del->execute($userIds);
   $rowsDeleted = (int) $del->rowCount();
   return ['rows_deleted' => $rowsDeleted, 'files_removed' => $filesRemoved];
+}
+
+/**
+ * Delete selected user accounts and their data.
+ * - Skips protected user ids (e.g. current actor)
+ * - Skips admin accounts
+ * - Purges gallery image rows/files and folder rows before deleting users
+ * - Removes matching emails from allowlist and access requests
+ *
+ * @param int[] $userIds
+ * @param int[] $protectedUserIds
+ * @return array{
+ *   users_deleted:int,
+ *   deleted_user_ids:int[],
+ *   skipped_admin_ids:int[],
+ *   skipped_protected_ids:int[],
+ *   images_deleted:int,
+ *   image_files_removed:int,
+ *   folders_deleted:int,
+ *   folder_links_deleted:int,
+ *   allowlist_deleted:int,
+ *   access_requests_deleted:int
+ * }
+ */
+function imagekpr_admin_delete_users(PDO $pdo, array $userIds, array $protectedUserIds = []): array
+{
+  $userIds = array_values(array_unique(array_filter(array_map('intval', $userIds), static fn ($x) => $x > 0)));
+  $protected = array_values(array_unique(array_filter(array_map('intval', $protectedUserIds), static fn ($x) => $x > 0)));
+  $result = [
+    'users_deleted' => 0,
+    'deleted_user_ids' => [],
+    'skipped_admin_ids' => [],
+    'skipped_protected_ids' => [],
+    'images_deleted' => 0,
+    'image_files_removed' => 0,
+    'folders_deleted' => 0,
+    'folder_links_deleted' => 0,
+    'allowlist_deleted' => 0,
+    'access_requests_deleted' => 0,
+  ];
+  if ($userIds === []) {
+    return $result;
+  }
+
+  $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+  $st = $pdo->prepare("SELECT id, email, is_admin FROM users WHERE id IN ($placeholders)");
+  $st->execute($userIds);
+  $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+  if ($rows === []) {
+    return $result;
+  }
+
+  $protectedMap = array_fill_keys($protected, true);
+  $targetIds = [];
+  $targetEmails = [];
+  foreach ($rows as $row) {
+    $uid = (int) ($row['id'] ?? 0);
+    if ($uid < 1) {
+      continue;
+    }
+    if (isset($protectedMap[$uid])) {
+      $result['skipped_protected_ids'][] = $uid;
+      continue;
+    }
+    if ((int) ($row['is_admin'] ?? 0) === 1) {
+      $result['skipped_admin_ids'][] = $uid;
+      continue;
+    }
+    $targetIds[] = $uid;
+    $targetEmails[] = strtolower(trim((string) ($row['email'] ?? '')));
+  }
+  $targetIds = array_values(array_unique($targetIds));
+  $targetEmails = array_values(array_unique(array_filter($targetEmails, static fn ($x) => $x !== '')));
+  $result['skipped_admin_ids'] = array_values(array_unique($result['skipped_admin_ids']));
+  $result['skipped_protected_ids'] = array_values(array_unique($result['skipped_protected_ids']));
+
+  if ($targetIds === []) {
+    return $result;
+  }
+
+  $pdo->beginTransaction();
+  try {
+    $purge = imagekpr_admin_purge_gallery_for_users($pdo, $targetIds);
+    $result['images_deleted'] = (int) ($purge['rows_deleted'] ?? 0);
+    $result['image_files_removed'] = (int) ($purge['files_removed'] ?? 0);
+
+    $phUsers = implode(',', array_fill(0, count($targetIds), '?'));
+    $delFolderLinks = $pdo->prepare("DELETE fi FROM folder_images fi INNER JOIN folders f ON f.id = fi.folder_id WHERE f.user_id IN ($phUsers)");
+    $delFolderLinks->execute($targetIds);
+    $result['folder_links_deleted'] = (int) $delFolderLinks->rowCount();
+
+    $delFolders = $pdo->prepare("DELETE FROM folders WHERE user_id IN ($phUsers)");
+    $delFolders->execute($targetIds);
+    $result['folders_deleted'] = (int) $delFolders->rowCount();
+
+    if ($targetEmails !== []) {
+      $phEmails = implode(',', array_fill(0, count($targetEmails), '?'));
+      $delAllow = $pdo->prepare("DELETE FROM email_allowlist WHERE LOWER(email) IN ($phEmails)");
+      $delAllow->execute($targetEmails);
+      $result['allowlist_deleted'] = (int) $delAllow->rowCount();
+
+      $delReq = $pdo->prepare("DELETE FROM email_access_requests WHERE LOWER(email) IN ($phEmails)");
+      $delReq->execute($targetEmails);
+      $result['access_requests_deleted'] = (int) $delReq->rowCount();
+    }
+
+    $delUsers = $pdo->prepare("DELETE FROM users WHERE id IN ($phUsers)");
+    $delUsers->execute($targetIds);
+    $result['users_deleted'] = (int) $delUsers->rowCount();
+    $result['deleted_user_ids'] = $targetIds;
+
+    $pdo->commit();
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+      $pdo->rollBack();
+    }
+    throw $e;
+  }
+
+  return $result;
 }
 
 /**

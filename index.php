@@ -262,6 +262,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         </div>
       </fieldset>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-show-filename"> Show filename at bottom (subtle)</label>
+      <label class="slideshow-check"><input type="checkbox" id="slideshow-fill-image"> Fill image (cover screen, crop overflow)</label>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-autoloop" checked> Loop (return to first after last)</label>
       <label class="slideshow-check slideshow-check-nested" id="slideshow-randomize-loop-label"><input type="checkbox" id="slideshow-randomize-loop"> Randomize order each time the slideshow loops</label>
       <fieldset class="slideshow-fieldset">
@@ -278,7 +279,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-green" value="green"> Green</label>
         <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-blue" value="blue"> Blue</label>
       </fieldset>
-      <p class="slideshow-settings-hint">Exit: click outside the picture, the × button, or press Esc. Auto: Enter pauses or resumes; ↑ / ↓ change seconds per slide.</p>
+      <p class="slideshow-settings-hint">Exit: click outside the picture, the × button, or press Esc. Auto: P pauses or resumes; ↑ / ↓ change seconds per slide. Press F during slideshow to toggle Fill image. When Fill image is on, use mouse wheel to pan the cropped image.</p>
       <div class="slideshow-settings-actions">
         <button type="button" id="slideshow-start" class="slideshow-btn-primary">Start slideshow</button>
         <button type="button" id="slideshow-settings-cancel">Cancel</button>

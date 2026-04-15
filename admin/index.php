@@ -479,6 +479,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
   exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_delete_users') {
+  if (!imagekpr_csrf_verify()) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Security token invalid. Try again.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $phrase = trim((string) ($_POST['delete_users_confirm'] ?? ''));
+  if (strcasecmp($phrase, imagekpr_admin_delete_users_confirm_phrase()) !== 0) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Confirmation phrase does not match. No user accounts were deleted.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+  $rawIds = $_POST['bulk_user_ids'] ?? [];
+  if (!is_array($rawIds)) {
+    $rawIds = [];
+  }
+  $ids = [];
+  foreach ($rawIds as $v) {
+    $ids[] = (int) $v;
+  }
+  $ids = array_values(array_unique(array_filter($ids, static fn ($x) => $x > 0)));
+  if ($ids === []) {
+    $_SESSION['admin_flash'] = ['type' => 'error', 'msg' => 'Select at least one user account to delete.'];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
+
+  $result = imagekpr_admin_delete_users($pdo, $ids, [$actorId]);
+  imagekpr_admin_audit_log($pdo, $actorId, 'bulk_user_delete', [
+    'target_user_ids_requested' => $ids,
+    'deleted_user_ids' => $result['deleted_user_ids'],
+    'users_deleted' => $result['users_deleted'],
+    'skipped_admin_ids' => $result['skipped_admin_ids'],
+    'skipped_protected_ids' => $result['skipped_protected_ids'],
+    'images_deleted' => $result['images_deleted'],
+    'image_files_removed' => $result['image_files_removed'],
+    'folders_deleted' => $result['folders_deleted'],
+    'folder_links_deleted' => $result['folder_links_deleted'],
+    'allowlist_deleted' => $result['allowlist_deleted'],
+    'access_requests_deleted' => $result['access_requests_deleted'],
+  ]);
+  $msg = 'Deleted ' . (int) $result['users_deleted'] . ' user account(s)';
+  if (!empty($result['skipped_admin_ids'])) {
+    $msg .= '; skipped ' . count($result['skipped_admin_ids']) . ' admin account(s)';
+  }
+  if (!empty($result['skipped_protected_ids'])) {
+    $msg .= '; skipped ' . count($result['skipped_protected_ids']) . ' protected account(s)';
+  }
+  $msg .= '.';
+  $_SESSION['admin_flash'] = ['type' => 'ok', 'msg' => $msg];
+  $redir = 'index.php';
+  $q = $_GET;
+  if (!empty($q)) {
+    $redir .= '?' . http_build_query($q);
+  }
+  header('Location: ' . $redir, true, 303);
+  exit;
+}
+
 $flash = $_SESSION['admin_flash'] ?? null;
 unset($_SESSION['admin_flash']);
 
@@ -599,6 +673,8 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     .admin-stat dt { font-size: 0.75rem; color: #666; margin: 0; text-transform: uppercase; letter-spacing: 0.03em; }
     .admin-stat dd { margin: 0.35rem 0 0; font-size: 1.15rem; font-weight: 600; color: #333; }
     .admin-top-list { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; color: #444; }
+    .admin-stats-wrap.is-hidden .admin-stats { display: none; }
+    .admin-info-wrap.is-hidden .admin-info-panel { display: none; }
     .admin-toast { padding: 0.65rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; }
     .admin-toast.ok { background: #e8f5e9; border: 1px solid #a5d6a7; color: #1b5e20; }
     .admin-toast.err { background: #ffebee; border: 1px solid #ef9a9a; color: #b71c1c; }
@@ -640,6 +716,9 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     .admin-bulk button { padding: 0.35rem 0.75rem; cursor: pointer; font-weight: 600; }
     .admin-bulk-actions { flex-direction: column; align-items: stretch; }
     .admin-bulk-actions .admin-bulk-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; }
+    .admin-toggle-row { display: flex; justify-content: flex-end; margin-bottom: 0.25rem; }
+    .admin-toggle-row button { padding: 0.3rem 0.65rem; cursor: pointer; font-size: 0.78rem; }
+    .admin-bulk-quick.is-hidden { display: none; }
     .admin-bulk-purge { margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px solid #ef9a9a; }
     .admin-bulk-purge legend { color: #b71c1c; }
     .admin-bulk-purge .admin-muted { max-width: 42rem; margin: 0 0 0.5rem; }
@@ -661,50 +740,61 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
       </div>
     <?php } ?>
 
-    <dl class="admin-stats">
-      <div class="admin-stat">
-        <dt>Total storage (images)</dt>
-        <dd><?php echo htmlspecialchars(imagekpr_format_bytes($totalStorage), ENT_QUOTES, 'UTF-8'); ?></dd>
+    <div id="admin-stats-wrap" class="admin-stats-wrap">
+      <div class="admin-toggle-row">
+        <button type="button" id="admin-stats-toggle" aria-expanded="true" aria-controls="admin-stats-panel">Hide stats</button>
       </div>
-      <div class="admin-stat">
-        <dt>Users</dt>
-        <dd><?php echo (int) $userCount; ?></dd>
-      </div>
-      <div class="admin-stat">
-        <dt>Over quota</dt>
-        <dd><?php echo $overQuota > 0 ? '<span class="admin-over">' . (int) $overQuota . '</span>' : (int) $overQuota; ?></dd>
-      </div>
-      <div class="admin-stat">
-        <dt>Upload grace expired</dt>
-        <dd><?php echo $expiredGraceUsers > 0 ? '<span class="admin-over">' . (int) $expiredGraceUsers . '</span>' : (int) $expiredGraceUsers; ?></dd>
-      </div>
-      <div class="admin-stat">
-        <dt>Largest users</dt>
-        <dd>
-          <?php if (empty($topUsers)) { ?>
-            <span class="admin-muted">—</span>
-          <?php } else { ?>
-            <ul class="admin-top-list">
-              <?php foreach ($topUsers as $tu) { ?>
-                <li><?php echo htmlspecialchars((string) $tu['email'], ENT_QUOTES, 'UTF-8'); ?> — <?php echo htmlspecialchars(imagekpr_format_bytes((int) $tu['used_bytes']), ENT_QUOTES, 'UTF-8'); ?></li>
-              <?php } ?>
-            </ul>
-          <?php } ?>
-        </dd>
-      </div>
-    </dl>
-
-    <p class="admin-muted">Default quota for users with no per-user cap: <?php
-      $d = imagekpr_default_storage_quota_bytes();
-    echo $d === null ? 'none (unlimited)' : htmlspecialchars(imagekpr_format_bytes($d), ENT_QUOTES, 'UTF-8');
-    ?> — set <span class="admin-mono">DEFAULT_STORAGE_QUOTA_BYTES</span> in <span class="admin-mono">config.php</span> if needed.</p>
+      <dl id="admin-stats-panel" class="admin-stats">
+        <div class="admin-stat">
+          <dt>Total storage (images)</dt>
+          <dd><?php echo htmlspecialchars(imagekpr_format_bytes($totalStorage), ENT_QUOTES, 'UTF-8'); ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Users</dt>
+          <dd><?php echo (int) $userCount; ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Over quota</dt>
+          <dd><?php echo $overQuota > 0 ? '<span class="admin-over">' . (int) $overQuota . '</span>' : (int) $overQuota; ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Upload grace expired</dt>
+          <dd><?php echo $expiredGraceUsers > 0 ? '<span class="admin-over">' . (int) $expiredGraceUsers . '</span>' : (int) $expiredGraceUsers; ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Largest users</dt>
+          <dd>
+            <?php if (empty($topUsers)) { ?>
+              <span class="admin-muted">—</span>
+            <?php } else { ?>
+              <ul class="admin-top-list">
+                <?php foreach ($topUsers as $tu) { ?>
+                  <li><?php echo htmlspecialchars((string) $tu['email'], ENT_QUOTES, 'UTF-8'); ?> — <?php echo htmlspecialchars(imagekpr_format_bytes((int) $tu['used_bytes']), ENT_QUOTES, 'UTF-8'); ?></li>
+                <?php } ?>
+              </ul>
+            <?php } ?>
+          </dd>
+        </div>
+      </dl>
+    </div>
 
     <?php
+    $d = imagekpr_default_storage_quota_bytes();
     $uploadTiers = imagekpr_allowed_upload_size_tiers_mb();
     $saasRef = imagekpr_plan_tier_storage_reference();
     ?>
-    <p class="admin-muted"><strong>SaaS tier matrix</strong> (reference — upload MB, total storage, image caps, shared-dashboard caps). Use <strong>Plan preset</strong> below to apply Free/Silver/Gold storage + upload limits together: <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
-    <p class="admin-muted"><?php echo imagekpr_admin_html_plan_matrix_pro_blurb(); ?></p>
+    <div id="admin-info-wrap" class="admin-info-wrap">
+      <div class="admin-toggle-row">
+        <button type="button" id="admin-info-toggle" aria-expanded="true" aria-controls="admin-info-panel">Hide quota/tier notes</button>
+      </div>
+      <div id="admin-info-panel" class="admin-info-panel">
+        <p class="admin-muted">Default quota for users with no per-user cap: <?php
+          echo $d === null ? 'none (unlimited)' : htmlspecialchars(imagekpr_format_bytes($d), ENT_QUOTES, 'UTF-8');
+        ?> — set <span class="admin-mono">DEFAULT_STORAGE_QUOTA_BYTES</span> in <span class="admin-mono">config.php</span> if needed.</p>
+        <p class="admin-muted"><strong>SaaS tier matrix</strong> (reference — upload MB, total storage, image caps, shared-dashboard caps). Use <strong>Plan preset</strong> below to apply Free/Silver/Gold storage + upload limits together: <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
+        <p class="admin-muted"><?php echo imagekpr_admin_html_plan_matrix_pro_blurb(); ?></p>
+      </div>
+    </div>
 
     <form class="admin-search" method="get" action="index.php">
       <?php if ($sort !== 'email') { ?><input type="hidden" name="sort" value="<?php echo htmlspecialchars($sort, ENT_QUOTES, 'UTF-8'); ?>"><?php } ?>
@@ -732,40 +822,46 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     $bulkAction = 'index.php' . (!empty($bulkActionQs) ? '?' . http_build_query($bulkActionQs) : '');
     ?>
     <?php $purgePhrase = imagekpr_admin_purge_confirm_phrase(); ?>
+    <?php $deleteUsersPhrase = imagekpr_admin_delete_users_confirm_phrase(); ?>
     <form id="bulkUserForm" class="admin-bulk admin-bulk-actions" method="post" action="<?php echo htmlspecialchars($bulkAction, ENT_QUOTES, 'UTF-8'); ?>">
       <?php echo imagekpr_csrf_field(); ?>
-      <div class="admin-bulk-row">
-        <fieldset>
-          <legend>Bulk quota (selected rows)</legend>
-          <label><input type="radio" name="bulk_quota_mode" value="default" checked> Site default</label>
-          <label><input type="radio" name="bulk_quota_mode" value="unlimited"> Unlimited</label>
-          <label title="Binary GiB; 50 = 50 GiB not 50 MB"><input type="radio" name="bulk_quota_mode" value="custom"> GiB <input type="number" name="bulk_quota_gb" min="0.001" step="any" value="10"></label>
-        </fieldset>
-        <button type="submit" name="action" value="bulk_set_quota">Apply quota to selected</button>
+      <div class="admin-toggle-row">
+        <button type="button" id="admin-bulk-quick-toggle" aria-expanded="true" aria-controls="admin-bulk-quick">Hide quick bulk tools</button>
       </div>
-      <div class="admin-bulk-row">
-        <fieldset>
-          <legend>Bulk upload tier (selected rows)</legend>
-          <?php foreach ($uploadTiers as $idx => $mb) { ?>
-          <label><input type="radio" name="bulk_upload_size_mb" value="<?php echo (int) $mb; ?>"<?php echo $idx === 0 ? ' checked' : ''; ?>><?php echo (int) $mb; ?>MB</label>
-          <?php } ?>
-        </fieldset>
-        <button type="submit" name="action" value="bulk_set_upload_tier">Apply upload tier to selected</button>
-      </div>
-      <div class="admin-bulk-row">
-        <fieldset>
-          <legend>Bulk SaaS preset (selected rows)</legend>
-          <?php
-          $firstSaas = true;
-          foreach ($saasRef as $sk => $stier) {
-            ?>
-          <label><input type="radio" name="bulk_saas_tier" value="<?php echo htmlspecialchars((string) $sk, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $firstSaas ? ' checked' : ''; ?>><?php echo htmlspecialchars((string) $stier['label'], ENT_QUOTES, 'UTF-8'); ?></label>
+      <div id="admin-bulk-quick" class="admin-bulk-quick">
+        <div class="admin-bulk-row">
+          <fieldset>
+            <legend>Bulk quota (selected rows)</legend>
+            <label><input type="radio" name="bulk_quota_mode" value="default" checked> Site default</label>
+            <label><input type="radio" name="bulk_quota_mode" value="unlimited"> Unlimited</label>
+            <label title="Binary GiB; 50 = 50 GiB not 50 MB"><input type="radio" name="bulk_quota_mode" value="custom"> GiB <input type="number" name="bulk_quota_gb" min="0.001" step="any" value="10"></label>
+          </fieldset>
+          <button type="submit" name="action" value="bulk_set_quota">Apply quota to selected</button>
+        </div>
+        <div class="admin-bulk-row">
+          <fieldset>
+            <legend>Bulk upload tier (selected rows)</legend>
+            <?php foreach ($uploadTiers as $idx => $mb) { ?>
+            <label><input type="radio" name="bulk_upload_size_mb" value="<?php echo (int) $mb; ?>"<?php echo $idx === 0 ? ' checked' : ''; ?>><?php echo (int) $mb; ?>MB</label>
+            <?php } ?>
+          </fieldset>
+          <button type="submit" name="action" value="bulk_set_upload_tier">Apply upload tier to selected</button>
+        </div>
+        <div class="admin-bulk-row">
+          <fieldset>
+            <legend>Bulk SaaS preset (selected rows)</legend>
             <?php
-            $firstSaas = false;
-          }
-          ?>
-        </fieldset>
-        <button type="submit" name="action" value="bulk_apply_saas_tier">Apply preset to selected</button>
+            $firstSaas = true;
+            foreach ($saasRef as $sk => $stier) {
+              ?>
+            <label><input type="radio" name="bulk_saas_tier" value="<?php echo htmlspecialchars((string) $sk, ENT_QUOTES, 'UTF-8'); ?>"<?php echo $firstSaas ? ' checked' : ''; ?>><?php echo htmlspecialchars((string) $stier['label'], ENT_QUOTES, 'UTF-8'); ?></label>
+              <?php
+              $firstSaas = false;
+            }
+            ?>
+          </fieldset>
+          <button type="submit" name="action" value="bulk_apply_saas_tier">Apply preset to selected</button>
+        </div>
       </div>
       <fieldset class="admin-bulk-purge">
         <legend>Purge gallery only (destructive)</legend>
@@ -773,6 +869,13 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
         <label>Type <kbd><?php echo htmlspecialchars($purgePhrase, ENT_QUOTES, 'UTF-8'); ?></kbd> to confirm:
           <input type="text" name="purge_confirm" autocomplete="off" placeholder="<?php echo htmlspecialchars($purgePhrase, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Type confirmation phrase to purge galleries"></label>
         <button type="submit" name="action" value="bulk_purge_gallery" class="admin-btn-danger">Purge gallery for selected</button>
+      </fieldset>
+      <fieldset class="admin-bulk-purge">
+        <legend>Delete user accounts (destructive)</legend>
+        <p class="admin-muted">Permanently deletes selected <strong>non-admin user accounts</strong> and their gallery/folder data, and removes matching emails from allowlist + access requests. Your own account is protected and cannot be deleted here.</p>
+        <label>Type <kbd><?php echo htmlspecialchars($deleteUsersPhrase, ENT_QUOTES, 'UTF-8'); ?></kbd> to confirm:
+          <input type="text" name="delete_users_confirm" autocomplete="off" placeholder="<?php echo htmlspecialchars($deleteUsersPhrase, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Type confirmation phrase to delete users"></label>
+        <button type="submit" name="action" value="bulk_delete_users" class="admin-btn-danger">Delete selected user accounts</button>
       </fieldset>
     </form>
 
@@ -922,6 +1025,96 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
       if (!all) return;
       all.addEventListener('change', function () {
         document.querySelectorAll('.admin-user-cb').forEach(function (cb) { cb.checked = all.checked; });
+      });
+    })();
+
+    (function () {
+      var wrap = document.getElementById('admin-stats-wrap');
+      var toggle = document.getElementById('admin-stats-toggle');
+      if (!wrap || !toggle) return;
+
+      var key = 'imagekpr_admin_stats_hidden';
+      var setState = function (hidden) {
+        wrap.classList.toggle('is-hidden', hidden);
+        toggle.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+        toggle.textContent = hidden ? 'Show stats' : 'Hide stats';
+      };
+
+      try {
+        var saved = window.localStorage.getItem(key);
+        setState(saved === null ? true : saved === '1');
+      } catch (e) {
+        setState(true);
+      }
+
+      toggle.addEventListener('click', function () {
+        var hidden = !wrap.classList.contains('is-hidden');
+        setState(hidden);
+        try {
+          window.localStorage.setItem(key, hidden ? '1' : '0');
+        } catch (e) {
+          // Ignore storage errors and keep the current UI state.
+        }
+      });
+    })();
+
+    (function () {
+      var wrap = document.getElementById('admin-info-wrap');
+      var toggle = document.getElementById('admin-info-toggle');
+      if (!wrap || !toggle) return;
+
+      var key = 'imagekpr_admin_info_hidden';
+      var setState = function (hidden) {
+        wrap.classList.toggle('is-hidden', hidden);
+        toggle.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+        toggle.textContent = hidden ? 'Show quota/tier notes' : 'Hide quota/tier notes';
+      };
+
+      try {
+        var saved = window.localStorage.getItem(key);
+        setState(saved === null ? true : saved === '1');
+      } catch (e) {
+        setState(true);
+      }
+
+      toggle.addEventListener('click', function () {
+        var hidden = !wrap.classList.contains('is-hidden');
+        setState(hidden);
+        try {
+          window.localStorage.setItem(key, hidden ? '1' : '0');
+        } catch (e) {
+          // Ignore storage errors and keep the current UI state.
+        }
+      });
+    })();
+
+    (function () {
+      var quick = document.getElementById('admin-bulk-quick');
+      var toggle = document.getElementById('admin-bulk-quick-toggle');
+      if (!quick || !toggle) return;
+
+      var key = 'imagekpr_admin_bulk_quick_hidden';
+      var setState = function (hidden) {
+        quick.classList.toggle('is-hidden', hidden);
+        toggle.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+        toggle.textContent = hidden ? 'Show quick bulk tools' : 'Hide quick bulk tools';
+      };
+
+      try {
+        var saved = window.localStorage.getItem(key);
+        setState(saved === null ? true : saved === '1');
+      } catch (e) {
+        setState(true);
+      }
+
+      toggle.addEventListener('click', function () {
+        var hidden = !quick.classList.contains('is-hidden');
+        setState(hidden);
+        try {
+          window.localStorage.setItem(key, hidden ? '1' : '0');
+        } catch (e) {
+          // Ignore storage errors and keep the current UI state.
+        }
       });
     })();
   </script>
