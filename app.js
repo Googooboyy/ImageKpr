@@ -2340,6 +2340,48 @@
     };
   }
 
+  function extFromMime(type) {
+    const t = String(type || '').toLowerCase();
+    if (t === 'image/jpeg') return '.jpg';
+    if (t === 'image/png') return '.png';
+    if (t === 'image/gif') return '.gif';
+    if (t === 'image/webp') return '.webp';
+    return '';
+  }
+
+  function getFileNameFromUrl(urlObj, mimeType) {
+    const raw = decodeURIComponent((urlObj.pathname || '').split('/').pop() || '').trim();
+    const safe = raw.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
+    const hasImageExt = /\.(jpe?g|png|gif|webp)$/i.test(safe);
+    if (safe) return hasImageExt ? safe : (safe + extFromMime(mimeType));
+    return 'remote-image' + extFromMime(mimeType);
+  }
+
+  async function fileFromImageUrl(rawUrl) {
+    let parsed;
+    try {
+      parsed = new URL(rawUrl);
+    } catch (_) {
+      throw new Error('Enter a valid URL');
+    }
+    if (!/^https?:$/i.test(parsed.protocol)) {
+      throw new Error('Only http/https image URLs are supported');
+    }
+    let response;
+    try {
+      response = await fetch(parsed.toString());
+    } catch (_) {
+      throw new Error('Could not fetch this URL (remote host may block cross-origin access)');
+    }
+    if (!response.ok) throw new Error('Remote server returned ' + response.status);
+    const blob = await response.blob();
+    const mimeType = (blob.type || '').toLowerCase();
+    if (!mimeType.startsWith('image/')) {
+      throw new Error('URL did not return an image');
+    }
+    return new File([blob], getFileNameFromUrl(parsed, mimeType), { type: mimeType, lastModified: Date.now() });
+  }
+
   function loadInbox() {
     fetchJSON(API_BASE + '/inbox.php').then(data => {
       const count = data.count || 0;
@@ -3016,11 +3058,53 @@
 
     const uploadZone = document.getElementById('upload-zone');
     const uploadInput = document.getElementById('upload-input');
-    uploadZone.addEventListener('click', () => uploadInput.click());
+    const uploadUrlInput = document.getElementById('upload-url-input');
+    const uploadUrlBtn = document.getElementById('upload-url-btn');
+    const uploadUrlRow = uploadUrlInput ? uploadUrlInput.closest('.upload-url-row') : null;
+    if (uploadUrlRow) {
+      const stopBubble = (e) => e.stopPropagation();
+      uploadUrlRow.addEventListener('mousedown', stopBubble);
+      uploadUrlRow.addEventListener('click', stopBubble);
+    }
+    uploadZone.addEventListener('click', (e) => {
+      if (uploadUrlRow && e.target && uploadUrlRow.contains(e.target)) return;
+      uploadInput.click();
+    });
     uploadInput.addEventListener('change', () => {
       if (uploadInput.files.length) showUploadConfirmModal(uploadInput.files);
       uploadInput.value = '';
     });
+    async function uploadFromUrl() {
+      if (!uploadUrlInput || !uploadUrlBtn) return;
+      const rawUrl = uploadUrlInput.value.trim();
+      if (!rawUrl) {
+        showToast('Paste an image URL first', true);
+        uploadUrlInput.focus();
+        return;
+      }
+      uploadUrlBtn.disabled = true;
+      const oldText = uploadUrlBtn.textContent;
+      uploadUrlBtn.textContent = 'Fetching...';
+      try {
+        const file = await fileFromImageUrl(rawUrl);
+        showUploadConfirmModal([file]);
+        uploadUrlInput.value = '';
+      } catch (err) {
+        showToast((err && err.message) ? err.message : 'Failed to fetch image URL', true);
+      } finally {
+        uploadUrlBtn.disabled = false;
+        uploadUrlBtn.textContent = oldText || 'Upload';
+      }
+    }
+    if (uploadUrlInput && uploadUrlBtn) {
+      uploadUrlBtn.addEventListener('click', uploadFromUrl);
+      uploadUrlInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          uploadFromUrl();
+        }
+      });
+    }
     uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
     uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
     uploadZone.addEventListener('drop', (e) => {

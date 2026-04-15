@@ -163,6 +163,17 @@ $adminNavCurrent = 'config';
       padding-top: 1.1rem;
       border-top: 1px solid #e2e8f0;
     }
+    .admin-collapsible { margin: 0 0 1rem; }
+    .admin-collapsible-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.6rem;
+    }
+    .admin-collapsible-head h2, .admin-collapsible-head h3 { margin: 0; }
+    .admin-collapsible-toggle { padding: 0.3rem 0.65rem; cursor: pointer; font-size: 0.78rem; }
+    .admin-collapsible.is-hidden .admin-collapsible-body { display: none; }
     .admin-config-form-actions button[type="submit"] { margin-top: 0; }
     .admin-limit-block {
       padding: 0.65rem 0;
@@ -194,47 +205,78 @@ $adminNavCurrent = 'config';
       </div>
     <?php } ?>
 
-    <p class="admin-muted admin-config-lead">Values here are stored in <span class="admin-mono">app_settings</span> and override PHP defaults where noted. Changes are audited. Use <strong>Save settings</strong> at the bottom to apply everything in the App settings form.</p>
+    <section class="admin-collapsible" data-collapsible-key="config_intro">
+      <div class="admin-collapsible-head">
+        <h2>About This Page</h2>
+        <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+      </div>
+      <div class="admin-collapsible-body">
+        <p class="admin-muted admin-config-lead">Values here are stored in <span class="admin-mono">app_settings</span> and override PHP defaults where noted. Changes are audited. Use <strong>Save settings</strong> at the bottom to apply everything in the App settings form.</p>
+      </div>
+    </section>
 
     <form method="post" action="config.php" class="admin-config-form">
       <?php echo imagekpr_csrf_field(); ?>
       <input type="hidden" name="form_action" value="save_app_settings">
       <h2>App settings</h2>
 
-      <div class="admin-config-panel">
-        <h3 class="admin-config-subtitle">Storage &amp; quotas</h3>
-        <label class="block">Default storage quota (bytes, per user when their quota is “site default”)<br>
-          <input type="text" name="default_storage_quota_bytes" value="<?php echo $defQ !== null ? htmlspecialchars((string) $defQ, ENT_QUOTES, 'UTF-8') : ''; ?>" placeholder="empty = use DEFAULT_STORAGE_QUOTA_BYTES in config.php if set">
-        </label>
-        <p class="admin-muted">Use <span class="admin-mono">0</span> or clear and save a separate time to mean unlimited site default. Empty field removes the DB override.</p>
-        <p class="admin-muted">Free tier total library is <span class="admin-mono">52428800</span> bytes (50&nbsp;MiB). On <a href="index.php">Users</a>, custom “GiB” caps use <strong>binary gigabytes</strong>: entering <span class="admin-mono">50</span> there means 50&nbsp;GiB, not 50&nbsp;MB — use the <strong>Free</strong> plan preset or ~<span class="admin-mono">0.047</span> GiB for 50&nbsp;MiB.</p>
-        <p class="admin-muted"><strong>Stripe / SaaS tier matrix</strong> (reference when setting per-user byte caps on <a href="index.php">Users</a>): <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
-        <p class="admin-muted"><?php echo imagekpr_admin_html_plan_matrix_pro_blurb(); ?></p>
-      </div>
+      <section class="admin-collapsible" data-collapsible-key="config_storage_quotas">
+        <div class="admin-collapsible-head">
+          <h3>Storage &amp; quotas</h3>
+          <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+        </div>
+        <div class="admin-collapsible-body admin-config-panel">
+          <h3 class="admin-config-subtitle">Storage &amp; quotas</h3>
+          <label class="block">Default storage quota (bytes, per user when their quota is “site default”)<br>
+            <input type="text" name="default_storage_quota_bytes" value="<?php echo $defQ !== null ? htmlspecialchars((string) $defQ, ENT_QUOTES, 'UTF-8') : ''; ?>" placeholder="empty = use DEFAULT_STORAGE_QUOTA_BYTES in config.php if set">
+          </label>
+          <p class="admin-muted">Use <span class="admin-mono">0</span> or clear and save a separate time to mean unlimited site default. Empty field removes the DB override.</p>
+          <p class="admin-muted">Free tier total library is <span class="admin-mono">52428800</span> bytes (50&nbsp;MiB). On <a href="index.php">Users</a>, custom “GiB” caps use <strong>binary gigabytes</strong>: entering <span class="admin-mono">50</span> there means 50&nbsp;GiB, not 50&nbsp;MB — use the <strong>Free</strong> plan preset or ~<span class="admin-mono">0.047</span> GiB for 50&nbsp;MiB.</p>
+          <p class="admin-muted"><strong>Stripe / SaaS tier matrix</strong> (reference when setting per-user byte caps on <a href="index.php">Users</a>): <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
+          <p class="admin-muted"><?php echo imagekpr_admin_html_plan_matrix_pro_blurb(); ?></p>
+        </div>
+      </section>
 
-      <div class="admin-config-panel">
-        <h3 class="admin-config-subtitle">Legacy library (NULL user rows)</h3>
-        <label class="block"><input type="checkbox" name="share_null_user_rows" value="1" <?php echo $shareChecked ? 'checked' : ''; ?>> Share legacy images with <span class="admin-mono">user_id</span> NULL (lists them for every signed-in user)</label>
-        <p class="admin-muted">If this has never been saved, the optional <span class="admin-mono">IMAGEKPR_SHARE_NULL_USER_ROWS</span> line in <span class="admin-mono">config.php</span> still applies. After you save this form, the checkbox here controls that behavior.</p>
-      </div>
+      <section class="admin-collapsible" data-collapsible-key="config_legacy_library">
+        <div class="admin-collapsible-head">
+          <h3>Legacy library (NULL user rows)</h3>
+          <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+        </div>
+        <div class="admin-collapsible-body admin-config-panel">
+          <h3 class="admin-config-subtitle">Legacy library (NULL user rows)</h3>
+          <label class="block"><input type="checkbox" name="share_null_user_rows" value="1" <?php echo $shareChecked ? 'checked' : ''; ?>> Share legacy images with <span class="admin-mono">user_id</span> NULL (lists them for every signed-in user)</label>
+          <p class="admin-muted">If this has never been saved, the optional <span class="admin-mono">IMAGEKPR_SHARE_NULL_USER_ROWS</span> line in <span class="admin-mono">config.php</span> still applies. After you save this form, the checkbox here controls that behavior.</p>
+        </div>
+      </section>
 
-      <div class="admin-config-panel">
-        <h3 class="admin-config-subtitle">Maintenance</h3>
-        <label class="block"><input type="checkbox" name="maintenance_mode" value="1" <?php echo $maintChecked ? 'checked' : ''; ?>> Maintenance / read-only mode (main app)</label>
-        <label class="block">Maintenance banner message<br>
-          <textarea name="maintenance_message" placeholder="Shown to all signed-in users on the main app"><?php echo htmlspecialchars($maintMsg, ENT_QUOTES, 'UTF-8'); ?></textarea>
-        </label>
-        <p class="admin-muted">While enabled, uploads, inbox import/delete, deletes, renames, and tag edits are blocked via API (downloads and viewing still work). You can still use this admin area.</p>
-      </div>
+      <section class="admin-collapsible" data-collapsible-key="config_maintenance">
+        <div class="admin-collapsible-head">
+          <h3>Maintenance</h3>
+          <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+        </div>
+        <div class="admin-collapsible-body admin-config-panel">
+          <h3 class="admin-config-subtitle">Maintenance</h3>
+          <label class="block"><input type="checkbox" name="maintenance_mode" value="1" <?php echo $maintChecked ? 'checked' : ''; ?>> Maintenance / read-only mode (main app)</label>
+          <label class="block">Maintenance banner message<br>
+            <textarea name="maintenance_message" placeholder="Shown to all signed-in users on the main app"><?php echo htmlspecialchars($maintMsg, ENT_QUOTES, 'UTF-8'); ?></textarea>
+          </label>
+          <p class="admin-muted">While enabled, uploads, inbox import/delete, deletes, renames, and tag edits are blocked via API (downloads and viewing still work). You can still use this admin area.</p>
+        </div>
+      </section>
 
-      <div class="admin-config-panel">
-        <h3 class="admin-config-subtitle">Request limits</h3>
-        <p class="admin-muted" style="margin-top:0">These caps protect the server from oversized requests. <strong>Leave a field empty</strong> to use ImageKpr’s built-in default for that setting. If you enter a value, it must be a whole number within the min–max range shown.</p>
+      <section class="admin-collapsible" data-collapsible-key="config_request_limits">
+        <div class="admin-collapsible-head">
+          <h3>Request limits</h3>
+          <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+        </div>
+        <div class="admin-collapsible-body admin-config-panel">
+          <h3 class="admin-config-subtitle">Request limits</h3>
+          <p class="admin-muted" style="margin-top:0">These caps protect the server from oversized requests. <strong>Leave a field empty</strong> to use ImageKpr’s built-in default for that setting. If you enter a value, it must be a whole number within the min–max range shown.</p>
 
-        <label class="block" style="margin-top:1rem">Message when users hit a request limit<br>
-          <textarea name="request_limit_user_message" rows="3" maxlength="2000" placeholder="Example: Free accounts are limited to {max} items per request. Contact the administrator to upgrade."><?php echo htmlspecialchars($reqLimitUserMsg, ENT_QUOTES, 'UTF-8'); ?></textarea>
-        </label>
-        <p class="admin-muted">Optional. If set, this text is shown (in the main app toast / API <span class="admin-mono">error</span> field) instead of short technical messages when someone exceeds bulk image-ID limits, multi-file upload size, duplicate-check filename count, or ZIP download ID count. Put the placeholder <span class="admin-mono">{max}</span> where the numeric cap for that request should appear. Clear the box and save to use the default technical messages only.</p>
+          <label class="block" style="margin-top:1rem">Message when users hit a request limit<br>
+            <textarea name="request_limit_user_message" rows="3" maxlength="2000" placeholder="Example: Free accounts are limited to {max} items per request. Contact the administrator to upgrade."><?php echo htmlspecialchars($reqLimitUserMsg, ENT_QUOTES, 'UTF-8'); ?></textarea>
+          </label>
+          <p class="admin-muted">Optional. If set, this text is shown (in the main app toast / API <span class="admin-mono">error</span> field) instead of short technical messages when someone exceeds bulk image-ID limits, multi-file upload size, duplicate-check filename count, or ZIP download ID count. Put the placeholder <span class="admin-mono">{max}</span> where the numeric cap for that request should appear. Clear the box and save to use the default technical messages only.</p>
 
       <?php
       $lims = [
@@ -289,15 +331,58 @@ $adminNavCurrent = 'config';
         </div>
       </div>
       <?php } ?>
-      </div>
+        </div>
+      </section>
 
       <div class="admin-config-form-actions">
         <button type="submit">Save settings</button>
       </div>
     </form>
 
-    <p class="admin-muted admin-config-section" style="margin-top:1.5rem">Email allowlist and access requests are managed on <a href="allowlist.php">Allowlist</a>.</p>
+    <section class="admin-collapsible admin-config-section" data-collapsible-key="config_allowlist_note">
+      <div class="admin-collapsible-head">
+        <h3>Allowlist Note</h3>
+        <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+      </div>
+      <div class="admin-collapsible-body">
+        <p class="admin-muted" style="margin-top:0">Email allowlist and access requests are managed on <a href="allowlist.php">Allowlist</a>.</p>
+      </div>
+    </section>
   </div>
+  <script>
+    (function () {
+      var nodes = document.querySelectorAll('.admin-collapsible[data-collapsible-key]');
+      if (!nodes.length) return;
+      nodes.forEach(function (wrap) {
+        var keyRaw = wrap.getAttribute('data-collapsible-key');
+        var btn = wrap.querySelector('.admin-collapsible-toggle');
+        if (!keyRaw || !btn) return;
+        var storageKey = 'imagekpr_admin_config_' + keyRaw + '_hidden';
+        var setState = function (hidden) {
+          wrap.classList.toggle('is-hidden', hidden);
+          btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+          btn.textContent = hidden ? 'Show' : 'Hide';
+        };
+
+        try {
+          var saved = window.localStorage.getItem(storageKey);
+          setState(saved === null ? true : saved === '1');
+        } catch (e) {
+          setState(true);
+        }
+
+        btn.addEventListener('click', function () {
+          var hidden = !wrap.classList.contains('is-hidden');
+          setState(hidden);
+          try {
+            window.localStorage.setItem(storageKey, hidden ? '1' : '0');
+          } catch (e) {
+            // Ignore storage errors and keep current UI state.
+          }
+        });
+      });
+    })();
+  </script>
   <?php
   require_once __DIR__ . '/../inc/footer.php';
   imagekpr_render_footer(['context' => 'dashboard']);

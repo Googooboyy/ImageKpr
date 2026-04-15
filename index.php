@@ -87,6 +87,16 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
           <span class="upload-zone-hint">Files above your limit can be auto-resized if you choose Continue.</span>
         </div>
         <div id="upload-progress" class="upload-progress" hidden></div>
+        <div class="upload-url-row">
+          <input
+            type="url"
+            id="upload-url-input"
+            class="upload-url-input"
+            placeholder="Paste image URL (https://...)"
+            aria-label="Image URL"
+          >
+          <button type="button" id="upload-url-btn" class="upload-url-btn">Upload</button>
+        </div>
       </div>
       <div class="user-session-bar">
         <a href="account.php" class="user-session-email user-session-profile-link" title="Account &amp; profile — <?php echo htmlspecialchars($ikEmail, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($ikName !== '' ? $ikName : $ikEmail, ENT_QUOTES, 'UTF-8'); ?></a>

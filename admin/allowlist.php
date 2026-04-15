@@ -181,6 +181,16 @@ $adminNavCurrent = 'allowlist';
     .admin-btn-approve { background: #2e7d32; color: #fff; border: 1px solid #1b5e20; cursor: pointer; border-radius: 4px; padding: 0.25rem 0.6rem; font-size: 0.8rem; }
     .admin-note-cell { max-width: 18rem; word-break: break-word; }
     .admin-toggle-form button[type="submit"] { margin-top: 0.5rem; }
+    .admin-collapsible-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.6rem;
+    }
+    .admin-collapsible-head h2 { margin: 0; }
+    .admin-collapsible-toggle { padding: 0.3rem 0.65rem; cursor: pointer; font-size: 0.78rem; }
+    .admin-collapsible.is-hidden .admin-collapsible-body { display: none; }
   </style>
 </head>
 <body>
@@ -195,94 +205,143 @@ $adminNavCurrent = 'allowlist';
       </div>
     <?php } ?>
 
-    <section class="admin-config-section admin-config-panel" aria-labelledby="req-toggle-heading">
-      <h2 id="req-toggle-heading">Access requests</h2>
-      <p class="admin-muted">When enabled, visitors can submit their email from the main sign-in page. If the allowlist is not empty, anyone who signs in with Google while not yet allowed is also added here automatically (note: &quot;Requested via Google sign-in&quot;). Pending rows appear below; approving adds the address to the allowlist and removes the request.</p>
-      <form method="post" action="allowlist.php" class="admin-toggle-form">
-        <?php echo imagekpr_csrf_field(); ?>
-        <input type="hidden" name="form_action" value="save_accept_requests">
-        <label class="block"><input type="checkbox" name="accept_access_requests" value="1" <?php echo $acceptRequestsChecked ? 'checked' : ''; ?>> Accept new access requests from the public form</label>
-        <button type="submit">Save</button>
-      </form>
+    <section class="admin-config-section admin-config-panel admin-collapsible" aria-labelledby="req-toggle-heading" data-collapsible-key="allowlist_access_requests">
+      <div class="admin-collapsible-head">
+        <h2 id="req-toggle-heading">Access requests</h2>
+        <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+      </div>
+      <div class="admin-collapsible-body">
+        <p class="admin-muted">When enabled, visitors can submit their email from the main sign-in page. If the allowlist is not empty, anyone who signs in with Google while not yet allowed is also added here automatically (note: &quot;Requested via Google sign-in&quot;). Pending rows appear below; approving adds the address to the allowlist and removes the request.</p>
+        <form method="post" action="allowlist.php" class="admin-toggle-form">
+          <?php echo imagekpr_csrf_field(); ?>
+          <input type="hidden" name="form_action" value="save_accept_requests">
+          <label class="block"><input type="checkbox" name="accept_access_requests" value="1" <?php echo $acceptRequestsChecked ? 'checked' : ''; ?>> Accept new access requests from the public form</label>
+          <button type="submit">Save</button>
+        </form>
+      </div>
     </section>
 
-    <section class="admin-config-section admin-config-panel" aria-labelledby="pending-heading">
-      <h2 id="pending-heading">Pending requests</h2>
-      <?php if (empty($pendingRows)) { ?>
-        <p class="admin-muted">No pending requests.</p>
-      <?php } else { ?>
-        <table class="allowlist">
-          <thead><tr><th>Email</th><th>Note</th><th>Requested</th><th></th></tr></thead>
-          <tbody>
-            <?php foreach ($pendingRows as $pr) {
-              $nid = (int) $pr['id'];
-              $pnote = (string) ($pr['note'] ?? '');
-              ?>
-            <tr>
-              <td class="admin-mono"><?php echo htmlspecialchars((string) $pr['email'], ENT_QUOTES, 'UTF-8'); ?></td>
-              <td class="admin-note-cell admin-muted"><?php echo $pnote !== '' ? htmlspecialchars($pnote, ENT_QUOTES, 'UTF-8') : '—'; ?></td>
-              <td class="admin-muted"><?php echo htmlspecialchars((string) $pr['created_at'], ENT_QUOTES, 'UTF-8'); ?></td>
-              <td>
-                <form method="post" action="allowlist.php" style="display:inline">
-                  <?php echo imagekpr_csrf_field(); ?>
-                  <input type="hidden" name="form_action" value="access_request_approve">
-                  <input type="hidden" name="request_id" value="<?php echo $nid; ?>">
-                  <button type="submit" class="admin-btn-approve">Approve</button>
-                </form>
-                <form method="post" action="allowlist.php" style="display:inline" onsubmit="return confirm('Dismiss this request without adding to the allowlist?');">
-                  <?php echo imagekpr_csrf_field(); ?>
-                  <input type="hidden" name="form_action" value="access_request_dismiss">
-                  <input type="hidden" name="request_id" value="<?php echo $nid; ?>">
-                  <button type="submit" class="admin-btn-secondary">Dismiss</button>
-                </form>
-              </td>
-            </tr>
-            <?php } ?>
-          </tbody>
-        </table>
-      <?php } ?>
+    <section class="admin-config-section admin-config-panel admin-collapsible" aria-labelledby="pending-heading" data-collapsible-key="allowlist_pending_requests">
+      <div class="admin-collapsible-head">
+        <h2 id="pending-heading">Pending requests</h2>
+        <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+      </div>
+      <div class="admin-collapsible-body">
+        <?php if (empty($pendingRows)) { ?>
+          <p class="admin-muted">No pending requests.</p>
+        <?php } else { ?>
+          <table class="allowlist">
+            <thead><tr><th>Email</th><th>Note</th><th>Requested</th><th></th></tr></thead>
+            <tbody>
+              <?php foreach ($pendingRows as $pr) {
+                $nid = (int) $pr['id'];
+                $pnote = (string) ($pr['note'] ?? '');
+                ?>
+              <tr>
+                <td class="admin-mono"><?php echo htmlspecialchars((string) $pr['email'], ENT_QUOTES, 'UTF-8'); ?></td>
+                <td class="admin-note-cell admin-muted"><?php echo $pnote !== '' ? htmlspecialchars($pnote, ENT_QUOTES, 'UTF-8') : '—'; ?></td>
+                <td class="admin-muted"><?php echo htmlspecialchars((string) $pr['created_at'], ENT_QUOTES, 'UTF-8'); ?></td>
+                <td>
+                  <form method="post" action="allowlist.php" style="display:inline">
+                    <?php echo imagekpr_csrf_field(); ?>
+                    <input type="hidden" name="form_action" value="access_request_approve">
+                    <input type="hidden" name="request_id" value="<?php echo $nid; ?>">
+                    <button type="submit" class="admin-btn-approve">Approve</button>
+                  </form>
+                  <form method="post" action="allowlist.php" style="display:inline" onsubmit="return confirm('Dismiss this request without adding to the allowlist?');">
+                    <?php echo imagekpr_csrf_field(); ?>
+                    <input type="hidden" name="form_action" value="access_request_dismiss">
+                    <input type="hidden" name="request_id" value="<?php echo $nid; ?>">
+                    <button type="submit" class="admin-btn-secondary">Dismiss</button>
+                  </form>
+                </td>
+              </tr>
+              <?php } ?>
+            </tbody>
+          </table>
+        <?php } ?>
+      </div>
     </section>
 
-    <section class="admin-config-section admin-config-panel" aria-labelledby="allowlist-heading">
-      <h2 id="allowlist-heading">Allowed emails</h2>
-      <?php if ($allowOpen) { ?>
-        <p class="admin-muted"><strong>Open signup:</strong> the allowlist is empty, so any Google account can sign in (subject to OAuth). Add emails below to restrict access.</p>
-      <?php } else { ?>
-        <p class="admin-muted"><strong>Restricted:</strong> only listed emails may sign in (<?php echo (int) $allowCount; ?> entr<?php echo $allowCount === 1 ? 'y' : 'ies'; ?>).</p>
-      <?php } ?>
+    <section class="admin-config-section admin-config-panel admin-collapsible" aria-labelledby="allowlist-heading" data-collapsible-key="allowlist_allowed_emails">
+      <div class="admin-collapsible-head">
+        <h2 id="allowlist-heading">Allowed emails</h2>
+        <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+      </div>
+      <div class="admin-collapsible-body">
+        <?php if ($allowOpen) { ?>
+          <p class="admin-muted"><strong>Open signup:</strong> the allowlist is empty, so any Google account can sign in (subject to OAuth). Add emails below to restrict access.</p>
+        <?php } else { ?>
+          <p class="admin-muted"><strong>Restricted:</strong> only listed emails may sign in (<?php echo (int) $allowCount; ?> entr<?php echo $allowCount === 1 ? 'y' : 'ies'; ?>).</p>
+        <?php } ?>
 
-      <form method="post" action="allowlist.php" style="margin:0.75rem 0">
-        <?php echo imagekpr_csrf_field(); ?>
-        <input type="hidden" name="form_action" value="allowlist_add">
-        <label>Add email <input type="email" name="allow_email" required placeholder="user@example.com" style="min-width:16rem;padding:0.35rem"></label>
-        <button type="submit">Add</button>
-      </form>
+        <form method="post" action="allowlist.php" style="margin:0.75rem 0">
+          <?php echo imagekpr_csrf_field(); ?>
+          <input type="hidden" name="form_action" value="allowlist_add">
+          <label>Add email <input type="email" name="allow_email" required placeholder="user@example.com" style="min-width:16rem;padding:0.35rem"></label>
+          <button type="submit">Add</button>
+        </form>
 
-      <?php if (empty($allowRows)) { ?>
-        <p class="admin-muted">No addresses in the list.</p>
-      <?php } else { ?>
-        <table class="allowlist">
-          <thead><tr><th>Email</th><th>Added</th><th></th></tr></thead>
-          <tbody>
-            <?php foreach ($allowRows as $ar) { ?>
-            <tr>
-              <td class="admin-mono"><?php echo htmlspecialchars((string) $ar['email'], ENT_QUOTES, 'UTF-8'); ?></td>
-              <td class="admin-muted"><?php echo htmlspecialchars((string) $ar['created_at'], ENT_QUOTES, 'UTF-8'); ?></td>
-              <td>
-                <form method="post" action="allowlist.php" style="display:inline" onsubmit="return confirm('Remove this email from the allowlist?');">
-                  <?php echo imagekpr_csrf_field(); ?>
-                  <input type="hidden" name="form_action" value="allowlist_delete">
-                  <input type="hidden" name="allowlist_id" value="<?php echo (int) $ar['id']; ?>">
-                  <button type="submit" class="admin-btn-danger" style="padding:0.2rem 0.5rem;font-size:0.8rem;cursor:pointer">Remove</button>
-                </form>
-              </td>
-            </tr>
-            <?php } ?>
-          </tbody>
-        </table>
-      <?php } ?>
+        <?php if (empty($allowRows)) { ?>
+          <p class="admin-muted">No addresses in the list.</p>
+        <?php } else { ?>
+          <table class="allowlist">
+            <thead><tr><th>Email</th><th>Added</th><th></th></tr></thead>
+            <tbody>
+              <?php foreach ($allowRows as $ar) { ?>
+              <tr>
+                <td class="admin-mono"><?php echo htmlspecialchars((string) $ar['email'], ENT_QUOTES, 'UTF-8'); ?></td>
+                <td class="admin-muted"><?php echo htmlspecialchars((string) $ar['created_at'], ENT_QUOTES, 'UTF-8'); ?></td>
+                <td>
+                  <form method="post" action="allowlist.php" style="display:inline" onsubmit="return confirm('Remove this email from the allowlist?');">
+                    <?php echo imagekpr_csrf_field(); ?>
+                    <input type="hidden" name="form_action" value="allowlist_delete">
+                    <input type="hidden" name="allowlist_id" value="<?php echo (int) $ar['id']; ?>">
+                    <button type="submit" class="admin-btn-danger" style="padding:0.2rem 0.5rem;font-size:0.8rem;cursor:pointer">Remove</button>
+                  </form>
+                </td>
+              </tr>
+              <?php } ?>
+            </tbody>
+          </table>
+        <?php } ?>
+      </div>
     </section>
   </div>
+  <script>
+    (function () {
+      var nodes = document.querySelectorAll('.admin-collapsible[data-collapsible-key]');
+      if (!nodes.length) return;
+      nodes.forEach(function (wrap) {
+        var keyRaw = wrap.getAttribute('data-collapsible-key');
+        var btn = wrap.querySelector('.admin-collapsible-toggle');
+        if (!keyRaw || !btn) return;
+        var storageKey = 'imagekpr_admin_allowlist_' + keyRaw + '_hidden';
+        var setState = function (hidden) {
+          wrap.classList.toggle('is-hidden', hidden);
+          btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+          btn.textContent = hidden ? 'Show' : 'Hide';
+        };
+
+        try {
+          var saved = window.localStorage.getItem(storageKey);
+          setState(saved === null ? true : saved === '1');
+        } catch (e) {
+          setState(true);
+        }
+
+        btn.addEventListener('click', function () {
+          var hidden = !wrap.classList.contains('is-hidden');
+          setState(hidden);
+          try {
+            window.localStorage.setItem(storageKey, hidden ? '1' : '0');
+          } catch (e) {
+            // Ignore storage errors and keep current UI state.
+          }
+        });
+      });
+    })();
+  </script>
   <?php
   require_once __DIR__ . '/../inc/footer.php';
   imagekpr_render_footer(['context' => 'dashboard']);

@@ -227,6 +227,16 @@ $adminNavCurrent = 'updates';
     .admin-inline button { border: 1px solid #c62828; background: #fff; color: #c62828; border-radius: 4px; padding: 0.2rem 0.45rem; cursor: pointer; }
     .admin-inline-publish button { border-color: #2e7d32; color: #2e7d32; }
     .admin-tagline { color: #444; font-size: 0.8rem; }
+    .admin-collapsible-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.6rem;
+    }
+    .admin-collapsible-head h2 { margin: 0; }
+    .admin-collapsible-toggle { padding: 0.3rem 0.65rem; cursor: pointer; font-size: 0.78rem; }
+    .admin-collapsible.is-hidden .admin-collapsible-body { display: none; }
   </style>
 </head>
 <body>
@@ -248,106 +258,150 @@ $adminNavCurrent = 'updates';
     <?php } ?>
 
     <?php if ($updatesTableReady) { ?>
-      <section class="admin-panel" aria-labelledby="updates-form-title">
-        <h2 id="updates-form-title"><?php echo $form['id'] > 0 ? 'Edit update' : 'New update'; ?></h2>
-        <form method="post" action="updates.php">
-          <?php echo imagekpr_csrf_field(); ?>
-          <input type="hidden" name="form_action" value="save_post">
-          <input type="hidden" name="id" value="<?php echo (int) $form['id']; ?>">
+      <section class="admin-panel admin-collapsible" aria-labelledby="updates-form-title" data-collapsible-key="updates_editor">
+        <div class="admin-collapsible-head">
+          <h2 id="updates-form-title"><?php echo $form['id'] > 0 ? 'Edit update' : 'New update'; ?></h2>
+          <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+        </div>
+        <div class="admin-collapsible-body">
+          <form method="post" action="updates.php">
+            <?php echo imagekpr_csrf_field(); ?>
+            <input type="hidden" name="form_action" value="save_post">
+            <input type="hidden" name="id" value="<?php echo (int) $form['id']; ?>">
 
-          <div class="admin-field">
-            <label for="upd-title">Title</label>
-            <input id="upd-title" type="text" name="title" maxlength="255" required value="<?php echo htmlspecialchars($form['title'], ENT_QUOTES, 'UTF-8'); ?>">
-          </div>
-          <div class="admin-field">
-            <label for="upd-slug">Slug (auto-generated from title if blank)</label>
-            <input id="upd-slug" type="text" name="slug" maxlength="191" value="<?php echo htmlspecialchars($form['slug'], ENT_QUOTES, 'UTF-8'); ?>">
-          </div>
-          <div class="admin-field">
-            <label for="upd-date">Published date</label>
-            <input id="upd-date" type="date" name="published_at" required value="<?php echo htmlspecialchars($form['published_at'], ENT_QUOTES, 'UTF-8'); ?>">
-          </div>
-          <div class="admin-field">
-            <label for="upd-status">Status</label>
-            <select id="upd-status" name="status">
-              <option value="published"<?php echo $form['status'] === 'published' ? ' selected' : ''; ?>>Published</option>
-              <option value="draft"<?php echo $form['status'] === 'draft' ? ' selected' : ''; ?>>Draft</option>
-            </select>
-          </div>
-          <div class="admin-field">
-            <label for="upd-summary">Summary (for updates listing)</label>
-            <textarea id="upd-summary" name="summary" rows="3" maxlength="1000" required><?php echo htmlspecialchars($form['summary'], ENT_QUOTES, 'UTF-8'); ?></textarea>
-          </div>
-          <div class="admin-field">
-            <label for="upd-tags">Tags (comma separated)</label>
-            <input id="upd-tags" type="text" name="tags" value="<?php echo htmlspecialchars($form['tags'], ENT_QUOTES, 'UTF-8'); ?>" placeholder="release, feature, maintenance">
-          </div>
-          <div class="admin-field">
-            <label for="upd-body">Body (separate paragraphs with blank lines)</label>
-            <textarea id="upd-body" name="body" required><?php echo htmlspecialchars($form['body'], ENT_QUOTES, 'UTF-8'); ?></textarea>
-          </div>
-          <div class="admin-actions">
-            <button type="submit">Save update</button>
-            <?php if ($form['id'] > 0) { ?>
-              <a href="updates.php">Cancel edit</a>
-            <?php } ?>
-          </div>
-        </form>
+            <div class="admin-field">
+              <label for="upd-title">Title</label>
+              <input id="upd-title" type="text" name="title" maxlength="255" required value="<?php echo htmlspecialchars($form['title'], ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+            <div class="admin-field">
+              <label for="upd-slug">Slug (auto-generated from title if blank)</label>
+              <input id="upd-slug" type="text" name="slug" maxlength="191" value="<?php echo htmlspecialchars($form['slug'], ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+            <div class="admin-field">
+              <label for="upd-date">Published date</label>
+              <input id="upd-date" type="date" name="published_at" required value="<?php echo htmlspecialchars($form['published_at'], ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+            <div class="admin-field">
+              <label for="upd-status">Status</label>
+              <select id="upd-status" name="status">
+                <option value="published"<?php echo $form['status'] === 'published' ? ' selected' : ''; ?>>Published</option>
+                <option value="draft"<?php echo $form['status'] === 'draft' ? ' selected' : ''; ?>>Draft</option>
+              </select>
+            </div>
+            <div class="admin-field">
+              <label for="upd-summary">Summary (for updates listing)</label>
+              <textarea id="upd-summary" name="summary" rows="3" maxlength="1000" required><?php echo htmlspecialchars($form['summary'], ENT_QUOTES, 'UTF-8'); ?></textarea>
+            </div>
+            <div class="admin-field">
+              <label for="upd-tags">Tags (comma separated)</label>
+              <input id="upd-tags" type="text" name="tags" value="<?php echo htmlspecialchars($form['tags'], ENT_QUOTES, 'UTF-8'); ?>" placeholder="release, feature, maintenance">
+            </div>
+            <div class="admin-field">
+              <label for="upd-body">Body (separate paragraphs with blank lines)</label>
+              <textarea id="upd-body" name="body" required><?php echo htmlspecialchars($form['body'], ENT_QUOTES, 'UTF-8'); ?></textarea>
+            </div>
+            <div class="admin-actions">
+              <button type="submit">Save update</button>
+              <?php if ($form['id'] > 0) { ?>
+                <a href="updates.php">Cancel edit</a>
+              <?php } ?>
+            </div>
+          </form>
+        </div>
       </section>
 
-      <section class="admin-panel" aria-labelledby="updates-list-title">
-        <h2 id="updates-list-title">All updates</h2>
-        <?php if (empty($rows)) { ?>
-          <p class="admin-muted">No updates yet.</p>
-        <?php } else { ?>
-          <table class="admin-updates">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Title</th>
-                <th>Slug</th>
-                <th>Updated</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($rows as $r) { ?>
+      <section class="admin-panel admin-collapsible" aria-labelledby="updates-list-title" data-collapsible-key="updates_list">
+        <div class="admin-collapsible-head">
+          <h2 id="updates-list-title">All updates</h2>
+          <button type="button" class="admin-collapsible-toggle" aria-expanded="false">Show</button>
+        </div>
+        <div class="admin-collapsible-body">
+          <?php if (empty($rows)) { ?>
+            <p class="admin-muted">No updates yet.</p>
+          <?php } else { ?>
+            <table class="admin-updates">
+              <thead>
                 <tr>
-                  <td><?php echo htmlspecialchars((string) $r['published_at'], ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td><?php echo htmlspecialchars((string) $r['status'], ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td>
-                    <?php echo htmlspecialchars((string) $r['title'], ENT_QUOTES, 'UTF-8'); ?>
-                    <?php if (!empty($r['summary'])) { ?>
-                      <div class="admin-tagline"><?php echo htmlspecialchars((string) $r['summary'], ENT_QUOTES, 'UTF-8'); ?></div>
-                    <?php } ?>
-                  </td>
-                  <td class="admin-muted"><?php echo htmlspecialchars((string) $r['slug'], ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td class="admin-muted"><?php echo htmlspecialchars((string) $r['updated_at'], ENT_QUOTES, 'UTF-8'); ?></td>
-                  <td>
-                    <a href="updates.php?edit=<?php echo (int) $r['id']; ?>">Edit</a>
-                    <?php if (($r['status'] ?? '') === 'draft') { ?>
-                      <form class="admin-inline admin-inline-publish" method="post" action="updates.php">
-                        <?php echo imagekpr_csrf_field(); ?>
-                        <input type="hidden" name="form_action" value="publish_post">
-                        <input type="hidden" name="id" value="<?php echo (int) $r['id']; ?>">
-                        <button type="submit">Publish</button>
-                      </form>
-                    <?php } ?>
-                    <form class="admin-inline" method="post" action="updates.php" onsubmit="return confirm('Delete this update?');">
-                      <?php echo imagekpr_csrf_field(); ?>
-                      <input type="hidden" name="form_action" value="delete_post">
-                      <input type="hidden" name="id" value="<?php echo (int) $r['id']; ?>">
-                      <button type="submit">Delete</button>
-                    </form>
-                  </td>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Title</th>
+                  <th>Slug</th>
+                  <th>Updated</th>
+                  <th></th>
                 </tr>
-              <?php } ?>
-            </tbody>
-          </table>
-        <?php } ?>
+              </thead>
+              <tbody>
+                <?php foreach ($rows as $r) { ?>
+                  <tr>
+                    <td><?php echo htmlspecialchars((string) $r['published_at'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?php echo htmlspecialchars((string) $r['status'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td>
+                      <?php echo htmlspecialchars((string) $r['title'], ENT_QUOTES, 'UTF-8'); ?>
+                      <?php if (!empty($r['summary'])) { ?>
+                        <div class="admin-tagline"><?php echo htmlspecialchars((string) $r['summary'], ENT_QUOTES, 'UTF-8'); ?></div>
+                      <?php } ?>
+                    </td>
+                    <td class="admin-muted"><?php echo htmlspecialchars((string) $r['slug'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td class="admin-muted"><?php echo htmlspecialchars((string) $r['updated_at'], ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td>
+                      <a href="updates.php?edit=<?php echo (int) $r['id']; ?>">Edit</a>
+                      <?php if (($r['status'] ?? '') === 'draft') { ?>
+                        <form class="admin-inline admin-inline-publish" method="post" action="updates.php">
+                          <?php echo imagekpr_csrf_field(); ?>
+                          <input type="hidden" name="form_action" value="publish_post">
+                          <input type="hidden" name="id" value="<?php echo (int) $r['id']; ?>">
+                          <button type="submit">Publish</button>
+                        </form>
+                      <?php } ?>
+                      <form class="admin-inline" method="post" action="updates.php" onsubmit="return confirm('Delete this update?');">
+                        <?php echo imagekpr_csrf_field(); ?>
+                        <input type="hidden" name="form_action" value="delete_post">
+                        <input type="hidden" name="id" value="<?php echo (int) $r['id']; ?>">
+                        <button type="submit">Delete</button>
+                      </form>
+                    </td>
+                  </tr>
+                <?php } ?>
+              </tbody>
+            </table>
+          <?php } ?>
+        </div>
       </section>
     <?php } ?>
   </div>
+  <script>
+    (function () {
+      var nodes = document.querySelectorAll('.admin-collapsible[data-collapsible-key]');
+      if (!nodes.length) return;
+      nodes.forEach(function (wrap) {
+        var keyRaw = wrap.getAttribute('data-collapsible-key');
+        var btn = wrap.querySelector('.admin-collapsible-toggle');
+        if (!keyRaw || !btn) return;
+        var storageKey = 'imagekpr_admin_updates_' + keyRaw + '_hidden';
+        var setState = function (hidden) {
+          wrap.classList.toggle('is-hidden', hidden);
+          btn.setAttribute('aria-expanded', hidden ? 'false' : 'true');
+          btn.textContent = hidden ? 'Show' : 'Hide';
+        };
+
+        try {
+          var saved = window.localStorage.getItem(storageKey);
+          setState(saved === null ? true : saved === '1');
+        } catch (e) {
+          setState(true);
+        }
+
+        btn.addEventListener('click', function () {
+          var hidden = !wrap.classList.contains('is-hidden');
+          setState(hidden);
+          try {
+            window.localStorage.setItem(storageKey, hidden ? '1' : '0');
+          } catch (e) {
+            // Ignore storage errors and keep current UI state.
+          }
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

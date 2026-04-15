@@ -231,6 +231,26 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
 .upload-zone.drag-over { border-color: #333; background: #c4d0dc; }
 .upload-progress { margin-top: 0.5rem; height: 4px; background: #eee; border-radius: 2px; overflow: hidden; }
 .upload-progress-bar { height: 100%; background: #333; width: 0%; transition: width 0.2s; }
+.upload-url-row { width: 100%; display: flex; gap: 0.4rem; margin-top: 0.45rem; }
+.upload-url-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.9rem;
+  padding: 0.38rem 0.5rem;
+  border: 1px solid #b8c2cc;
+  border-radius: 4px;
+  background: #fff;
+}
+.upload-url-btn {
+  padding: 0.38rem 0.65rem;
+  border: 1px solid #9ca9b5;
+  background: #f2f5f8;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.upload-url-btn:hover { background: #e6ebf0; }
+.upload-url-btn:disabled { cursor: wait; opacity: 0.7; }
 .scroll-to-top-btn,
 .select-all-visible-btn {
   padding: 0.25rem 0.75rem;
