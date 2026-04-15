@@ -3,6 +3,25 @@ ob_start();
 require_once __DIR__ . '/inc/auth.php';
 imagekpr_ensure_config();
 imagekpr_start_session();
+if (!empty($_GET['share'])) {
+  try {
+    require __DIR__ . '/inc/shared_dashboard.php';
+  } catch (Throwable $e) {
+    $debugCode = substr(hash('sha256', (string) microtime(true) . '|' . (string) mt_rand()), 0, 10);
+    error_log('ImageKpr share route fatal [' . $debugCode . ']: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    $showDebug = isset($_GET['ik_debug']) && (string) $_GET['ik_debug'] === '1';
+    $debugText = '';
+    if ($showDebug) {
+      $debugText = htmlspecialchars(get_class($e) . ': ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine(), ENT_QUOTES, 'UTF-8');
+    }
+    if (!headers_sent()) {
+      http_response_code(200);
+      header('Content-Type: text/html; charset=utf-8');
+    }
+    echo '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Shared Dashboard Unavailable</title><style>body{font-family:Arial,sans-serif;background:#f8fafc;color:#111827;margin:0;padding:2rem}main{max-width:42rem;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:1.25rem}h1{margin:0 0 .5rem;font-size:1.2rem}p{margin:.45rem 0;color:#374151}.code{margin-top:.85rem;font-family:Consolas,monospace;font-size:.85rem;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:8px;padding:.65rem;overflow:auto}</style></head><body><main><h1>Shared dashboard temporarily unavailable</h1><p>The link is valid but the server hit an internal error while rendering this page.</p><p>Reference: <strong>' . htmlspecialchars($debugCode, ENT_QUOTES, 'UTF-8') . '</strong></p>' . ($debugText !== '' ? '<div class="code">' . $debugText . '</div>' : '') . '<p>Please try again in a minute or ask the owner to refresh/recreate the link.</p></main></body></html>';
+  }
+  exit;
+}
 $ikLoggedIn = imagekpr_user_id() >= 1;
 
 if ($ikLoggedIn) {
@@ -121,7 +140,9 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
   <section class="folders-filter">
     <input type="hidden" id="folder-filter" value="" aria-label="Filter by folder">
     <div id="folder-icons" class="folder-icons"></div>
-    <button type="button" id="manage-folders-btn" class="ikpr-btn-folders">Manage folders</button>
+    <section id="my-dashboards" class="my-dashboards">
+      <div id="my-dashboards-cards" class="my-dashboards-list" aria-label="Dashboards"></div>
+    </section>
   </section>
 
   <section class="sort-row" aria-label="Sort order">
@@ -140,7 +161,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
       <div class="banner-row" id="hint-banner-row">
         <div class="user-hint-banner">
           <span class="user-hint-text" id="user-hint-text">Loading…</span>
-          <input type="search" id="search" placeholder="Search..." aria-label="Search images">
+          <input type="search" id="search" placeholder="Search..." aria-label="Search images" autocomplete="off">
           <button type="button" id="bulk-select-all" class="select-all-visible-btn" title="Select every image currently shown below (folder, tag, and search filters apply; scroll to load more rows, then click again to include them)">Select all</button>
           <button type="button" id="scroll-to-top" class="scroll-to-top-btn" aria-label="Scroll to top" title="Scroll to top">↑ Top</button>
         </div>
@@ -160,6 +181,40 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
           <label for="grid-scale-20">2x</label>
         </div>
       </div>
+      <div id="dashboard-editor-wrap" class="dashboard-editor-wrap" hidden>
+        <div class="dashboard-editor-head">
+          <h3 id="dashboard-editor-title"></h3>
+          <div class="dashboard-editor-head-actions">
+            <button type="button" id="dashboard-editor-copy-link" class="ikpr-btn-dark" hidden>Copy link</button>
+            <button type="button" id="dashboard-editor-view-link" class="ikpr-btn-dark" hidden>View link</button>
+            <button type="button" id="dashboard-editor-qr" class="ikpr-btn-dark" hidden>Show QR</button>
+            <button type="button" id="dashboard-editor-delete" class="ikpr-btn-delete" hidden>Delete</button>
+            <button type="button" id="dashboard-editor-close">Close</button>
+          </div>
+        </div>
+        <div class="dashboard-editor-grid">
+          <label>Title
+            <input type="text" id="dashboard-title" maxlength="255" placeholder="e.g. Spring campaign selects">
+          </label>
+          <label class="dashboard-field-subtitle">Subtitle
+            <input type="text" id="dashboard-subtitle" maxlength="500" placeholder="Optional short description">
+          </label>
+          <label id="dashboard-expiry-custom-wrap">Custom expiry
+            <input type="datetime-local" id="dashboard-expiry-custom">
+          </label>
+          <label id="dashboard-password-wrap" class="dashboard-field-password" hidden>Password (paid)
+            <input type="password" id="dashboard-password" maxlength="100" placeholder="Leave blank to remove password">
+          </label>
+        </div>
+        <div class="dashboard-editor-hero">
+          <span>Select Hero Image for shared dashboard <span id="dashboard-image-count" class="dashboard-image-count"></span></span>
+          <div id="dashboard-hero-strip" class="dashboard-hero-strip"></div>
+        </div>
+        <div class="dashboard-editor-actions">
+          <button type="button" id="dashboard-create-btn" class="ikpr-btn-dark">Save and Copy link</button>
+          <span id="dashboard-editor-status" aria-live="polite"></span>
+        </div>
+      </div>
       <div class="selection-banner-below" id="selection-banner" hidden>
       <div class="bulk-bar" id="bulk-bar">
         <span id="bulk-count">0 selected</span>
@@ -167,6 +222,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <button type="button" id="bulk-delete" class="ikpr-btn-delete">Delete</button>
         <button type="button" id="bulk-download">Download ZIP</button>
         <button type="button" id="bulk-slideshow" class="ikpr-btn-dark">Slideshow</button>
+        <button type="button" id="bulk-create-dashboard" class="ikpr-btn-dark">Create Dashboard</button>
         <button type="button" id="bulk-tags" class="ikpr-btn-tags">Apply/Manage Tags</button>
         <button type="button" id="bulk-folders" class="ikpr-btn-folders">Apply/Manage Folders</button>
         <button type="button" id="bulk-rename">Rename</button>
@@ -299,6 +355,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <div>L toggles Loop.</div>
         <div>C shows/hides the mini controller tray.</div>
         <div>When Fill image is on, use mouse wheel to pan the cropped image.</div>
+        <div style="margin-top:0.45rem;font-style:italic">On mobile: swipe left/right to navigate, single tap to pause/resume (or advance in Manual), double tap to toggle Fill.</div>
       </div>
       <div class="slideshow-settings-actions">
         <button type="button" id="slideshow-start" class="slideshow-btn-primary">Start slideshow</button>
@@ -498,6 +555,17 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
     </div>
   </div>
 
+  <div id="unsaved-dialog" class="dialog" hidden aria-modal="true">
+    <div class="dialog-content">
+      <p id="unsaved-message">You have unsaved changes. What would you like to do?</p>
+      <div class="dialog-actions">
+        <button type="button" id="unsaved-save" class="ikpr-btn-dark">Save first</button>
+        <button type="button" id="unsaved-discard" class="ikpr-btn-delete">Discard</button>
+        <button type="button" id="unsaved-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="add-to-folder-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="add-to-folder-title">
     <div class="dialog-content">
       <h3 id="add-to-folder-title">Add to folder</h3>
@@ -551,6 +619,25 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
       <div id="manage-tags-list" class="manage-tags-list"></div>
       <div class="dialog-actions">
         <button type="button" id="manage-tags-close" class="ikpr-btn-tags">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="dashboard-preview-modal" class="dialog dashboard-preview-modal" hidden aria-modal="true">
+    <div class="dashboard-preview-modal-content">
+      <button type="button" id="dashboard-preview-close" class="dashboard-preview-modal-close" aria-label="Close preview">&times;</button>
+      <iframe id="dashboard-preview-iframe" class="dashboard-preview-iframe" sandbox="allow-scripts allow-same-origin" title="Dashboard preview"></iframe>
+    </div>
+  </div>
+
+  <div id="dashboard-qr-modal" class="dialog dashboard-qr-modal" hidden aria-modal="true">
+    <div class="dialog-content dashboard-qr-modal-content">
+      <h3>QR Code</h3>
+      <img id="dashboard-qr-img" class="dashboard-qr-img" src="" alt="QR code">
+      <div class="dialog-actions dashboard-qr-actions">
+        <button type="button" id="dashboard-qr-download" class="ikpr-btn-dark">Download</button>
+        <button type="button" id="dashboard-qr-copy" class="ikpr-btn-dark">Copy image</button>
+        <button type="button" id="dashboard-qr-close">Close</button>
       </div>
     </div>
   </div>

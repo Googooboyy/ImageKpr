@@ -154,6 +154,28 @@
     });
   }
 
+  function unsavedDialog(msg) {
+    return new Promise((resolve) => {
+      const d = document.getElementById('unsaved-dialog');
+      if (!d) return resolve('discard');
+      const msgEl = document.getElementById('unsaved-message');
+      const saveBtn = document.getElementById('unsaved-save');
+      const discardBtn = document.getElementById('unsaved-discard');
+      const cancelBtn = document.getElementById('unsaved-cancel');
+      if (msg) msgEl.textContent = msg;
+      d.hidden = false;
+      const cleanup = () => {
+        d.hidden = true;
+        saveBtn.onclick = null;
+        discardBtn.onclick = null;
+        cancelBtn.onclick = null;
+      };
+      saveBtn.onclick = () => { cleanup(); resolve('save'); };
+      discardBtn.onclick = () => { cleanup(); resolve('discard'); };
+      cancelBtn.onclick = () => { cleanup(); resolve('cancel'); };
+    });
+  }
+
   function addToFolderSelectDialog() {
     return new Promise((resolve) => {
       const d = document.getElementById('add-to-folder-select-dialog');
@@ -441,8 +463,16 @@
     const count = document.getElementById('bulk-count');
     const banner = document.getElementById('selection-banner');
     const hintRow = document.getElementById('hint-banner-row');
+    const editorOpen = document.body.classList.contains('dashboard-editor-open');
     count.textContent = selectedIds.size + ' selected';
     updateSelectionBanner();
+    if (editorOpen) {
+      if (banner) banner.hidden = true;
+      if (hintRow) hintRow.hidden = false;
+      document.body.classList.remove('selection-active');
+      dashboardRenderHeroStrip();
+      return;
+    }
     if (selectMode) {
       if (banner) banner.hidden = false;
       if (hintRow) hintRow.hidden = true;
@@ -585,6 +615,10 @@
         }
         inner.classList.toggle('selected', checkEl.checked);
         updateBulkBar();
+        if (!document.getElementById('dashboard-editor-wrap').hidden) {
+          dashboardRenderHeroStrip();
+          dashboardQueueAutosave();
+        }
       });
       if (selectedIds.has(Number(img.id))) {
         checkEl.checked = true;
@@ -854,6 +888,12 @@
   }
 
   let slideshowState = null;
+  let ssTouchStartX = 0;
+  let ssTouchStartY = 0;
+  let ssTouchStartTime = 0;
+  let ssTouchMoved = false;
+  let ssLastTapTime = 0;
+  let ssTapTimeout = null;
 
   function getSlideshowImageById(id) {
     const nid = Number(id);
@@ -1214,6 +1254,79 @@
     applySlideshowImagePan();
   }
 
+  function setupSlideshowTouchHandlers(stageEl) {
+    if (!stageEl) return;
+
+    function onTouchStart(e) {
+      if (!slideshowState) return;
+      const t = e.touches[0];
+      ssTouchStartX = t.clientX;
+      ssTouchStartY = t.clientY;
+      ssTouchStartTime = Date.now();
+      ssTouchMoved = false;
+    }
+
+    function onTouchMove(e) {
+      if (!slideshowState) return;
+      const t = e.touches[0];
+      const dx = Math.abs(t.clientX - ssTouchStartX);
+      const dy = Math.abs(t.clientY - ssTouchStartY);
+      if (dx > 10 || dy > 10) ssTouchMoved = true;
+      if (dx > dy && dx > 10) e.preventDefault();
+    }
+
+    function onTouchEnd(e) {
+      if (!slideshowState) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - ssTouchStartX;
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(t.clientY - ssTouchStartY);
+      const elapsed = Date.now() - ssTouchStartTime;
+
+      if (absDx > 40 && absDx > absDy * 1.5 && elapsed < 500) {
+        slideshowState._suppressClick = true;
+        if (dx < 0) {
+          if (slideshowAdvance(1) && slideshowState.auto && !slideshowState.paused) armSlideshowAutoTimer();
+        } else {
+          if (slideshowAdvance(-1) && slideshowState.auto && !slideshowState.paused) armSlideshowAutoTimer();
+        }
+        return;
+      }
+
+      if (!ssTouchMoved && elapsed < 300) {
+        slideshowState._suppressClick = true;
+        const now = Date.now();
+        if (now - ssLastTapTime < 300) {
+          clearTimeout(ssTapTimeout);
+          ssLastTapTime = 0;
+          slideshowState.fillImage = !slideshowState.fillImage;
+          if (!slideshowState.fillImage) resetSlideshowImagePan();
+          applySlideshowImageFit();
+          syncSlideshowMiniControllerUi();
+          showToast(slideshowState.fillImage ? 'Fill image: ON' : 'Fill image: OFF', false);
+        } else {
+          ssLastTapTime = now;
+          ssTapTimeout = setTimeout(() => {
+            if (!slideshowState) return;
+            if (slideshowState.auto) {
+              toggleSlideshowPause();
+            } else {
+              slideshowAdvance(1);
+            }
+          }, 300);
+        }
+      }
+    }
+
+    stageEl.addEventListener('touchstart', onTouchStart, { passive: true });
+    stageEl.addEventListener('touchmove', onTouchMove, { passive: false });
+    stageEl.addEventListener('touchend', onTouchEnd, { passive: true });
+
+    slideshowState.stageTouchStartHandler = onTouchStart;
+    slideshowState.stageTouchMoveHandler = onTouchMove;
+    slideshowState.stageTouchEndHandler = onTouchEnd;
+  }
+
   function clearSlideshowTimer() {
     if (slideshowState && slideshowState.timerId != null) {
       clearInterval(slideshowState.timerId);
@@ -1334,6 +1447,17 @@
       if (slideshowState.stageWheelHandler && st) {
         st.removeEventListener('wheel', slideshowState.stageWheelHandler);
       }
+      if (slideshowState.stageTouchStartHandler && st) {
+        st.removeEventListener('touchstart', slideshowState.stageTouchStartHandler);
+      }
+      if (slideshowState.stageTouchMoveHandler && st) {
+        st.removeEventListener('touchmove', slideshowState.stageTouchMoveHandler);
+      }
+      if (slideshowState.stageTouchEndHandler && st) {
+        st.removeEventListener('touchend', slideshowState.stageTouchEndHandler);
+      }
+      if (ssTapTimeout) { clearTimeout(ssTapTimeout); ssTapTimeout = null; }
+      ssLastTapTime = 0;
       teardownSlideshowMiniController();
     }
     const player = document.getElementById('slideshow-player');
@@ -1411,6 +1535,10 @@
     if (stage) {
       slideshowState.stageClickHandler = (e) => {
         if (!slideshowState) return;
+        if (slideshowState._suppressClick) {
+          slideshowState._suppressClick = false;
+          return;
+        }
         if (slideshowState.fillImage) return;
         const imgEl = document.getElementById('slideshow-img');
         const st = document.querySelector('#slideshow-player .slideshow-stage');
@@ -1424,6 +1552,8 @@
       stage.addEventListener('click', slideshowState.stageClickHandler);
       slideshowState.stageWheelHandler = (e) => panSlideshowImageFromWheel(e);
       stage.addEventListener('wheel', slideshowState.stageWheelHandler, { passive: false });
+
+      setupSlideshowTouchHandlers(stage);
     }
 
     slideshowState.onKeyDown = (e) => {
@@ -3080,6 +3210,31 @@
       btn.setAttribute('aria-label', title || label);
       btnWrap.appendChild(tooltip);
       btnWrap.appendChild(btn);
+      if (isDropTarget && window.ImageKprFolders) {
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'folder-icon-delete';
+        delBtn.setAttribute('aria-label', 'Delete folder ' + value);
+        delBtn.title = 'Delete folder';
+        delBtn.textContent = '×';
+        delBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!(await confirmDialog('Delete folder "' + value + '"? Items will be removed from this folder.'))) return;
+          try {
+            await window.ImageKprFolders.deleteFolder(value);
+            if (filterInput.value === value) {
+              filterInput.value = '';
+              refreshGrid(false);
+            }
+            populateFolderIcons(filterInput.value || '');
+            showToast('Folder deleted');
+          } catch (err) {
+            showToast((err && err.message) || 'Delete failed', true);
+          }
+        });
+        btnWrap.appendChild(delBtn);
+      }
       wrap.appendChild(btnWrap);
       const labelEl = document.createElement('span');
       labelEl.className = 'folder-icon-label';
@@ -3209,11 +3364,377 @@
     }).catch(() => {});
   }
 
+  const dashboardState = {
+    list: [],
+    activeId: null,
+    autosaveTimer: null,
+    editorDirty: false,
+    isPaid: false,
+    imageLimit: 20,
+  };
+
+  function dashboardIconSvg() {
+    return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 9h18"></path><path d="M8 14h3"></path><path d="M13 14h3"></path></svg>';
+  }
+
+  function dashboardApiFetch(url, opts) {
+    return apiFetch(url, opts).then((r) => r.json());
+  }
+
+  function dashboardShareUrl(dash) {
+    if (!dash) return '';
+    const raw = (typeof dash.url === 'string' && dash.url.trim() !== '') ? dash.url : ('index.php?share=' + encodeURIComponent(String(dash.token || '')));
+    try {
+      return new URL(raw, window.location.href).href;
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  function renderDashboardCards() {
+    const wrap = document.getElementById('my-dashboards-cards');
+    if (!wrap) return;
+    if (!dashboardState.list.length) {
+      wrap.innerHTML = '<div class="empty">No dashboards yet.</div>';
+      return;
+    }
+    wrap.innerHTML = '';
+    dashboardState.list.forEach((dash) => {
+      const iconWrap = document.createElement('div');
+      const isActive = Number(dash.id) === Number(dashboardState.activeId);
+      iconWrap.className = 'folder-icon-wrap dashboard-icon-wrap' + (isActive ? ' active' : '');
+      const btnWrap = document.createElement('div');
+      btnWrap.className = 'folder-icon-btn-wrap';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'folder-icon dashboard-icon' + (isActive ? ' active' : '');
+      btn.dataset.id = String(Number(dash.id));
+      btn.innerHTML = dashboardIconSvg();
+      btn.setAttribute('aria-label', 'Edit dashboard ' + (dash.title || 'Untitled dashboard'));
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'folder-icon-delete';
+      delBtn.setAttribute('aria-label', 'Delete dashboard ' + (dash.title || 'Untitled dashboard'));
+      delBtn.title = 'Delete dashboard';
+      delBtn.dataset.dashboardDeleteId = String(Number(dash.id));
+      delBtn.textContent = '×';
+      const label = document.createElement('span');
+      label.className = 'folder-icon-label';
+      label.textContent = (dash.title && String(dash.title).trim() ? String(dash.title).trim() : 'Untitled dashboard') + ' (' + Number(dash.image_count || 0) + ')';
+      btnWrap.appendChild(btn);
+      btnWrap.appendChild(delBtn);
+      iconWrap.appendChild(btnWrap);
+      iconWrap.appendChild(label);
+
+      const dashId = Number(dash.id);
+      const dashTitle = dash.title && String(dash.title).trim() ? String(dash.title).trim() : 'Untitled dashboard';
+      const clearDrop = () => iconWrap.classList.remove('folder-drop-over');
+      iconWrap.addEventListener('dragenter', (e) => {
+        if (!e.dataTransfer) return;
+        if (!Array.from(e.dataTransfer.types || []).includes(GRID_CARD_DRAG_MIME)) return;
+        e.preventDefault();
+        iconWrap.classList.add('folder-drop-over');
+      });
+      iconWrap.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer) return;
+        if (!Array.from(e.dataTransfer.types || []).includes(GRID_CARD_DRAG_MIME)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        iconWrap.classList.add('folder-drop-over');
+      });
+      iconWrap.addEventListener('dragleave', (e) => {
+        if (e.relatedTarget && iconWrap.contains(e.relatedTarget)) return;
+        clearDrop();
+      });
+      iconWrap.addEventListener('drop', (e) => {
+        e.preventDefault();
+        clearDrop();
+        if (!e.dataTransfer) return;
+        const raw = e.dataTransfer.getData(GRID_CARD_DRAG_MIME);
+        if (!raw) return;
+        let payload = null;
+        try { payload = JSON.parse(raw); } catch (_) { payload = null; }
+        const imgId = payload ? Number(payload.id) : NaN;
+        if (!Number.isFinite(imgId) || imgId < 1) return;
+        const imageName = payload && payload.filename ? String(payload.filename) : ('image-' + imgId);
+        dashboardApiFetch(API_BASE + '/dashboards.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'add_images', id: dashId, image_ids: [imgId] }),
+        }).then((data) => {
+          if (data && data.success) {
+            const added = data.added || 0;
+            if (added > 0) {
+              showToast('Added "' + imageName + '" to "' + dashTitle + '"');
+            } else {
+              showToast('"' + imageName + '" already in "' + dashTitle + '"');
+            }
+            if (data.dashboard) {
+              const idx = dashboardState.list.findIndex((d) => Number(d.id) === dashId);
+              if (idx >= 0) dashboardState.list[idx] = data.dashboard;
+            }
+            renderDashboardCards();
+          } else {
+            showToast(data && data.error ? data.error : 'Failed to add image', true);
+          }
+        }).catch(() => {
+          showToast('Failed to add image to dashboard', true);
+        });
+      });
+
+      wrap.appendChild(iconWrap);
+    });
+  }
+
+  function dashboardSelectedImageIds() {
+    return getSelectedIdsOrdered().map((id) => Number(id));
+  }
+
+  function dashboardReadEditorPayload(existingId) {
+    const customExpiry = document.getElementById('dashboard-expiry-custom').value;
+    const payload = {
+      action: existingId ? 'update' : 'create',
+      id: existingId || undefined,
+      title: document.getElementById('dashboard-title').value.trim(),
+      subtitle: document.getElementById('dashboard-subtitle').value.trim(),
+      allow_slideshow: true,
+      allow_download: true,
+      password: document.getElementById('dashboard-password').value,
+      expiry_preset: customExpiry ? 'custom' : 'never',
+      expires_custom: customExpiry || '',
+      image_ids: dashboardSelectedImageIds(),
+      hero_image_id: Number(document.querySelector('.dashboard-hero-thumb.is-active')?.dataset.id || 0) || null,
+    };
+    return payload;
+  }
+
+  function dashboardSetStatus(msg, error) {
+    const el = document.getElementById('dashboard-editor-status');
+    if (!el) return;
+    el.textContent = msg || '';
+    el.classList.toggle('is-error', !!error);
+  }
+
+  const DASHBOARD_FREE_LIMIT = 20;
+
+  function dashboardUpdateImageCount() {
+    let el = document.getElementById('dashboard-image-count');
+    if (!el) {
+      const heroDiv = document.querySelector('.dashboard-editor-hero > span');
+      if (!heroDiv) return;
+      el = document.createElement('span');
+      el.id = 'dashboard-image-count';
+      el.className = 'dashboard-image-count';
+      heroDiv.appendChild(el);
+    }
+    const count = dashboardSelectedImageIds().length;
+    el.textContent = ' (' + count + '/' + dashboardState.imageLimit + ' images)';
+  }
+
+  function dashboardRenderHeroStrip() {
+    const strip = document.getElementById('dashboard-hero-strip');
+    if (!strip) return;
+    const ids = dashboardSelectedImageIds();
+    strip.innerHTML = '';
+    dashboardUpdateImageCount();
+    let dragId = null;
+    ids.forEach((id, idx) => {
+      const img = selectedImages.get(id);
+      if (!img) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'dashboard-hero-thumb-wrap';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dashboard-hero-thumb' + (idx === 0 ? ' is-active' : '');
+      btn.dataset.id = String(id);
+      btn.draggable = true;
+      btn.innerHTML = '<img src="' + escapeHtml(img.url) + '" alt="' + escapeHtml(img.filename || 'image') + '">';
+      btn.addEventListener('click', () => {
+        strip.querySelectorAll('.dashboard-hero-thumb').forEach((el) => el.classList.remove('is-active'));
+        btn.classList.add('is-active');
+      });
+      btn.addEventListener('dragstart', (e) => {
+        dragId = Number(btn.dataset.id || 0);
+        btn.classList.add('is-dragging');
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', String(dragId));
+        }
+      });
+      btn.addEventListener('dragend', () => {
+        btn.classList.remove('is-dragging');
+        dragId = null;
+      });
+      btn.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      });
+      btn.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const toId = Number(btn.dataset.id || 0);
+        if (!dragId || !toId || dragId === toId) return;
+        reorderSelectionThumbs(dragId, toId);
+        updateSelectionBanner();
+        dashboardRenderHeroStrip();
+        dashboardQueueAutosave();
+      });
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'dashboard-hero-thumb-delete';
+      delBtn.setAttribute('aria-label', 'Remove image');
+      delBtn.title = 'Remove from dashboard';
+      delBtn.textContent = '×';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectedIds.delete(id);
+        selectedImages.delete(id);
+        selectedOrder = selectedOrder.filter((oid) => oid !== id);
+        const checkbox = document.querySelector('.card-select[value="' + id + '"]');
+        if (checkbox) {
+          checkbox.checked = false;
+          const inner = checkbox.closest('.card-inner');
+          if (inner) inner.classList.remove('selected');
+        }
+        updateBulkBar();
+        dashboardRenderHeroStrip();
+        dashboardQueueAutosave();
+      });
+      wrap.appendChild(btn);
+      wrap.appendChild(delBtn);
+      strip.appendChild(wrap);
+    });
+  }
+
+  function dashboardOpenEditor(modeLabel) {
+    const editor = document.getElementById('dashboard-editor-wrap');
+    if (!editor) return;
+    document.getElementById('dashboard-editor-title').textContent = '';
+    dashboardRenderHeroStrip();
+    editor.hidden = false;
+    document.body.classList.add('dashboard-editor-open');
+    updateBulkBar();
+    dashboardSetStatus('', false);
+  }
+
+  function dashboardCloseEditorImmediate() {
+    const editor = document.getElementById('dashboard-editor-wrap');
+    if (!editor) return;
+    clearTimeout(dashboardState.autosaveTimer);
+    editor.hidden = true;
+    document.body.classList.remove('dashboard-editor-open');
+    dashboardState.activeId = null;
+    dashboardState.editorDirty = false;
+    document.getElementById('dashboard-editor-copy-link').hidden = true;
+    document.getElementById('dashboard-editor-view-link').hidden = true;
+    document.getElementById('dashboard-editor-qr').hidden = true;
+    document.getElementById('dashboard-editor-delete').hidden = true;
+    document.getElementById('dashboard-create-btn').textContent = 'Save and Copy link';
+    selectedIds.clear();
+    selectedImages.clear();
+    selectedOrder = [];
+    document.querySelectorAll('.card-select:checked').forEach(c => { c.checked = false; });
+    document.querySelectorAll('.card-inner.selected').forEach(el => el.classList.remove('selected'));
+    renderDashboardCards();
+    updateBulkBar();
+  }
+
+  async function dashboardCloseEditor() {
+    if (dashboardState.editorDirty) {
+      const choice = await unsavedDialog('You have unsaved changes. What would you like to do?');
+      if (choice === 'cancel') return;
+      if (choice === 'save') await dashboardSaveNow();
+    }
+    dashboardCloseEditorImmediate();
+  }
+
+  function dashboardQueueAutosave() {
+    if (!dashboardState.activeId) return;
+    dashboardState.editorDirty = true;
+    clearTimeout(dashboardState.autosaveTimer);
+    dashboardSetStatus('Unsaved changes...', false);
+    dashboardState.autosaveTimer = setTimeout(() => dashboardSaveNow(), 600);
+  }
+
+  async function dashboardSaveNow() {
+    if (!dashboardState.activeId) return;
+    clearTimeout(dashboardState.autosaveTimer);
+    dashboardSetStatus('Saving...', false);
+    try {
+      const payload = dashboardReadEditorPayload(dashboardState.activeId);
+      payload.action = 'update';
+      await dashboardApiFetch(API_BASE + '/dashboards.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      dashboardState.editorDirty = false;
+      dashboardSetStatus('Saved', false);
+      await dashboardLoadMyDashboards();
+    } catch (err) {
+      dashboardSetStatus((err && err.message) ? err.message : 'Save failed', true);
+    }
+  }
+
+  async function dashboardLoadMyDashboards() {
+    const data = await dashboardApiFetch(API_BASE + '/dashboards.php');
+    dashboardState.list = Array.isArray(data.dashboards) ? data.dashboards : [];
+    renderDashboardCards();
+  }
+
+  async function dashboardEdit(id) {
+    if (!id) return;
+    if (!document.getElementById('dashboard-editor-wrap').hidden && dashboardState.activeId && dashboardState.activeId !== id) {
+      if (dashboardState.editorDirty) {
+        const choice = await unsavedDialog('You have unsaved changes. What would you like to do?');
+        if (choice === 'cancel') return;
+        if (choice === 'save') await dashboardSaveNow();
+      }
+    }
+    const data = await dashboardApiFetch(API_BASE + '/dashboards.php?id=' + encodeURIComponent(String(id)));
+    const dash = data.dashboard;
+    dashboardState.activeId = Number(dash.id);
+    document.getElementById('dashboard-title').value = dash.title || '';
+    document.getElementById('dashboard-subtitle').value = dash.subtitle || '';
+    document.getElementById('dashboard-password').value = '';
+    document.getElementById('dashboard-expiry-custom').value = dash.expires_at ? String(dash.expires_at).slice(0, 16).replace(' ', 'T') : '';
+    selectedIds = new Set();
+    selectedImages = new Map();
+    selectedOrder = [];
+    (dash.images || []).forEach((img) => {
+      const rid = Number(img.id);
+      selectedIds.add(rid);
+      selectedOrder.push(rid);
+      selectedImages.set(rid, { url: img.url, filename: img.filename });
+    });
+    updateBulkBar();
+    updateHintBanner();
+    dashboardOpenEditor('');
+    const strip = document.getElementById('dashboard-hero-strip');
+    if (dash.hero_image_id) {
+      const heroBtn = strip.querySelector('.dashboard-hero-thumb[data-id="' + Number(dash.hero_image_id) + '"]');
+      if (heroBtn) {
+        strip.querySelectorAll('.dashboard-hero-thumb').forEach((el) => el.classList.remove('is-active'));
+        heroBtn.classList.add('is-active');
+      }
+    }
+    document.getElementById('dashboard-editor-copy-link').hidden = false;
+    document.getElementById('dashboard-editor-view-link').hidden = false;
+    document.getElementById('dashboard-editor-qr').hidden = false;
+    document.getElementById('dashboard-editor-delete').hidden = false;
+    document.getElementById('dashboard-create-btn').textContent = 'Save and Copy link';
+    renderDashboardCards();
+  }
+
   document.addEventListener('DOMContentLoaded', async () => {
     try {
       if (window.ImageKprFolders && window.ImageKprFolders.refresh) {
         await window.ImageKprFolders.refresh();
       }
+    } catch (_) {}
+    try {
+      const who = await fetchJSON(API_BASE + '/whoami.php');
+      dashboardState.isPaid = Number(who.upload_size_mb || 0) >= 10;
+      dashboardState.imageLimit = Number(who.dashboard_image_limit || DASHBOARD_FREE_LIMIT);
     } catch (_) {}
     syncMaintenanceUiFromWhoami();
     /* Reset folder filter on load (IDs are server-backed; avoid a stale hidden filter). */
@@ -3223,11 +3744,14 @@
     populateSortPills();
     if (window.ImageKprFolders) window.ImageKprFolders.onChange = () => { populateFolderIcons(); refreshGrid(false); };
     populateTagsRow();
-    document.getElementById('manage-folders-btn').addEventListener('click', () => {
-      const d = document.getElementById('manage-folders-dialog');
-      renderManageFoldersList();
-      d.hidden = false;
-    });
+    const manageFoldersBtn = document.getElementById('manage-folders-btn');
+    if (manageFoldersBtn) {
+      manageFoldersBtn.addEventListener('click', () => {
+        const d = document.getElementById('manage-folders-dialog');
+        renderManageFoldersList();
+        d.hidden = false;
+      });
+    }
     document.getElementById('manage-close').addEventListener('click', () => { document.getElementById('manage-folders-dialog').hidden = true; });
     document.getElementById('manage-create-folder').addEventListener('click', () => {
       const n = document.getElementById('new-folder-name').value.trim();
@@ -3492,6 +4016,24 @@
       if (selectedIds.size === 0) return;
       openSlideshowSettingsPanel();
     });
+    document.getElementById('bulk-create-dashboard').addEventListener('click', () => {
+      if (selectedIds.size === 0) {
+        showToast('Select images first', true);
+        return;
+      }
+      dashboardState.activeId = null;
+      document.getElementById('dashboard-title').value = '';
+      document.getElementById('dashboard-subtitle').value = '';
+      document.getElementById('dashboard-expiry-custom').value = '';
+      document.getElementById('dashboard-password').value = '';
+      document.getElementById('dashboard-password-wrap').hidden = !dashboardState.isPaid;
+      document.getElementById('dashboard-editor-copy-link').hidden = true;
+      document.getElementById('dashboard-editor-view-link').hidden = true;
+      document.getElementById('dashboard-editor-qr').hidden = true;
+      document.getElementById('dashboard-editor-delete').hidden = true;
+      document.getElementById('dashboard-create-btn').textContent = 'Save and Copy link';
+      dashboardOpenEditor('');
+    });
     document.getElementById('slideshow-settings-backdrop').addEventListener('click', closeSlideshowSettingsPanel);
     document.getElementById('slideshow-settings-cancel').addEventListener('click', closeSlideshowSettingsPanel);
     document.getElementById('slideshow-start').addEventListener('click', startSlideshowFromForm);
@@ -3616,6 +4158,166 @@
     });
 
     document.getElementById('inbox-import-btn').addEventListener('click', importInbox);
+    dashboardLoadMyDashboards().catch(() => showToast('Failed to load dashboards', true));
+    document.getElementById('my-dashboards-cards').addEventListener('click', async (e) => {
+      const delBtn = e.target.closest('button[data-dashboard-delete-id]');
+      if (delBtn) {
+        const id = Number(delBtn.dataset.dashboardDeleteId || 0);
+        if (!id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (!(await confirmDialog('Delete this dashboard?'))) return;
+        try {
+          await dashboardApiFetch(API_BASE + '/dashboards.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', id }),
+          });
+          if (Number(dashboardState.activeId) === id) {
+            dashboardCloseEditorImmediate();
+          }
+          await dashboardLoadMyDashboards();
+          showToast('Dashboard deleted');
+        } catch (_) {
+          showToast('Delete failed', true);
+        }
+        return;
+      }
+      const btn = e.target.closest('button.dashboard-icon');
+      if (!btn) return;
+      const id = Number(btn.dataset.id || 0);
+      if (!id) return;
+      dashboardState.activeId = id;
+      renderDashboardCards();
+      dashboardEdit(id).catch(() => showToast('Failed to load dashboard', true));
+    });
+    document.getElementById('dashboard-editor-close').addEventListener('click', dashboardCloseEditor);
+    document.getElementById('dashboard-editor-copy-link').addEventListener('click', () => {
+      const dash = dashboardState.list.find((d) => Number(d.id) === dashboardState.activeId);
+      if (dash) copyUrl(dashboardShareUrl(dash), true);
+    });
+    document.getElementById('dashboard-editor-view-link').addEventListener('click', () => {
+      const dash = dashboardState.list.find((d) => Number(d.id) === dashboardState.activeId);
+      if (!dash) return;
+      const url = dashboardShareUrl(dash) + (dashboardShareUrl(dash).includes('?') ? '&' : '?') + 'embed=1';
+      const modal = document.getElementById('dashboard-preview-modal');
+      const iframe = document.getElementById('dashboard-preview-iframe');
+      iframe.src = url;
+      modal.hidden = false;
+    });
+    document.getElementById('dashboard-preview-close').addEventListener('click', () => {
+      const modal = document.getElementById('dashboard-preview-modal');
+      const iframe = document.getElementById('dashboard-preview-iframe');
+      modal.hidden = true;
+      iframe.src = '';
+    });
+    document.getElementById('dashboard-preview-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'dashboard-preview-modal') {
+        document.getElementById('dashboard-preview-modal').hidden = true;
+        document.getElementById('dashboard-preview-iframe').src = '';
+      }
+    });
+
+    document.getElementById('dashboard-editor-qr').addEventListener('click', () => {
+      const dash = dashboardState.list.find((d) => Number(d.id) === dashboardState.activeId);
+      if (!dash) return;
+      const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=' + encodeURIComponent(dashboardShareUrl(dash));
+      const modal = document.getElementById('dashboard-qr-modal');
+      const img = document.getElementById('dashboard-qr-img');
+      img.src = qrUrl;
+      modal.hidden = false;
+    });
+    document.getElementById('dashboard-qr-close').addEventListener('click', () => {
+      document.getElementById('dashboard-qr-modal').hidden = true;
+    });
+    document.getElementById('dashboard-qr-modal').addEventListener('click', (e) => {
+      if (e.target.id === 'dashboard-qr-modal') {
+        document.getElementById('dashboard-qr-modal').hidden = true;
+      }
+    });
+    document.getElementById('dashboard-qr-download').addEventListener('click', () => {
+      const img = document.getElementById('dashboard-qr-img');
+      if (!img.src) return;
+      fetch(img.src).then((r) => r.blob()).then((blob) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'dashboard-qr.png';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }).catch(() => {
+        window.open(img.src, '_blank');
+      });
+    });
+    document.getElementById('dashboard-qr-copy').addEventListener('click', async () => {
+      const img = document.getElementById('dashboard-qr-img');
+      if (!img.src) return;
+      try {
+        const resp = await fetch(img.src);
+        const blob = await resp.blob();
+        const pngBlob = blob.type === 'image/png' ? blob : await new Promise((res) => {
+          const c = document.createElement('canvas');
+          const ctx = c.getContext('2d');
+          const i = new Image();
+          i.crossOrigin = 'anonymous';
+          i.onload = () => { c.width = i.width; c.height = i.height; ctx.drawImage(i, 0, 0); c.toBlob((b) => res(b), 'image/png'); };
+          i.src = URL.createObjectURL(blob);
+        });
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+        showToast('QR code copied to clipboard');
+      } catch (_) {
+        showToast('Could not copy image — try downloading instead', true);
+      }
+    });
+    document.getElementById('dashboard-editor-delete').addEventListener('click', async () => {
+      const id = Number(dashboardState.activeId || 0);
+      if (!id) return;
+      if (!(await confirmDialog('Delete this dashboard?'))) return;
+      dashboardApiFetch(API_BASE + '/dashboards.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', id }),
+      }).then(async () => {
+        dashboardCloseEditorImmediate();
+        await dashboardLoadMyDashboards();
+        showToast('Dashboard deleted');
+      }).catch(() => showToast('Delete failed', true));
+    });
+    ['dashboard-title', 'dashboard-subtitle', 'dashboard-expiry-custom', 'dashboard-password'].forEach((id) => {
+      const el = document.getElementById(id);
+      el.addEventListener('input', dashboardQueueAutosave);
+    });
+    document.getElementById('selection-row').addEventListener('mouseup', () => {
+      dashboardRenderHeroStrip();
+      dashboardQueueAutosave();
+    });
+    document.getElementById('dashboard-create-btn').addEventListener('click', async () => {
+      const payload = dashboardReadEditorPayload(dashboardState.activeId);
+      try {
+        const data = await dashboardApiFetch(API_BASE + '/dashboards.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const dash = data.dashboard || null;
+        if (dash) {
+          copyUrl(dashboardShareUrl(dash), true);
+          showToast(payload.action === 'create' ? 'Dashboard created' : 'Dashboard saved');
+        }
+        dashboardState.activeId = dash ? Number(dash.id) : dashboardState.activeId;
+        document.getElementById('dashboard-editor-copy-link').hidden = !dash;
+        document.getElementById('dashboard-editor-view-link').hidden = !dash;
+        document.getElementById('dashboard-editor-qr').hidden = !dash;
+        document.getElementById('dashboard-editor-delete').hidden = !dash;
+        document.getElementById('dashboard-create-btn').textContent = 'Save and Copy link';
+        await dashboardLoadMyDashboards();
+        renderDashboardCards();
+      } catch (err) {
+        showToast((err && err.message) ? err.message : 'Failed to save dashboard', true);
+      }
+    });
 
     document.getElementById('bulk-select-all').addEventListener('click', selectAllVisibleInGrid);
     document.getElementById('bulk-select-all-bar').addEventListener('click', selectAllVisibleInGrid);

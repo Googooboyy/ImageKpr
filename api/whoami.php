@@ -20,6 +20,14 @@ try {
   // Keep safe defaults if DB read fails.
 }
 
+require_once __DIR__ . '/../inc/tiers.php';
+
+$dashboardImageLimit = imagekpr_dashboard_free_limit();
+try {
+  if (!isset($pdo)) $pdo = imagekpr_pdo();
+  $dashboardImageLimit = imagekpr_dashboard_image_limit($pdo, (int) imagekpr_user_id());
+} catch (Throwable $e) {}
+
 $quotaPayload = [
   'effective_bytes' => null,
   'unlimited' => true,
@@ -50,4 +58,5 @@ echo json_encode([
   'storage_quota_unlimited' => $quotaPayload['unlimited'],
   'storage_remaining_bytes' => imagekpr_json_byte_string($quotaPayload['remaining_bytes']),
   'storage_quota_used_bytes' => imagekpr_json_byte_string($quotaPayload['used_bytes']),
+  'dashboard_image_limit' => $dashboardImageLimit,
 ], JSON_UNESCAPED_UNICODE);

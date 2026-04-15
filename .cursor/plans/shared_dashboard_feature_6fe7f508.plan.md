@@ -15,19 +15,19 @@ todos:
     content: Add ?share=token intercept in index.php before auth checks, routing to inc/shared_dashboard.php
     status: pending
   - id: public-page
-    content: Create inc/shared_dashboard.php -- full public dashboard page with hero, masonry grid, lightbox, slideshow, selection, download controls, and 'Powered by' badge
+    content: Create inc/shared_dashboard.php -- full public dashboard page with compact hero, password-gated empty state, masonry grid, minimal lightbox (copy URL + counter), slideshow, download controls, and corner watermark badge for free tier
     status: pending
   - id: bulk-bar-button
     content: Add 'Create Dashboard' button to bulk selection bar in index.php and creation modal HTML
     status: pending
   - id: my-dashboards-ui
-    content: Add 'My Dashboards' management section to index.php with list/edit/delete UI
+    content: Add owner-only Manage Dashboard mode with yellow top-nav toggler, cards grid, top slide-down editor, and copy/edit/delete/show-QR actions
     status: pending
   - id: app-js-crud
     content: Add dashboard CRUD functions, modal handlers, and My Dashboards logic to app.js
     status: pending
   - id: styles
-    content: Add CSS for dashboard modals, My Dashboards section, and public dashboard page (masonry, lightbox, hero)
+    content: Add CSS for yellow owner mode toggler, slide-down editor, dashboard cards, public dashboard page (masonry, minimal lightbox, sticky mobile action bar, corner watermark)
     status: pending
 isProject: false
 ---
@@ -104,13 +104,13 @@ All under `api/dashboards.php` (single file, method-routed):
 
 Key validation rules:
 
-- **Per-dashboard image cap** (each dashboard has its own limit; multiple dashboards do not share one pool — see [Stripe tier matrix](stripe_paid_tier_upgrade_e2f8b7f0.plan.md) Entitlements):
+- **Per-dashboard image cap** (each dashboard has its own limit; multiple dashboards do not share one pool):
   - **Free:** max **20** selected images per dashboard
-  - **Silver:** max **50** per dashboard
-  - **Gold** (shared SaaS): **unlimited** per dashboard
-  - **Pro (white-label):** N/A on shared app — client runs a **dedicated** ImageKpr; dashboard limits are **deploy/contract**, not this matrix (see [Stripe plan — Pro](stripe_paid_tier_upgrade_e2f8b7f0.plan.md) conventions).
+  - **Paid (Silver/Gold on shared SaaS):** **unlimited**
+  - **Pro (white-label):** N/A on shared app (dedicated deployment)
 - Password field only accepted from paid tier users (check `users.upload_size_mb` or a future billing `plan_tier` column — **interim:** treat `upload_size_mb >= 10` as paid, which matches **Silver and Gold** in the Stripe tier matrix; Free stays `3`. Do **not** use `>= 100` — that would exclude Silver.)
 - Expiry presets: 1h, 24h, 7d, 30d, 90d, never, or custom datetime
+- Downgrade handling: keep dashboards intact; apply **30-day grace**; after grace, auto-trim to allowed limit by `images.date_uploaded ASC, images.id ASC`
 
 ---
 
@@ -141,13 +141,13 @@ This file handles the full public-facing page:
 
 **Page structure:**
 
-- Hero section: full-width hero image (selected by owner), overlaid `title` and `subtitle`
-- "Powered by ImageKpr" footer badge (free tier only; hidden for paid tier owners)
+- Compact hero section with selected hero image, `title`, `subtitle`, and prominent expiry badge
+- "Powered by ImageKpr" fixed bottom-corner badge (free tier only; hidden for paid tier owners)
 - Masonry image grid below hero
-- Toolbar: "Select All", "Download Selected" (if downloads enabled), "Slideshow" button
-- Lightbox modal (click image to enlarge, prev/next arrows, keyboard nav)
+- Visitor toolbar/actions only from owner permissions: `Start Slideshow`, `Download` (single/all), expiry info
+- Lightbox modal: click image to open; top-right has **Copy URL + counter** only; desktop arrows + mobile swipe
 - Slideshow player (reuse slideshow logic from `app.js`, adapted for standalone)
-- Image interactions: click to select (checkbox overlay), right-click copy link/copy image (browser native), download button per image (if enabled)
+- If password-protected and locked: show hero/meta/password UI and keep image region empty until unlock
 
 **Styling:** New section in `styles.css` with `.shared-dash-`* prefix, or a dedicated `shared-dashboard.css`. Masonry via CSS columns (`column-count` + `break-inside: avoid`) for simplicity (no JS library needed).
 
@@ -157,7 +157,7 @@ This file handles the full public-facing page:
 
 ### 5a. Bulk Selection Bar Addition ([index.php](index.php) bulk bar area)
 
-Add a "Create Dashboard" button next to existing "Slideshow" button in the bulk actions bar. Clicking opens a **Dashboard Settings Modal** with:
+Add a primary "Create Dashboard" button next to existing "Slideshow" button in the bulk actions bar. Clicking opens a **top slide-down Dashboard Editor** (~50% viewport height) with:
 
 - Title input (headline)
 - Subtitle input (sub-headline)  
@@ -166,17 +166,18 @@ Add a "Create Dashboard" button next to existing "Slideshow" button in the bulk 
 - Allow downloads toggle
 - Password field (shown only for paid tier users)
 - "Create & Copy Link" button
+- Auto-save for edits once dashboard is created
 
 ### 5b. My Dashboards Section
 
-A new section accessible from the main app header/nav (tab or dropdown item). Shows:
+A new owner mode in top nav: yellow toggler between `Manage Folders` and `Manage Dashboard`. In dashboard mode, show cards grid with:
 
-- List/cards of user's dashboards with: title, image count, created date, expiry status, share link
-- Click to expand/edit: change title, subtitle, hero, expiry, download toggle, password
+- Card metadata: title, image count, updated date, expiry status, capability badges, views placeholder
+- Card actions: Copy link, Show QR (separate), Edit, Delete (simple confirm)
+- Click edit: open the same top slide-down editor; if another editor is open, always confirm before switching
+- Auto-save edits: title, subtitle, toggles, expiry, ordering
 - Add/remove images (image picker from user's library)
-- Copy link button
-- Delete dashboard button (with confirmation)
-- Visual indicator for expired dashboards
+- Visual indicators: expired and over-limit badges (for downgrade grace flow)
 
 ### 5c. Frontend JS
 
@@ -196,10 +197,11 @@ The public dashboard page needs lightweight JS for:
 
 - **Masonry layout** -- CSS-only with `column-count` (responsive: 1 col mobile, 2-3 tablet, 4 desktop)
 - **Lightbox** -- modal overlay with full-size image, prev/next, keyboard nav (arrow keys, Esc)
-- **Selection** -- click to toggle checkbox, "Select All" button, selection counter
-- **Copy link / Copy image** -- clipboard API (same pattern as existing `copyUrl()` in app.js)
-- **Download** -- individual: direct `<a download>` link; bulk: POST selected IDs to a new `api/download_dashboard.php` that zips and streams (or reuse existing `api/download_bulk.php` with a dashboard token auth path)
+- **Minimal interaction model** -- no persistent selection UX for visitors
+- **Copy link** -- lightbox top-right icon copies image URL and shows toast
+- **Download** -- single download + download-all ZIP (when owner allows)
 - **Slideshow** -- self-contained slideshow player (extract core logic from `app.js` slideshow into a reusable snippet)
+- **Mobile UX** -- sticky bottom action bar for slideshow/download actions
 
 ---
 
@@ -219,7 +221,7 @@ function imagekpr_user_is_paid($pdo, $user_id) {
 
 **After Stripe:** replace this with a canonical check (e.g. `plan_tier` `free` / `silver` / `gold` on the **shared SaaS**, or active subscription) so paid status does not depend on upload MB alone. **`pro` on SaaS** may exist only for CRM if you track white-label sales; **Pro buyers** normally do not consume shared-app tiers (dedicated deployment). See [Stripe paid tier plan](stripe_paid_tier_upgrade_e2f8b7f0.plan.md).
 
-This gates: **password protection** and **"Powered by" badge** (paid = Silver+ on **shared SaaS**). **Per-dashboard image caps** (Free 20, Silver 50, Gold unlimited) come from the Stripe Entitlements table for the **multi-tenant app**; until `plan_tier` exists, infer from `upload_size_mb`: **3 → 20**, **10 → 50**, **100 → unlimited** (Gold).
+This gates: **password protection** and **"Powered by" badge** (paid = Silver+ on **shared SaaS**). **Per-dashboard image caps** for now: **Free 20**, **Paid unlimited**. Until `plan_tier` exists, infer from `upload_size_mb`: **3 → Free (20)**, **>=10 → Paid (unlimited)**.
 
 ---
 
