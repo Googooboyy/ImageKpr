@@ -41,10 +41,11 @@ function ikpr_render_pricing_laptop_mockup(): void
     <header class="ikpr-pricing-intro">
       <h1>Pricing</h1>
       <p class="ikpr-pricing-intro-lead"><strong>Free</strong> is always available—full core experience at <strong>S$0</strong>.</p>
-      <p class="ikpr-pricing-intro-lead"><strong>Silver</strong> and <strong>Gold</strong> are upgrades if you outgrow the free tier.</p>
+      <p class="ikpr-pricing-intro-lead"><strong>Silver</strong>, <strong>Gold</strong>, and <strong>Platinum</strong> add headroom as your library grows.</p>
       <p>All prices are in <strong>SGD</strong>.</p>
     </header>
 
+    <div class="ikpr-pricing-tier-band">
     <div class="ikpr-pricing-grid">
       <article class="ikpr-pricing-card ikpr-pricing-card--free">
         <div class="ikpr-pricing-sec ikpr-pricing-sec--icon">
@@ -175,8 +176,8 @@ function ikpr_render_pricing_laptop_mockup(): void
         <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
           <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub">Included</h3>
           <ul class="ikpr-pricing-features ikpr-pricing-features--compact">
-            <li class="ikpr-pricing-feat">Everything in Silver, with the highest self-serve limits</li>
-            <li class="ikpr-pricing-feat">Same core app; best for bigger libraries and larger uploads than Silver</li>
+            <li class="ikpr-pricing-feat">Everything in Silver, with higher limits above</li>
+            <li class="ikpr-pricing-feat">Same core app; strong fit before Platinum for very large libraries</li>
           </ul>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--cta">
@@ -184,42 +185,96 @@ function ikpr_render_pricing_laptop_mockup(): void
         </div>
       </article>
 
-      <article class="ikpr-pricing-card ikpr-pricing-card--pro">
+      <article class="ikpr-pricing-card ikpr-pricing-card--platinum">
         <div class="ikpr-pricing-sec ikpr-pricing-sec--icon">
           <div class="ikpr-pricing-icon" aria-hidden="true">
             <svg viewBox="0 0 64 56" width="56" height="49" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="8" y="12" width="48" height="34" rx="2"/>
-              <path d="M8 20h48M20 44h24"/>
-              <rect x="22" y="24" width="20" height="14" rx="1"/>
-              <path d="M26 31h12M26 35h8"/>
+              <rect x="6" y="10" width="52" height="36" rx="3"/>
+              <path d="M6 18h52"/>
+              <path d="M14 26h36M14 32h28M14 38h32"/>
             </svg>
           </div>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--title">
-          <h2 class="ikpr-pricing-tier">Pro</h2>
+          <h2 class="ikpr-pricing-tier">Platinum</h2>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--price">
-          <p class="ikpr-pricing-pro-tagline">Dedicated white-label deployment</p>
-          <div class="ikpr-pricing-price ikpr-pricing-price--once ikpr-pricing-price--pro-ask">
-            <span class="ikpr-pricing-amount ikpr-pricing-amount--ask" aria-label="Pricing on request">$ASK</span>
-            <span class="ikpr-pricing-period ikpr-pricing-period--once">Per-organization deployment. <strong>Contact us</strong> for pricing and terms.</span>
+          <div class="ikpr-pricing-price">
+            <sup class="ikpr-pricing-dollar">S$</sup><span class="ikpr-pricing-amount">49.90</span>
+            <span class="ikpr-pricing-period">/ month</span>
+            <span class="ikpr-pricing-annual">(or S$499/yr)</span>
           </div>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--mockup">
           <?php ikpr_render_pricing_laptop_mockup(); ?>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--primary">
-          <h3 class="ikpr-pricing-features-title">Summary</h3>
+          <h3 class="ikpr-pricing-features-title">Upgrades</h3>
           <ul class="ikpr-pricing-features">
-            <li class="ikpr-pricing-feat">For teams that need <strong>their own</strong> infrastructure—not just an upgrade.</li>
-            <li class="ikpr-pricing-feat">White label with <strong>your own branding</strong> and technical setup.</li>
-            <li class="ikpr-pricing-feat"><strong>~20&nbsp;GiB</strong> storage and your own curated limits.</li>
-            <li class="ikpr-pricing-feat"><strong>Unlimited limits</strong> or as you see fit for your organisation.</li>
+            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum">Up to <strong>500 MB</strong> per image file</li>
+            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum"><strong>10 GB</strong> total library storage</li>
+            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum">Up to <strong>10,000</strong> images in your library</li>
+            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum">Shared dashboard: up to <strong>2,000</strong> images per dashboard</li>
           </ul>
         </div>
-        <div class="ikpr-pricing-sec ikpr-pricing-sec--included ikpr-pricing-sec--included-empty" aria-hidden="true"></div>
+        <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
+          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub">Included</h3>
+          <ul class="ikpr-pricing-features ikpr-pricing-features--compact">
+            <li class="ikpr-pricing-feat">Everything in Gold, with the highest self-serve limits on this service</li>
+            <li class="ikpr-pricing-feat">Billed monthly or yearly via Stripe (when checkout is enabled)</li>
+          </ul>
+        </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--cta">
-          <a class="ikpr-pricing-cta ikpr-pricing-cta--pro" href="contact.php">Contact us</a>
+          <a class="ikpr-pricing-cta" href="contact.php">Contact us</a>
+        </div>
+      </article>
+    </div>
+
+      <article class="ikpr-pricing-card ikpr-pricing-card--pro ikpr-pricing-card--ultra-wide">
+        <div class="ikpr-pricing-ultra-grid">
+          <div class="ikpr-pricing-ultra-col ikpr-pricing-ultra-col--lead">
+            <div class="ikpr-pricing-sec ikpr-pricing-sec--icon">
+              <div class="ikpr-pricing-icon" aria-hidden="true">
+                <svg viewBox="0 0 64 56" width="56" height="49" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="8" y="12" width="48" height="34" rx="2"/>
+                  <path d="M8 20h48M20 44h24"/>
+                  <rect x="22" y="24" width="20" height="14" rx="1"/>
+                  <path d="M26 31h12M26 35h8"/>
+                </svg>
+              </div>
+            </div>
+            <div class="ikpr-pricing-sec ikpr-pricing-sec--title">
+              <h2 class="ikpr-pricing-tier">Ultra</h2>
+            </div>
+            <div class="ikpr-pricing-sec ikpr-pricing-sec--price">
+              <p class="ikpr-pricing-pro-tagline">Dedicated white-label deployment</p>
+              <div class="ikpr-pricing-price ikpr-pricing-price--once ikpr-pricing-price--pro-ask">
+                <span class="ikpr-pricing-amount ikpr-pricing-amount--ask" aria-label="Pricing on request">$ASK</span>
+                <span class="ikpr-pricing-period ikpr-pricing-period--once">Per-organization deployment. <strong>Contact us</strong> for pricing and terms.</span>
+              </div>
+            </div>
+          </div>
+          <div class="ikpr-pricing-ultra-col ikpr-pricing-ultra-col--visual">
+            <div class="ikpr-pricing-sec ikpr-pricing-sec--mockup">
+              <?php ikpr_render_pricing_laptop_mockup(); ?>
+            </div>
+          </div>
+          <div class="ikpr-pricing-ultra-col ikpr-pricing-ultra-col--summary">
+            <div class="ikpr-pricing-sec ikpr-pricing-sec--primary">
+              <h3 class="ikpr-pricing-features-title">Summary</h3>
+              <ul class="ikpr-pricing-features ikpr-pricing-features--ultra-summary">
+                <li class="ikpr-pricing-feat">For teams that need <strong>their own</strong> infrastructure—not just an upgrade.</li>
+                <li class="ikpr-pricing-feat">White label with <strong>your own branding</strong> and technical setup.</li>
+                <li class="ikpr-pricing-feat"><strong>~20&nbsp;GiB</strong> storage and your own curated limits.</li>
+                <li class="ikpr-pricing-feat"><strong>Unlimited limits</strong> or as you see fit for your organisation.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="ikpr-pricing-ultra-col ikpr-pricing-ultra-col--cta">
+            <div class="ikpr-pricing-sec ikpr-pricing-sec--cta">
+              <a class="ikpr-pricing-cta ikpr-pricing-cta--pro" href="contact.php">Contact us</a>
+            </div>
+          </div>
         </div>
       </article>
     </div>

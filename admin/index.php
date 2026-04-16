@@ -1,6 +1,7 @@
 <?php
 ob_start();
 require_once __DIR__ . '/../inc/admin.php';
+require_once __DIR__ . '/../inc/tiers.php';
 imagekpr_require_admin_html(1, 1);
 
 $pdo = imagekpr_pdo();
@@ -567,6 +568,8 @@ $sortMap = [
   'admin' => 'u.is_admin',
   'quo' => 'u.storage_quota_bytes',
   'upl' => 'u.upload_size_mb',
+  'files' => 'image_count',
+  'dashes' => 'dashboard_count',
 ];
 if (!isset($sortMap[$sort])) {
   $sort = 'email';
@@ -583,7 +586,9 @@ if ($qSearch !== '') {
 }
 
 $sql = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at,
-  COALESCE(SUM(i.size_bytes), 0) AS used_bytes
+  COALESCE(SUM(i.size_bytes), 0) AS used_bytes,
+  COUNT(i.id) AS image_count,
+  (SELECT COUNT(*) FROM shared_dashboards sd WHERE sd.user_id = u.id) AS dashboard_count
   FROM users u
   LEFT JOIN images i ON i.user_id = u.id'
   . $whereSql .
@@ -595,10 +600,28 @@ $st->execute($params);
 $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
 $totalStorage = (int) $pdo->query('SELECT COALESCE(SUM(size_bytes), 0) FROM images')->fetchColumn();
+$totalFiles = (int) $pdo->query('SELECT COUNT(*) FROM images')->fetchColumn();
+$totalFolders = (int) $pdo->query('SELECT COUNT(*) FROM folders')->fetchColumn();
+$totalDashboards = (int) $pdo->query('SELECT COUNT(*) FROM shared_dashboards')->fetchColumn();
+$totalTags = (int) $pdo->query('SELECT COALESCE(SUM(JSON_LENGTH(tags)), 0) FROM images WHERE tags IS NOT NULL')->fetchColumn();
 $userCount = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
+$tierCounts = $pdo->query(
+  'SELECT
+    SUM(upload_size_mb <= 3) AS free_count,
+    SUM(upload_size_mb = 10) AS silver_count,
+    SUM(upload_size_mb = 50) AS gold_count,
+    SUM(upload_size_mb = 500) AS platinum_count
+  FROM users'
+)->fetch(PDO::FETCH_ASSOC);
+$freeUsers     = (int) ($tierCounts['free_count'] ?? 0);
+$silverUsers   = (int) ($tierCounts['silver_count'] ?? 0);
+$goldUsers     = (int) ($tierCounts['gold_count'] ?? 0);
+$platinumUsers = (int) ($tierCounts['platinum_count'] ?? 0);
 
 $sqlAll = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at,
-  COALESCE(SUM(i.size_bytes), 0) AS used_bytes
+  COALESCE(SUM(i.size_bytes), 0) AS used_bytes,
+  COUNT(i.id) AS image_count,
+  (SELECT COUNT(*) FROM shared_dashboards sd WHERE sd.user_id = u.id) AS dashboard_count
   FROM users u
   LEFT JOIN images i ON i.user_id = u.id
   GROUP BY u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at';
@@ -668,11 +691,13 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     .admin-nav .admin-nav-spacer { flex: 1; min-width: 0; }
     .admin-muted { color: #666; font-size: 0.9rem; }
     .admin-badge { display: inline-block; padding: 0.2rem 0.5rem; background: #e3f2fd; border-radius: 4px; font-size: 0.75rem; color: #1565c0; }
-    .admin-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.75rem; margin: 1rem 0 1.5rem; }
-    .admin-stat { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 0.75rem 1rem; }
+    .admin-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem; margin: 1rem 0 1.5rem; }
+    .admin-stat { background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 0.75rem 1rem; min-width: 0; }
+    .admin-stat--wide { grid-column: span 2; }
     .admin-stat dt { font-size: 0.75rem; color: #666; margin: 0; text-transform: uppercase; letter-spacing: 0.03em; }
     .admin-stat dd { margin: 0.35rem 0 0; font-size: 1.15rem; font-weight: 600; color: #333; }
     .admin-top-list { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; color: #444; }
+    .admin-top-list li { word-break: break-all; line-height: 1.4; }
     .admin-stats-wrap.is-hidden .admin-stats { display: none; }
     .admin-info-wrap.is-hidden .admin-info-panel { display: none; }
     .admin-toast { padding: 0.65rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; }
@@ -692,9 +717,10 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     table.admin-users .admin-col-cb { width: 2.25rem; box-sizing: border-box; }
     table.admin-users .admin-col-email { width: 20%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     table.admin-users .admin-col-name { width: 11%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    table.admin-users .admin-col-used { width: 6.5%; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
-    table.admin-users .admin-col-qtxt { width: 12%; word-break: break-word; hyphens: auto; line-height: 1.3; font-size: 0.78rem; }
-    table.admin-users .admin-col-login { width: 10%; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 0.78rem; }
+    table.admin-users .admin-col-storage { width: 11%; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 0.8rem; }
+    table.admin-users .admin-col-files { width: 8%; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; font-size: 0.8rem; }
+    table.admin-users .admin-col-dashboards { width: 8.5%; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; font-size: 0.8rem; }
+    table.admin-users .admin-col-login { width: 7%; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 0.78rem; }
     table.admin-users .admin-col-days { width: 4rem; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
     table.admin-users .admin-col-admin { width: 2.5rem; white-space: nowrap; text-align: center; }
     table.admin-users .admin-col-plan { width: 6.75rem; min-width: 6rem; font-size: 0.75rem; line-height: 1.25; }
@@ -750,8 +776,40 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
           <dd><?php echo htmlspecialchars(imagekpr_format_bytes($totalStorage), ENT_QUOTES, 'UTF-8'); ?></dd>
         </div>
         <div class="admin-stat">
+          <dt>Files</dt>
+          <dd><?php echo number_format($totalFiles); ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Folders</dt>
+          <dd><?php echo number_format($totalFolders); ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Shared dashboards</dt>
+          <dd><?php echo number_format($totalDashboards); ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Tag usages</dt>
+          <dd><?php echo number_format($totalTags); ?></dd>
+        </div>
+        <div class="admin-stat">
           <dt>Users</dt>
           <dd><?php echo (int) $userCount; ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Free users</dt>
+          <dd><?php echo $freeUsers; ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Silver users</dt>
+          <dd><?php echo $silverUsers; ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Gold users</dt>
+          <dd><?php echo $goldUsers; ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Platinum users</dt>
+          <dd><?php echo $platinumUsers; ?></dd>
         </div>
         <div class="admin-stat">
           <dt>Over quota</dt>
@@ -761,7 +819,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
           <dt>Upload grace expired</dt>
           <dd><?php echo $expiredGraceUsers > 0 ? '<span class="admin-over">' . (int) $expiredGraceUsers . '</span>' : (int) $expiredGraceUsers; ?></dd>
         </div>
-        <div class="admin-stat">
+        <div class="admin-stat admin-stat--wide">
           <dt>Largest users</dt>
           <dd>
             <?php if (empty($topUsers)) { ?>
@@ -791,7 +849,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
         <p class="admin-muted">Default quota for users with no per-user cap: <?php
           echo $d === null ? 'none (unlimited)' : htmlspecialchars(imagekpr_format_bytes($d), ENT_QUOTES, 'UTF-8');
         ?> — set <span class="admin-mono">DEFAULT_STORAGE_QUOTA_BYTES</span> in <span class="admin-mono">config.php</span> if needed.</p>
-        <p class="admin-muted"><strong>SaaS tier matrix</strong> (reference — upload MB, total storage, image caps, shared-dashboard caps). Use <strong>Plan preset</strong> below to apply Free/Silver/Gold storage + upload limits together: <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
+        <p class="admin-muted"><strong>SaaS tier matrix</strong> (reference — upload MB, total storage, image caps, shared-dashboard caps). Use <strong>Plan preset</strong> below to apply Free/Silver/Gold/Platinum storage + upload limits together: <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
         <p class="admin-muted"><?php echo imagekpr_admin_html_plan_matrix_pro_blurb(); ?></p>
       </div>
     </div>
@@ -825,6 +883,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     <?php $deleteUsersPhrase = imagekpr_admin_delete_users_confirm_phrase(); ?>
     <form id="bulkUserForm" class="admin-bulk admin-bulk-actions" method="post" action="<?php echo htmlspecialchars($bulkAction, ENT_QUOTES, 'UTF-8'); ?>">
       <?php echo imagekpr_csrf_field(); ?>
+      <?php /* HIDDEN: bulk quota / upload tier / SaaS preset tools — superseded by per-row preset buttons; re-enable if bulk batch operations become needed */ if (false): ?>
       <div class="admin-toggle-row">
         <button type="button" id="admin-bulk-quick-toggle" aria-expanded="true" aria-controls="admin-bulk-quick">Hide quick bulk tools</button>
       </div>
@@ -863,6 +922,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
           <button type="submit" name="action" value="bulk_apply_saas_tier">Apply preset to selected</button>
         </div>
       </div>
+      <?php endif; ?>
       <fieldset class="admin-bulk-purge">
         <legend>Purge gallery only (destructive)</legend>
         <p class="admin-muted">Deletes <strong>published gallery</strong> database rows and image files for the selected users. Does <strong>not</strong> remove user accounts, the email allowlist, or files in the shared inbox folder.</p>
@@ -886,15 +946,12 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
             <th class="admin-col-cb"><input type="checkbox" id="admin-select-all" title="Select all on this page" aria-label="Select all users on this page"></th>
             <th class="admin-col-email"><?php echo admin_sort_link('email', 'Email', $sort, $dir, $qSearch); ?></th>
             <th class="admin-col-name"><?php echo admin_sort_link('name', 'Name', $sort, $dir, $qSearch); ?></th>
-            <th class="admin-col-used"><?php echo admin_sort_link('used', 'Used', $sort, $dir, $qSearch); ?></th>
-            <th class="admin-col-qtxt"><?php echo admin_sort_link('quo', 'Quota', $sort, $dir, $qSearch); ?></th>
-            <th class="admin-col-login"><?php echo admin_sort_link('last', 'Last login', $sort, $dir, $qSearch); ?></th>
-            <th class="admin-col-days" title="Whole days since first successful sign-in (account created)">1st access<br><span class="admin-th-sub">days ago</span></th>
+            <th class="admin-col-plan" title="Match = exact storage cap + upload MB vs matrix; preset applies both">Plan preset<br><span class="admin-th-sub">matrix match</span></th>
+            <th class="admin-col-storage" title="Used storage / quota cap in MiB"><?php echo admin_sort_link('used', 'Storage', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-files" title="Uploaded images / plan limit"><?php echo admin_sort_link('files', 'Files', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-dashboards" title="Shared dashboards / plan limit"><?php echo admin_sort_link('dashes', 'Dashboards', $sort, $dir, $qSearch); ?></th>
             <th class="admin-col-days" title="Whole days since last sign-in (— if never)">Last access<br><span class="admin-th-sub">days ago</span></th>
             <th class="admin-col-admin"><?php echo admin_sort_link('admin', 'Admin', $sort, $dir, $qSearch); ?></th>
-            <th class="admin-col-plan" title="Match = exact storage cap + upload MB vs matrix; preset applies both">Plan preset<br><span class="admin-th-sub">matrix match</span></th>
-            <th class="admin-col-quota">Set quota</th>
-            <th class="admin-col-quota"><?php echo admin_sort_link('upl', 'Set upload tier', $sort, $dir, $qSearch); ?></th>
           </tr>
         </thead>
         <tbody>
@@ -941,27 +998,6 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
               ?>
               <td class="admin-mono admin-col-email" title="<?php echo htmlspecialchars($emailDisp, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($emailDisp, ENT_QUOTES, 'UTF-8'); ?></td>
               <td class="admin-col-name" title="<?php echo htmlspecialchars($nameDisp !== '' ? $nameDisp : '(no name)', ENT_QUOTES, 'UTF-8'); ?>"><?php echo $nameDisp !== '' ? htmlspecialchars($nameDisp, ENT_QUOTES, 'UTF-8') : '—'; ?></td>
-              <td class="admin-col-used <?php echo $over ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars(imagekpr_format_bytes($used), ENT_QUOTES, 'UTF-8'); ?></td>
-              <td class="admin-col-qtxt"><?php echo htmlspecialchars($displayQuota, ENT_QUOTES, 'UTF-8'); ?></td>
-              <td class="admin-muted admin-col-login"><?php
-                $ll = $r['last_login_at'];
-            if ($ll) {
-              $llStr = (string) $ll;
-              $llTs = strtotime($llStr);
-              echo $llTs !== false ? htmlspecialchars(date('Y-m-d H:i', $llTs), ENT_QUOTES, 'UTF-8') : htmlspecialchars($llStr, ENT_QUOTES, 'UTF-8');
-            } else {
-              echo '—';
-            }
-            ?></td>
-              <td class="admin-muted admin-col-days"><?php
-                $df = imagekpr_days_since_mysql_datetime(isset($r['created_at']) ? (string) $r['created_at'] : null);
-            echo $df !== null ? (string) (int) $df : '—';
-            ?></td>
-              <td class="admin-muted admin-col-days"><?php
-                $dl = imagekpr_days_since_mysql_datetime($ll !== null && $ll !== '' ? (string) $ll : null);
-            echo $dl !== null ? (string) (int) $dl : '—';
-            ?></td>
-              <td class="admin-col-admin"><?php echo (int) $r['is_admin'] ? 'Yes' : ''; ?></td>
               <td class="admin-col-plan">
                 <div class="admin-tier-match"><?php echo htmlspecialchars($tierMatchLabel, ENT_QUOTES, 'UTF-8'); ?></div>
                 <form class="admin-preset-form" method="post" action="index.php<?php
@@ -978,41 +1014,27 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
                   <?php } ?>
                 </form>
               </td>
-              <td class="admin-col-quota">
-                <form class="admin-quota-form" method="post" action="index.php<?php
-            $hiddenQ = array_filter(['q' => $qSearch !== '' ? $qSearch : null, 'sort' => $sort !== 'email' ? $sort : null, 'dir' => $dir !== 'ASC' ? strtolower($dir) : null]);
-            if (!empty($hiddenQ)) {
-              echo '?' . htmlspecialchars(http_build_query($hiddenQ), ENT_QUOTES, 'UTF-8');
-            }
-            ?>">
-                  <?php echo imagekpr_csrf_field(); ?>
-                  <input type="hidden" name="action" value="set_quota">
-                  <input type="hidden" name="user_id" value="<?php echo (int) $r['id']; ?>">
-                  <label title="Use site default quota from config / Admin Config"><input type="radio" name="quota_mode" value="default" <?php echo $dbq === null ? 'checked' : ''; ?>> Default</label>
-                  <label title="No storage cap"><input type="radio" name="quota_mode" value="unlimited" <?php echo $dbq === 0 ? 'checked' : ''; ?>> Unlimited</label>
-                  <label title="Custom cap in binary gigabytes (GiB). 50 here = 50 GiB, not 50 MB — use Free preset or ~0.047 for 50 MB."><input type="radio" name="quota_mode" value="custom" <?php echo $dbq !== null && $dbq > 0 ? 'checked' : ''; ?>> GiB <input type="number" name="quota_gb" min="0.001" step="any" value="<?php echo htmlspecialchars($customGb, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Cap in binary gigabytes (GiB)"></label>
-                  <button type="submit">Save</button>
-                </form>
-              </td>
-              <td class="admin-col-quota">
-                <form class="admin-quota-form" method="post" action="index.php<?php
-            $hiddenQ = array_filter(['q' => $qSearch !== '' ? $qSearch : null, 'sort' => $sort !== 'email' ? $sort : null, 'dir' => $dir !== 'ASC' ? strtolower($dir) : null]);
-            if (!empty($hiddenQ)) {
-              echo '?' . htmlspecialchars(http_build_query($hiddenQ), ENT_QUOTES, 'UTF-8');
-            }
-            ?>">
-                  <?php echo imagekpr_csrf_field(); ?>
-                  <input type="hidden" name="action" value="set_upload_tier">
-                  <input type="hidden" name="user_id" value="<?php echo (int) $r['id']; ?>">
-                  <?php foreach ($uploadTiers as $mb) { ?>
-                  <label><input type="radio" name="upload_size_mb" value="<?php echo (int) $mb; ?>" <?php echo $uploadMb === $mb ? 'checked' : ''; ?>><?php echo (int) $mb; ?>MB</label>
-                  <?php } ?>
-                  <?php if ($tierDownAt) { ?>
-                    <span class="admin-muted"><?php echo $tierGraceExpired ? 'Grace expired' : ('Grace until ' . htmlspecialchars(date('Y-m-d', strtotime($tierDownAt . ' +30 days')), ENT_QUOTES, 'UTF-8')); ?></span>
-                  <?php } ?>
-                  <button type="submit">Save</button>
-                </form>
-              </td>
+              <?php
+              $ll = $r['last_login_at'];
+              $imageCount = (int) ($r['image_count'] ?? 0);
+              $maxImages = imagekpr_plan_max_images_for_upload_mb($uploadMb);
+              $maxImagesDisp = $maxImages !== null ? (string) $maxImages : '—';
+              $dashCount = (int) ($r['dashboard_count'] ?? 0);
+              $dashLimit = imagekpr_dashboard_limit_for_tier($uploadMb);
+              $usedMib = round($used / (1024 * 1024), 1);
+              $quotaMibStr = $eff === null ? '∞' : (string) (int) round($eff / (1024 * 1024));
+              $storageDisp = $usedMib . ' / ' . $quotaMibStr . ' MiB';
+              $imagesOver = $maxImages !== null && $imageCount >= $maxImages;
+              $dashOver = $dashCount >= $dashLimit;
+              ?>
+              <td class="admin-col-storage <?php echo $over ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars($storageDisp, ENT_QUOTES, 'UTF-8'); ?></td>
+              <td class="admin-col-files <?php echo $imagesOver ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars($imageCount . ' / ' . $maxImagesDisp, ENT_QUOTES, 'UTF-8'); ?></td>
+              <td class="admin-col-dashboards <?php echo $dashOver ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars($dashCount . ' / ' . $dashLimit, ENT_QUOTES, 'UTF-8'); ?></td>
+              <td class="admin-muted admin-col-days"><?php
+                $dl = imagekpr_days_since_mysql_datetime($ll !== null && $ll !== '' ? (string) $ll : null);
+            echo $dl !== null ? (string) (int) $dl : '—';
+            ?></td>
+              <td class="admin-col-admin"><?php echo (int) $r['is_admin'] ? 'Yes' : ''; ?></td>
             </tr>
           <?php } ?>
         </tbody>

@@ -187,10 +187,10 @@ function imagekpr_format_bytes(int $bytes): string
   return round($v, $u >= 2 ? 2 : 1) . ' ' . $units[$u];
 }
 
-/** Allowed per-image upload size tiers (MB). Align with Stripe tier matrix (Free 3, Silver 10, Gold 50). */
+/** Allowed per-image upload size tiers (MB). Align with Stripe tier matrix (Free 3, Silver 10, Gold 50, Platinum 500). */
 function imagekpr_allowed_upload_size_tiers_mb(): array
 {
-  return [3, 10, 50];
+  return [3, 10, 50, 500];
 }
 
 /**
@@ -222,12 +222,44 @@ function imagekpr_plan_tier_matrix_reference(): array
       'max_images' => 1000,
       'shared_dashboard_cap' => 200,
     ],
+    'platinum' => [
+      'label' => 'Platinum',
+      'upload_mb' => 500,
+      'storage_bytes' => 10737418240,
+      'max_images' => 10000,
+      'shared_dashboard_cap' => 2000,
+    ],
     'pro' => [
       'label' => 'Pro',
+      'display_label' => 'Ultra',
       'storage_bytes' => 20971520000,
       'commercial_note' => 'S$999 list per 3-year license; renewal at end of term',
     ],
   ];
+}
+
+/** Public-facing tier name (e.g. Ultra for the dedicated `pro` matrix row). */
+function imagekpr_plan_tier_display_label(array $row): string
+{
+  if (isset($row['display_label']) && trim((string) $row['display_label']) !== '') {
+    return (string) $row['display_label'];
+  }
+  return (string) ($row['label'] ?? '');
+}
+
+/**
+ * Max library images for a known SaaS upload tier, or null if upload MB does not match a preset row.
+ */
+function imagekpr_plan_max_images_for_upload_mb(int $uploadMb): ?int
+{
+  $uploadMb = imagekpr_normalize_upload_size_mb($uploadMb);
+  $m = imagekpr_plan_tier_matrix_reference();
+  foreach (['free', 'silver', 'gold', 'platinum'] as $k) {
+    if ((int) $m[$k]['upload_mb'] === $uploadMb) {
+      return (int) $m[$k]['max_images'];
+    }
+  }
+  return null;
 }
 
 /**
@@ -239,7 +271,7 @@ function imagekpr_plan_tier_storage_reference(): array
 {
   $m = imagekpr_plan_tier_matrix_reference();
   $out = [];
-  foreach (['free', 'silver', 'gold'] as $k) {
+  foreach (['free', 'silver', 'gold', 'platinum'] as $k) {
     $r = $m[$k];
     $out[$k] = ['label' => $r['label'], 'bytes' => $r['storage_bytes'], 'upload_mb' => $r['upload_mb']];
   }
@@ -249,7 +281,7 @@ function imagekpr_plan_tier_storage_reference(): array
 /**
  * Match effective storage cap + upload tier to a SaaS preset (exact bytes and MB).
  *
- * @return string|null Preset key free|silver|gold, 'custom' if capped but no match, null if unlimited.
+ * @return string|null Preset key free|silver|gold|platinum, 'custom' if capped but no match, null if unlimited.
  */
 function imagekpr_infer_saas_tier_preset_match(?int $storageQuotaColumn, int $uploadMb): ?string
 {
@@ -298,12 +330,12 @@ function imagekpr_user_storage_quota_status(PDO $pdo, int $userId): array
   ];
 }
 
-/** HTML fragment: Free/Silver/Gold line for admin help text. */
+/** HTML fragment: Free/Silver/Gold/Platinum line for admin help text. */
 function imagekpr_admin_html_plan_matrix_saas_blurb(): string
 {
   $m = imagekpr_plan_tier_matrix_reference();
   $chunks = [];
-  foreach (['free', 'silver', 'gold'] as $k) {
+  foreach (['free', 'silver', 'gold', 'platinum'] as $k) {
     $r = $m[$k];
     $chunks[] =
       '<strong>' . htmlspecialchars((string) $r['label'], ENT_QUOTES, 'UTF-8') . '</strong>: '
@@ -316,13 +348,14 @@ function imagekpr_admin_html_plan_matrix_saas_blurb(): string
   return implode('; ', $chunks);
 }
 
-/** HTML fragment: Pro (dedicated) line for admin help text. */
+/** HTML fragment: Ultra / dedicated (`pro` matrix row) line for admin help text. */
 function imagekpr_admin_html_plan_matrix_pro_blurb(): string
 {
   $p = imagekpr_plan_tier_matrix_reference()['pro'];
   $b = (int) $p['storage_bytes'];
   $note = htmlspecialchars((string) $p['commercial_note'], ENT_QUOTES, 'UTF-8');
-  return '<strong>' . htmlspecialchars((string) $p['label'], ENT_QUOTES, 'UTF-8') . '</strong> (dedicated white-label, maximum features): '
+  $disp = htmlspecialchars(imagekpr_plan_tier_display_label($p), ENT_QUOTES, 'UTF-8');
+  return '<strong>' . $disp . '</strong> (dedicated white-label, maximum features; preset key <span class="admin-mono">pro</span>): '
     . 'not a seat on this shared multi-tenant app. Reference storage '
     . htmlspecialchars(imagekpr_format_bytes($b), ENT_QUOTES, 'UTF-8')
     . ' (<span class="admin-mono">' . $b . '</span> B); unlimited library images &amp; shared-dashboard selection on the dedicated instance. '
@@ -612,6 +645,33 @@ function imagekpr_storage_quota_denies_add(PDO $pdo, int $userId, int $netAddByt
     return null;
   }
   return 'Storage quota exceeded. Remaining: ' . imagekpr_format_bytes($rem) . '.';
+}
+
+/**
+ * Image MIME types accepted for upload.
+ * AVIF is included only when PHP/GD was compiled with libavif (IMG_AVIF constant, PHP 8.1+).
+ * @return string[]
+ */
+function imagekpr_supported_upload_mimes(): array
+{
+  $mimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (defined('IMG_AVIF') && (imagetypes() & IMG_AVIF)) {
+    $mimes[] = 'image/avif';
+  }
+  return $mimes;
+}
+
+/**
+ * File extensions corresponding to imagekpr_supported_upload_mimes().
+ * @return string[]
+ */
+function imagekpr_supported_upload_exts(): array
+{
+  $exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+  if (defined('IMG_AVIF') && (imagetypes() & IMG_AVIF)) {
+    $exts[] = 'avif';
+  }
+  return $exts;
 }
 
 /** Append-only audit row. $meta JSON-encoded; null stored as SQL NULL. */

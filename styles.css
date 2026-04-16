@@ -759,6 +759,18 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
 .toast { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 0.75rem 1.5rem; border-radius: 4px; z-index: 1100; }
 .toast-prominent { padding: 1rem 2rem; font-size: 1.1rem; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 
+.upload-warn-content { max-width: 480px; }
+.upload-warn-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.25rem; }
+.upload-warn-header h3 { margin: 0; }
+.upload-warn-icon { font-size: 1.6rem; line-height: 1; color: #b45309; flex-shrink: 0; }
+.upload-warn-body { margin: 0 0 0.75rem; color: #444; line-height: 1.5; }
+.upload-warn-list { margin: 0 0 1rem; padding-left: 1.5rem; font-size: 0.875rem; color: #555; max-height: 140px; overflow-y: auto; }
+.upload-warn-list li { padding: 0.2rem 0; word-break: break-all; }
+.upload-warn-footnote { font-size: 0.8125rem; color: #888; margin: 0 0 0; }
+.upload-warn-footnote a { color: #666; }
+.upload-warn-content .dialog-actions button:first-of-type { background: #92400e; border-color: #92400e; color: #fff; }
+.upload-warn-content .dialog-actions button:first-of-type:hover { background: #b45309; border-color: #b45309; }
+
 .credits-footer { text-align: center; padding: 2rem; color: #666; font-size: 0.875rem; border-top: 1px solid #eee; margin-top: 2rem; }
 .credits-footer a { color: #333; text-decoration: none; }
 .credits-footer a:hover { text-decoration: underline; }
@@ -909,6 +921,11 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.ikpr-page-hero-inner a {
+  display: flex;
+  justify-content: center;
 }
 
 .ikpr-page-hero-inner img {
@@ -1556,11 +1573,12 @@ a.user-session-profile-link:hover {
   text-decoration: underline;
 }
 
-/* Slideshow: settings drawer + fullscreen player */
+/* Slideshow: settings drawer + fullscreen player
+   Must stack above .shared-mobile-actions (1200) and .shared-dash-watermark (1201) on shared dashboards. */
 .slideshow-settings-wrap {
   position: fixed;
   inset: 0;
-  z-index: 1004;
+  z-index: 3200;
   pointer-events: none;
 }
 .slideshow-settings-wrap:not([hidden]) {
@@ -1700,7 +1718,7 @@ a.user-session-profile-link:hover {
 .modal-fullscreen {
   position: fixed;
   inset: 0;
-  z-index: 1006;
+  z-index: 3200;
   background: #000;
 }
 .modal-fullscreen-stage {
@@ -1724,7 +1742,7 @@ a.user-session-profile-link:hover {
 .slideshow-player {
   position: fixed;
   inset: 0;
-  z-index: 1005;
+  z-index: 3200;
   background: #000;
 }
 .slideshow-stage {
@@ -2151,6 +2169,12 @@ a.user-session-profile-link:hover {
   color: #888;
 }
 
+.ikpr-pricing-tier-band {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
 .ikpr-pricing-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -2169,7 +2193,7 @@ a.user-session-profile-link:hover {
       align-items: start;
     }
 
-    .ikpr-pricing-card {
+    .ikpr-pricing-grid > .ikpr-pricing-card {
       display: grid;
       grid-template-rows: subgrid;
       grid-row: span 7;
@@ -2248,7 +2272,7 @@ a.user-session-profile-link:hover {
 
 /* Stacked cards: flex layout (narrow screens, or no subgrid). */
 @media (max-width: 1099px) {
-  .ikpr-pricing-card {
+  .ikpr-pricing-grid > .ikpr-pricing-card {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2257,7 +2281,7 @@ a.user-session-profile-link:hover {
 
 @supports not (grid-template-rows: subgrid) {
   @media (min-width: 1100px) {
-    .ikpr-pricing-card {
+    .ikpr-pricing-grid > .ikpr-pricing-card {
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -2332,6 +2356,25 @@ a.user-session-profile-link:hover {
   color: #2e7d40;
 }
 
+/* Platinum — cool metallic, deep-teal upgrade accents */
+.ikpr-pricing-card--platinum {
+  background: linear-gradient(168deg, #f4f7f9 0%, #e6ecf1 38%, #d5dee6 72%, #c5d0da 100%);
+  color: #111;
+  border: 1px solid #9eb0bd;
+  box-shadow:
+    0 10px 34px rgba(55, 75, 95, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.ikpr-pricing-card--platinum .ikpr-pricing-icon {
+  color: #4a6678;
+}
+
+.ikpr-pricing-card--platinum .ikpr-pricing-feat--platinum {
+  color: #14532d;
+  font-weight: 600;
+}
+
 .ikpr-pricing-card--featured .ikpr-pricing-icon {
   color: #5c4818;
 }
@@ -2371,6 +2414,99 @@ a.user-session-profile-link:hover {
 .ikpr-pricing-card--pro .ikpr-pricing-feat strong {
   color: #d4af37;
   font-weight: 700;
+}
+
+/* Ultra (pro) — full-width horizontal band */
+.ikpr-pricing-card--pro.ikpr-pricing-card--ultra-wide {
+  padding: 1.35rem 1.25rem 1.5rem;
+}
+
+.ikpr-pricing-ultra-grid {
+  display: grid;
+  width: 100%;
+  gap: 1.15rem 1.5rem;
+  align-items: center;
+  grid-template-columns: 1fr;
+}
+
+.ikpr-pricing-ultra-col {
+  min-width: 0;
+}
+
+.ikpr-pricing-ultra-col--lead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.ikpr-pricing-ultra-col--visual .ikpr-pricing-laptop {
+  margin-bottom: 0;
+}
+
+.ikpr-pricing-ultra-col--summary .ikpr-pricing-sec--primary {
+  align-items: stretch;
+  text-align: left;
+}
+
+.ikpr-pricing-ultra-col--summary .ikpr-pricing-features-title {
+  text-align: center;
+}
+
+.ikpr-pricing-features--ultra-summary {
+  margin-bottom: 0;
+  text-align: left;
+}
+
+.ikpr-pricing-card--pro.ikpr-pricing-card--ultra-wide .ikpr-pricing-sec--cta {
+  justify-content: center;
+  padding-top: 0;
+}
+
+.ikpr-pricing-ultra-col--cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (min-width: 900px) {
+  .ikpr-pricing-ultra-grid {
+    grid-template-columns: minmax(11rem, 15rem) minmax(150px, 210px) minmax(0, 1fr) auto;
+    align-items: stretch;
+  }
+
+  .ikpr-pricing-card--pro.ikpr-pricing-card--ultra-wide {
+    text-align: left;
+  }
+
+  .ikpr-pricing-ultra-col--lead {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .ikpr-pricing-ultra-col--visual {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .ikpr-pricing-ultra-col--visual .ikpr-pricing-laptop {
+    max-width: 200px;
+  }
+
+  .ikpr-pricing-ultra-col--summary {
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    padding-left: 1.25rem;
+  }
+
+  .ikpr-pricing-ultra-col--summary .ikpr-pricing-features-title {
+    text-align: left;
+  }
+
+  .ikpr-pricing-ultra-col--cta {
+    justify-content: flex-end;
+    align-self: center;
+  }
 }
 
 .ikpr-pricing-pro-tagline {

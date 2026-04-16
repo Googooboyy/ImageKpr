@@ -2318,6 +2318,7 @@
   let MAX_UPLOAD = 3 * 1024 * 1024;
   let MAX_UPLOAD_MB = 3;
   const MAX_WIDTH = 1920;
+  let ALLOWED_UPLOAD_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
   function canvasToBlob(canvas, type, quality) {
     return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
@@ -2470,10 +2471,64 @@
     return window.confirm(msg);
   }
 
-  function showUploadConfirmModal(files) {
+  function warnRejectedFiles(rejected, acceptedCount) {
+    return new Promise((resolve) => {
+      const d = document.getElementById('upload-warn-dialog');
+      const bodyEl = document.getElementById('upload-warn-body');
+      const listEl = document.getElementById('upload-warn-list');
+      const continueBtn = document.getElementById('upload-warn-continue');
+      const cancelBtn = document.getElementById('upload-warn-cancel');
+      const rCount = rejected.length;
+      if (acceptedCount > 0) {
+        bodyEl.textContent = rCount + ' file' + (rCount === 1 ? '' : 's') + ' will be skipped because ' +
+          (rCount === 1 ? 'its format isn\'t' : 'their formats aren\'t') + ' supported. Continue to upload the other ' +
+          acceptedCount + ' accepted file' + (acceptedCount === 1 ? '' : 's') + ', or cancel the whole batch.';
+      } else {
+        bodyEl.textContent = 'None of the selected files are in a supported format — nothing will be uploaded.';
+      }
+      listEl.innerHTML = '';
+      const MAX_SHOW = 8;
+      rejected.slice(0, MAX_SHOW).forEach(f => {
+        const li = document.createElement('li');
+        const typeLabel = f.type && f.type !== 'image/' ? f.type.replace('image/', '').toUpperCase() : 'unknown format';
+        li.textContent = f.name + ' \u2014 ' + typeLabel;
+        listEl.appendChild(li);
+      });
+      if (rejected.length > MAX_SHOW) {
+        const li = document.createElement('li');
+        li.textContent = '\u2026 and ' + (rejected.length - MAX_SHOW) + ' more';
+        listEl.appendChild(li);
+      }
+      continueBtn.hidden = acceptedCount === 0;
+      if (acceptedCount > 0) {
+        continueBtn.textContent = 'Continue with ' + acceptedCount + ' file' + (acceptedCount === 1 ? '' : 's');
+      }
+      d.hidden = false;
+      const cleanup = () => { d.hidden = true; continueBtn.onclick = null; cancelBtn.onclick = null; };
+      continueBtn.onclick = () => { cleanup(); resolve(true); };
+      cancelBtn.onclick = () => { cleanup(); resolve(false); };
+    });
+  }
+
+  async function showUploadConfirmModal(files) {
     const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
     if (arr.length === 0) return;
-    const tooBig = arr.filter(f => f.size > MAX_UPLOAD);
+    const accepted = arr.filter(f => ALLOWED_UPLOAD_MIMES.includes(f.type));
+    const rejected = arr.filter(f => !ALLOWED_UPLOAD_MIMES.includes(f.type));
+    let finalFiles = arr;
+    if (rejected.length > 0) {
+      if (accepted.length === 0) {
+        showToast('None of those files are in a supported format (JPEG, PNG, GIF, WebP)', true);
+        return;
+      }
+      const proceed = await warnRejectedFiles(rejected, accepted.length);
+      if (!proceed) {
+        showToast('Upload cancelled');
+        return;
+      }
+      finalFiles = accepted;
+    }
+    const tooBig = finalFiles.filter(f => f.size > MAX_UPLOAD);
     const forceResizeBig = tooBig.length > 0;
     if (forceResizeBig && !askOversizeDecision(tooBig.length)) {
       showToast('Upload cancelled');
@@ -2488,7 +2543,7 @@
     const folderSelect = document.getElementById('upload-add-to-folder-select');
     const folderNewInput = document.getElementById('upload-add-to-folder-new');
 
-    let pendingItems = arr.map(f => ({ file: f, newName: '', tags: [], folder: null }));
+    let pendingItems = finalFiles.map(f => ({ file: f, newName: '', tags: [], folder: null }));
     let objectUrls = [];
 
     function refreshFolderSelect() {
@@ -2712,13 +2767,14 @@
     if (t === 'image/png') return '.png';
     if (t === 'image/gif') return '.gif';
     if (t === 'image/webp') return '.webp';
+    if (t === 'image/avif') return '.avif';
     return '';
   }
 
   function getFileNameFromUrl(urlObj, mimeType) {
     const raw = decodeURIComponent((urlObj.pathname || '').split('/').pop() || '').trim();
     const safe = raw.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
-    const hasImageExt = /\.(jpe?g|png|gif|webp)$/i.test(safe);
+    const hasImageExt = /\.(jpe?g|png|gif|webp|avif)$/i.test(safe);
     if (safe) return hasImageExt ? safe : (safe + extFromMime(mimeType));
     return 'remote-image' + extFromMime(mimeType);
   }
@@ -3347,6 +3403,11 @@
       if (hintEl) {
         hintEl.textContent = 'Files above your ' + MAX_UPLOAD_MB + 'MB limit can be auto-resized if you choose Continue.';
       }
+      if (Array.isArray(d.supported_mime_types) && d.supported_mime_types.length > 0) {
+        ALLOWED_UPLOAD_MIMES = d.supported_mime_types.slice();
+        const uploadInput = document.getElementById('upload-input');
+        if (uploadInput) uploadInput.accept = d.supported_mime_types.join(',');
+      }
       const on = d.maintenance === true;
       if (on) {
         document.body.classList.add('ikpr-maintenance');
@@ -3870,7 +3931,7 @@
     uploadZone.addEventListener('drop', (e) => {
       e.preventDefault();
       uploadZone.classList.remove('drag-over');
-      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      const files = Array.from(e.dataTransfer.files);
       if (files.length) showUploadConfirmModal(files);
     });
 

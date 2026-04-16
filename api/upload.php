@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   exit;
 }
 
-const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+$allowedMimes = imagekpr_supported_upload_mimes();
 
 function sanitizeFilename($name) {
   $name = basename($name);
@@ -76,7 +76,7 @@ foreach ($files as $file) {
   $finfo = finfo_open(FILEINFO_MIME_TYPE);
   $mime = finfo_file($finfo, $file['tmp_name']);
   finfo_close($finfo);
-  if (!in_array($mime, ALLOWED_MIMES)) {
+  if (!in_array($mime, $allowedMimes)) {
     continue;
   }
   $baseName = sanitizeFilename($file['name']);
@@ -113,7 +113,7 @@ foreach ($files as $file) {
   $finfo = finfo_open(FILEINFO_MIME_TYPE);
   $mime = finfo_file($finfo, $file['tmp_name']);
   finfo_close($finfo);
-  if (!in_array($mime, ALLOWED_MIMES)) {
+  if (!in_array($mime, $allowedMimes)) {
     $uploaded[] = ['success' => false, 'error' => 'Invalid image type'];
     continue;
   }

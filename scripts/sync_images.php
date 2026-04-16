@@ -29,12 +29,13 @@ if ($argc >= 2 && ctype_digit((string) $argv[1])) {
   $syncUserId = (int) $argv[1];
 }
 
-$exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+$_avifSupported = defined('IMG_AVIF') && (imagetypes() & IMG_AVIF);
+$exts = array_merge(['jpg', 'jpeg', 'png', 'gif', 'webp'], $_avifSupported ? ['avif'] : []);
 $inboxDir = rtrim(INBOX_DIR, '/\\') . DIRECTORY_SEPARATOR;
 $targetUserId = $syncUserId === null ? 0 : (int) $syncUserId;
 $imagesDir = imagekpr_ensure_user_images_dir($targetUserId) . DIRECTORY_SEPARATOR;
 $maxSize = 3 * 1024 * 1024;
-$allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+$allowedMimes = array_merge(['image/jpeg', 'image/png', 'image/gif', 'image/webp'], $_avifSupported ? ['image/avif'] : []);
 
 try {
   $pdo = new PDO(

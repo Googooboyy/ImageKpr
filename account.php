@@ -121,16 +121,16 @@ try {
   $dbq = $dbq === null ? null : (int) $dbq;
   $preset = imagekpr_infer_saas_tier_preset_match($dbq, $uploadMb);
   if ($preset === null) {
-    $planLabelDisplay = 'Pro';
+    $planLabelDisplay = 'Ultra';
   } elseif ($preset === 'custom') {
     $planLabelDisplay = 'Custom';
   } else {
     $refLabel = imagekpr_plan_tier_matrix_reference()[$preset];
-    $planLabelDisplay = (string) $refLabel['label'];
+    $planLabelDisplay = imagekpr_plan_tier_display_label($refLabel);
   }
   $maxFileSizeDisplay = 'Up to ' . (int) $uploadMb . ' MB per file';
 
-  if (in_array($preset, ['free', 'silver', 'gold'], true)) {
+  if (in_array($preset, ['free', 'silver', 'gold', 'platinum'], true)) {
     $refCaps = imagekpr_plan_tier_matrix_reference()[$preset];
     $planCapMaxImages = (int) $refCaps['max_images'];
     $planCapSharedDashboard = (int) $refCaps['shared_dashboard_cap'];
@@ -227,7 +227,7 @@ $headerLabel = imagekpr_user_header_display_label(
         <div><dt>Max library images</dt><dd><?php echo (int) $planCapMaxImages; ?> <span class="ikpr-account-dl-sub">(plan cap)</span></dd></div>
         <div><dt>Shared dashboards</dt><dd><?php echo htmlspecialchars('Up to ' . (int) $planCapSharedDashboard . ' images in each shared dashboard', ENT_QUOTES, 'UTF-8'); ?></dd></div>
         <?php } else { ?>
-        <div><dt>Max library images</dt><dd class="ikpr-account-dl-note"><?php echo htmlspecialchars('Not listed — your quota does not match a standard Free, Silver, or Gold preset.', ENT_QUOTES, 'UTF-8'); ?></dd></div>
+        <div><dt>Max library images</dt><dd class="ikpr-account-dl-note"><?php echo htmlspecialchars('Not listed — your quota does not match a standard Free, Silver, Gold, or Platinum preset.', ENT_QUOTES, 'UTF-8'); ?></dd></div>
         <div><dt>Shared dashboards</dt><dd class="ikpr-account-dl-note"><?php echo htmlspecialchars('Not listed for the same reason.', ENT_QUOTES, 'UTF-8'); ?></dd></div>
         <?php } ?>
         <div><dt>Total shared dashboards</dt><dd class="ikpr-account-dl-note"><?php echo htmlspecialchars('Coming soon..', ENT_QUOTES, 'UTF-8'); ?></dd></div>

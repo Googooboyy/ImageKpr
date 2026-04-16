@@ -499,6 +499,22 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
     </div>
   </div>
 
+  <div id="upload-warn-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="upload-warn-title">
+    <div class="dialog-content upload-warn-content">
+      <div class="upload-warn-header">
+        <span class="upload-warn-icon" aria-hidden="true">⚠</span>
+        <h3 id="upload-warn-title">Some files can't be uploaded</h3>
+      </div>
+      <p id="upload-warn-body" class="upload-warn-body"></p>
+      <ul id="upload-warn-list" class="upload-warn-list"></ul>
+      <p class="upload-warn-footnote">ImageKpr accepts JPEG, PNG, GIF, and WebP only. <a href="knowledge-base.php#kb-working" target="_blank">Learn more</a></p>
+      <div class="dialog-actions">
+        <button type="button" id="upload-warn-continue">Continue</button>
+        <button type="button" id="upload-warn-cancel">Cancel upload</button>
+      </div>
+    </div>
+  </div>
+
   <div id="upload-rename-dialog" class="dialog" hidden aria-modal="true">
     <div class="dialog-content">
       <h3>Rename file</h3>

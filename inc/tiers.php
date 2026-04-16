@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/admin.php';
 
 function imagekpr_user_is_paid(PDO $pdo, int $userId): bool
 {
@@ -19,8 +20,15 @@ function imagekpr_dashboard_free_limit(): int
 
 function imagekpr_dashboard_limit_for_tier(int $uploadSizeMb): int
 {
-  if ($uploadSizeMb >= 50) return 200;
-  if ($uploadSizeMb >= 10) return 40;
+  if ($uploadSizeMb >= 500) {
+    return 2000;
+  }
+  if ($uploadSizeMb >= 50) {
+    return 200;
+  }
+  if ($uploadSizeMb >= 10) {
+    return 40;
+  }
   return 20;
 }
 

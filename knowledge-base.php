@@ -32,6 +32,18 @@ declare(strict_types=1);
     <section class="ikpr-doc-card" aria-labelledby="kb-working">
       <h2 id="kb-working">Working with Images</h2>
       <div class="ikpr-doc-subsection">
+        <h3>Supported file formats</h3>
+        <p>ImageKpr accepts <strong>JPEG, PNG, GIF, and WebP</strong>. These cover photos from cameras and phones, screenshots, web-ready graphics, and animated images.</p>
+        <p>The following common formats are <strong>not supported</strong> and will be skipped on upload:</p>
+        <ul>
+          <li><strong>HEIC / HEIF</strong> — default photo format on iPhones and many Android devices. Convert to JPEG before uploading (most phones offer a compatibility setting, or use a free converter).</li>
+          <li><strong>AVIF</strong> — newer web-delivery format. Supported automatically if the server has libavif compiled in (PHP 8.1+); if not, export as WebP or JPEG instead.</li>
+          <li><strong>SVG</strong> — vector graphics, not a raster image.</li>
+          <li><strong>BMP, TIFF, ICO</strong> — legacy or specialised formats rarely needed in day-to-day image libraries.</li>
+        </ul>
+        <p>If you drag or select a mix of supported and unsupported files, you'll get a heads-up before anything is sent so you can cancel or continue with only the accepted files.</p>
+      </div>
+      <div class="ikpr-doc-subsection">
         <h3>Upload and review</h3>
         <p>Upload confirmation lets you rename files and apply folders/tags before final import. Use this to enforce naming quality from the start.</p>
       </div>

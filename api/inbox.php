@@ -7,7 +7,7 @@ imagekpr_block_if_maintenance_json();
 $uid = imagekpr_user_id();
 header('Content-Type: application/json; charset=utf-8');
 
-$exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+$exts = imagekpr_supported_upload_exts();
 $inboxDir = rtrim(INBOX_DIR, '/\\') . DIRECTORY_SEPARATOR;
 $inboxReal = is_dir($inboxDir) ? realpath($inboxDir) : false;
 
@@ -72,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   $imagesDir = imagekpr_ensure_user_images_dir($uid) . DIRECTORY_SEPARATOR;
   $maxSize = 3 * 1024 * 1024;
-  $allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  $allowedMimes = imagekpr_supported_upload_mimes();
 
   if (!$inboxReal) {
     echo json_encode(['success' => true, 'imported' => 0, 'imported_ids' => []]);

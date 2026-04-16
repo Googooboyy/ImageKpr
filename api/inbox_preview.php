@@ -6,6 +6,10 @@ header('X-Content-Type-Options: nosniff');
 
 $exts = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
 $mimes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp'];
+if (defined('IMG_AVIF') && (imagetypes() & IMG_AVIF)) {
+  $exts[] = 'avif';
+  $mimes['avif'] = 'image/avif';
+}
 $inboxDir = rtrim(INBOX_DIR, '/\\') . DIRECTORY_SEPARATOR;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET' || empty($_GET['file'])) {

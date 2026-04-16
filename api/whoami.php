@@ -59,4 +59,5 @@ echo json_encode([
   'storage_remaining_bytes' => imagekpr_json_byte_string($quotaPayload['remaining_bytes']),
   'storage_quota_used_bytes' => imagekpr_json_byte_string($quotaPayload['used_bytes']),
   'dashboard_image_limit' => $dashboardImageLimit,
+  'supported_mime_types' => imagekpr_supported_upload_mimes(),
 ], JSON_UNESCAPED_UNICODE);
