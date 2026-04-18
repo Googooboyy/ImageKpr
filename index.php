@@ -180,6 +180,10 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
           <input type="radio" id="grid-scale-20" name="grid-scale" value="2">
           <label for="grid-scale-20">2x</label>
         </div>
+        <label class="grid-tight-toggle" title="Compact view: square thumbnails, no card padding; thin white lines between cells">
+          <input type="checkbox" id="grid-layout-tight" aria-label="Compact view: flush squares with thin white separators">
+          compact-view
+        </label>
       </div>
       <div id="dashboard-editor-wrap" class="dashboard-editor-wrap" hidden>
         <div class="dashboard-editor-head">

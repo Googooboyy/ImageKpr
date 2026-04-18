@@ -4412,6 +4412,24 @@
       });
     })();
 
+    (function initGridLayoutTightToggle() {
+      const main = document.querySelector('main.main-content');
+      const cb = document.getElementById('grid-layout-tight');
+      if (!main || !cb) return;
+      const key = 'imagekprGridLayoutTight';
+      function applyTight() {
+        main.classList.toggle('grid-layout--tight', cb.checked);
+        try {
+          localStorage.setItem(key, cb.checked ? '1' : '0');
+        } catch (_) {}
+      }
+      try {
+        cb.checked = localStorage.getItem(key) === '1';
+      } catch (_) {}
+      applyTight();
+      cb.addEventListener('change', applyTight);
+    })();
+
     (function initSelectionThumbsLargeToggle() {
       const banner = document.getElementById('selection-banner');
       const cb = document.getElementById('selection-thumbs-large');
