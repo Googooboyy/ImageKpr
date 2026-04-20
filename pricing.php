@@ -124,6 +124,7 @@ function ikpr_render_pricing_laptop_mockup(): void
             <li class="ikpr-pricing-feat ikpr-pricing-feat--pos"><strong>200 MB</strong> total library storage</li>
             <li class="ikpr-pricing-feat ikpr-pricing-feat--pos">Up to <strong>200</strong> images in your library</li>
             <li class="ikpr-pricing-feat ikpr-pricing-feat--pos">Shared dashboard: up to <strong>40</strong> images per dashboard</li>
+            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos">MP4 video uploads (up to <strong>10 MB</strong> per clip)</li>
           </ul>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
@@ -171,13 +172,14 @@ function ikpr_render_pricing_laptop_mockup(): void
             <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--bright"><strong>1 GB</strong> total library storage</li>
             <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--bright">Up to <strong>1,000</strong> images in your library</li>
             <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--bright">Shared dashboard: up to <strong>200</strong> images per dashboard</li>
+            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--bright">MP4 video uploads (up to <strong>50 MB</strong> per clip)</li>
           </ul>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
           <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub">Included</h3>
           <ul class="ikpr-pricing-features ikpr-pricing-features--compact">
             <li class="ikpr-pricing-feat">Everything in Silver, with higher limits above</li>
-            <li class="ikpr-pricing-feat">Same core app; strong fit before Platinum for very large libraries</li>
+            <li class="ikpr-pricing-feat">Same core app; strong fit before Platinum for very large libraries and short MP4 clips</li>
           </ul>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--cta">
@@ -215,6 +217,7 @@ function ikpr_render_pricing_laptop_mockup(): void
             <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum"><strong>10 GB</strong> total library storage</li>
             <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum">Up to <strong>10,000</strong> images in your library</li>
             <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum">Shared dashboard: up to <strong>2,000</strong> images per dashboard</li>
+            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum">MP4 video uploads (up to <strong>500 MB</strong> per clip)</li>
           </ul>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--included">

@@ -89,6 +89,20 @@ require_once __DIR__ . '/inc/marketing_illustration.php';
 
     <section class="ikpr-features-row ikpr-features-row--flip">
       <div class="ikpr-features-copy">
+        <h3>Video clips, for paid members</h3>
+        <p>Capture short memories in motion alongside your photos. ImageKpr keeps clips lightweight and album-friendly, so your library stays fast and practical.</p>
+        <ul>
+          <li>Upload MP4 clips on paid plans (Silver, Gold, Platinum), up to your plan's file-size limit</li>
+          <li>Play clips inline in the library, modal, and shared dashboards</li>
+          <li>Mix photos and MP4 clips in slideshow mode</li>
+        </ul>
+        <a class="ikpr-features-cta" href="/">Open ImageKpr</a>
+      </div>
+      <?php ikpr_marketing_render_illustration('Illustration: short video clips and photos', 'default'); ?>
+    </section>
+
+    <section class="ikpr-features-row ikpr-features-row--flip">
+      <div class="ikpr-features-copy">
         <h3>Organize without friction</h3>
         <p>Folders and tags work together so you can browse visually or filter precisely. Manage folder lists as your library grows.</p>
         <ul>

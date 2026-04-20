@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS images (
   width INT UNSIGNED,
   height INT UNSIGNED,
   tags JSON,
+  media_type ENUM('image','video') NOT NULL DEFAULT 'image',
   user_id INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_date (date_uploaded),

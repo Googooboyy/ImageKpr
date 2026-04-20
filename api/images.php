@@ -111,7 +111,7 @@ $offset = ($page - 1) * $perPage;
 // Integers only (already validated); avoid bound LIMIT/OFFSET — breaks some MySQL PDO native prepares.
 $lim = (int) $perPage;
 $off = (int) $offset;
-$sql = "SELECT id, filename, url, date_uploaded, size_bytes, width, height, tags
+$sql = "SELECT id, filename, url, date_uploaded, size_bytes, width, height, tags, media_type
         FROM images
         WHERE $whereClause
         ORDER BY $orderBy
@@ -130,6 +130,9 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 foreach ($rows as &$row) {
   if (isset($row['tags']) && is_string($row['tags'])) {
     $row['tags'] = json_decode($row['tags'], true) ?: [];
+  }
+  if (empty($row['media_type'])) {
+    $row['media_type'] = 'image';
   }
 }
 

@@ -250,6 +250,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
           <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         <img id="modal-img" src="" alt="">
+        <video id="modal-video" controls hidden></video>
         <button type="button" id="modal-next" class="modal-nav-btn modal-nav-next" aria-label="Next image" hidden>
           <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         </button>
@@ -324,7 +325,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
       <p class="slideshow-settings-lead">Plays selected images in the order shown under Selected (drag thumbnails there to reorder). Missing from the grid still works if they stay selected.</p>
       <fieldset class="slideshow-fieldset">
         <legend>Advance</legend>
-        <label class="slideshow-radio"><input type="radio" name="slideshow-advance" id="slideshow-advance-manual" value="manual" checked> Manual — Space for next, arrow keys to move</label>
+        <label class="slideshow-radio"><input type="radio" name="slideshow-advance" id="slideshow-advance-manual" value="manual" checked> Manual — Space (image: next, video: play/pause), arrow keys to move</label>
         <label class="slideshow-radio"><input type="radio" name="slideshow-advance" id="slideshow-advance-auto" value="auto"> Auto</label>
         <div class="slideshow-duration-row" id="slideshow-duration-row">
           <label for="slideshow-duration">Seconds per slide</label>
@@ -333,9 +334,9 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
       </fieldset>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-show-filename"> Show filename at bottom (subtle)</label>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-fill-image"> Fill image (cover screen, crop overflow)</label>
-      <label class="slideshow-check"><input type="checkbox" id="slideshow-show-controller"> Show mini controller tray on start</label>
+      <label class="slideshow-check"><input type="checkbox" id="slideshow-show-controller" checked> Show mini controller tray on start</label>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-autoloop" checked> Loop (return to first after last)</label>
-      <label class="slideshow-check slideshow-check-nested" id="slideshow-randomize-loop-label"><input type="checkbox" id="slideshow-randomize-loop"> Randomize order each time the slideshow loops</label>
+      <label class="slideshow-check" id="slideshow-randomize-loop-label"><input type="checkbox" id="slideshow-randomize-loop"> Randomize slide order (turn off to restore your Selected order)</label>
       <fieldset class="slideshow-fieldset">
         <legend>Transition</legend>
         <label class="slideshow-radio"><input type="radio" name="slideshow-transition" id="slideshow-trans-diffuse" value="diffuse" checked> Diffuse (crossfade)</label>
@@ -351,15 +352,34 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-blue" value="blue"> Blue</label>
       </fieldset>
       <div class="slideshow-settings-hint" aria-label="Slideshow keyboard help">
-        <div>Exit: click outside the picture, the × button, or press Esc.</div>
-        <div>M/A switches Manual/Auto.</div>
-        <div>P pauses/resumes in Auto mode.</div>
-        <div>↑ / ↓ changes seconds per slide.</div>
-        <div>F toggles Fill image.</div>
-        <div>L toggles Loop.</div>
-        <div>C shows/hides the mini controller tray.</div>
-        <div>When Fill image is on, use mouse wheel to pan the cropped image.</div>
-        <div style="margin-top:0.45rem;font-style:italic">On mobile: swipe left/right to navigate, single tap to pause/resume (or advance in Manual), double tap to toggle Fill.</div>
+        <div class="ss-hint-group ss-hint-nav">
+          <span class="ss-hint-label">Navigate</span>
+          <span class="ss-hint-item"><kbd>Space</kbd> next slide on images &middot; play / pause on videos</span>
+          <span class="ss-hint-item"><kbd>&larr;</kbd> <kbd>&rarr;</kbd> previous / next slide</span>
+          <span class="ss-hint-item"><kbd>Home</kbd> <kbd>End</kbd> first / last slide in the current order</span>
+        </div>
+        <div class="ss-hint-group ss-hint-play">
+          <span class="ss-hint-label">Playback</span>
+          <span class="ss-hint-item"><kbd>M</kbd> / <kbd>A</kbd> switch Manual / Auto</span>
+          <span class="ss-hint-item"><kbd>P</kbd> pause / resume (Auto mode)</span>
+          <span class="ss-hint-item"><kbd>&uarr;</kbd> <kbd>&darr;</kbd> seconds per slide (Auto mode)</span>
+          <span class="ss-hint-item"><kbd>O</kbd> toggle "replay video on end" (MP4 loops instead of advancing)</span>
+          <span class="ss-hint-item"><span class="ss-hint-pill">REPLAY</span> tray button restarts the current video (videos only)</span>
+        </div>
+        <div class="ss-hint-group ss-hint-display">
+          <span class="ss-hint-label">Display</span>
+          <span class="ss-hint-item"><kbd>F</kbd> toggle Fill image &middot; mouse wheel pans when on</span>
+          <span class="ss-hint-item"><kbd>C</kbd> show / hide the mini controller tray</span>
+        </div>
+        <div class="ss-hint-group ss-hint-deck">
+          <span class="ss-hint-label">Deck</span>
+          <span class="ss-hint-item"><kbd>L</kbd> toggle Loop &middot; <kbd>R</kbd> toggle Randomize order</span>
+        </div>
+        <div class="ss-hint-group ss-hint-exit">
+          <span class="ss-hint-label">Exit</span>
+          <span class="ss-hint-item"><kbd>Esc</kbd> &middot; the &times; button &middot; click outside the picture</span>
+        </div>
+        <div class="ss-hint-mobile">On mobile: swipe left/right to navigate &middot; single tap to pause / resume (or advance in Manual) &middot; double tap to toggle Fill.</div>
       </div>
       <div class="slideshow-settings-actions">
         <button type="button" id="slideshow-start" class="slideshow-btn-primary">Start slideshow</button>
@@ -377,8 +397,9 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-manual" data-active="false" title="Manual mode (M)">MAN</button>
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-auto" data-active="false" title="Auto mode (A)">AUTO</button>
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-loop" data-active="false" title="Loop (L)">LOOP</button>
-      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-rand" data-active="false" title="Randomize on each loop">RAND</button>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-rand" data-active="false" title="Randomize order (R)">RAND</button>
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-pause" data-active="false" title="Pause / resume (P)">PAUSE</button>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-replay" disabled data-active="false" title="Replay video from start">REPLAY</button>
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-fill" data-active="false" title="Fill image (F)">FILL</button>
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-interval-dec" data-active="false" title="Decrease interval">-1s</button>
       <span class="ss-ctrl-pill ss-ctrl-readout" id="ss-ctrl-interval-value" aria-live="polite">5s</span>
@@ -405,6 +426,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
     <div class="slideshow-stage">
       <div class="slideshow-player-bg" id="slideshow-player-bg" aria-hidden="true"></div>
       <img id="slideshow-img" class="slideshow-img" src="" alt="">
+      <video id="slideshow-video" class="slideshow-video" controls preload="metadata" hidden></video>
     </div>
   </div>
 
@@ -486,7 +508,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
   <div id="upload-confirm-dialog" class="dialog upload-confirm-dialog" hidden aria-modal="true" aria-labelledby="upload-confirm-title">
     <div class="dialog-content upload-confirm-content">
       <h3 id="upload-confirm-title">Confirm upload</h3>
-      <p class="upload-confirm-hint">Review the images below. Use Rename, Apply/Manage Tags, Apply/Manage Folders per image. Remove any you don't want before confirming.</p>
+      <p class="upload-confirm-hint">Review the files below. Use Rename, Apply/Manage Tags, Apply/Manage Folders per item. Remove any you don't want before confirming.</p>
       <div id="upload-confirm-grid" class="upload-confirm-grid upload-confirm-list"></div>
       <div class="upload-add-to-folder">
         <label for="upload-add-to-folder-select" class="upload-add-to-folder-label">Add all to folder (optional):</label>

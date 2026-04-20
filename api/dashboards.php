@@ -48,7 +48,7 @@ function imagekpr_dash_parse_expiry(?string $preset, ?string $custom): ?string
 
 function imagekpr_dash_image_rows(PDO $pdo, int $dashboardId, int $userId): array
 {
-  $sql = 'SELECT i.id, i.filename, i.url, i.date_uploaded, i.width, i.height, sdi.sort_order
+  $sql = 'SELECT i.id, i.filename, i.url, i.date_uploaded, i.width, i.height, i.media_type, sdi.sort_order
           FROM shared_dashboard_images sdi
           INNER JOIN images i ON i.id = sdi.image_id
           WHERE sdi.dashboard_id = ? AND i.user_id = ?

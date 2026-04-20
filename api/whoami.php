@@ -60,4 +60,5 @@ echo json_encode([
   'storage_quota_used_bytes' => imagekpr_json_byte_string($quotaPayload['used_bytes']),
   'dashboard_image_limit' => $dashboardImageLimit,
   'supported_mime_types' => imagekpr_supported_upload_mimes(),
+  'can_upload_video' => isset($pdo) ? imagekpr_user_is_paid($pdo, (int) imagekpr_user_id()) : false,
 ], JSON_UNESCAPED_UNICODE);

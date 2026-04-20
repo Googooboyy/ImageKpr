@@ -558,6 +558,17 @@ $flash = $_SESSION['admin_flash'] ?? null;
 unset($_SESSION['admin_flash']);
 
 $qSearch = trim((string) ($_GET['q'] ?? ''));
+$tierFilter = strtolower(trim((string) ($_GET['tier'] ?? 'all')));
+$tierMap = [
+  'all' => null,
+  'free' => 'u.upload_size_mb <= 3',
+  'silver' => 'u.upload_size_mb = 10',
+  'gold' => 'u.upload_size_mb = 50',
+  'platinum' => 'u.upload_size_mb >= 500',
+];
+if (!array_key_exists($tierFilter, $tierMap)) {
+  $tierFilter = 'all';
+}
 $sort = (string) ($_GET['sort'] ?? 'email');
 $dir = strtolower((string) ($_GET['dir'] ?? 'asc')) === 'desc' ? 'DESC' : 'ASC';
 $sortMap = [
@@ -577,12 +588,19 @@ if (!isset($sortMap[$sort])) {
 $orderCol = $sortMap[$sort];
 
 $params = [];
-$whereSql = '';
+$whereParts = [];
 if ($qSearch !== '') {
-  $whereSql = ' WHERE (u.email LIKE ? OR u.name LIKE ?) ';
+  $whereParts[] = '(u.email LIKE ? OR u.name LIKE ?)';
   $like = '%' . $qSearch . '%';
   $params[] = $like;
   $params[] = $like;
+}
+if ($tierMap[$tierFilter] !== null) {
+  $whereParts[] = (string) $tierMap[$tierFilter];
+}
+$whereSql = '';
+if (!empty($whereParts)) {
+  $whereSql = ' WHERE ' . implode(' AND ', $whereParts) . ' ';
 }
 
 $sql = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at,
@@ -601,6 +619,25 @@ $rows = $st->fetchAll(PDO::FETCH_ASSOC);
 
 $totalStorage = (int) $pdo->query('SELECT COALESCE(SUM(size_bytes), 0) FROM images')->fetchColumn();
 $totalFiles = (int) $pdo->query('SELECT COUNT(*) FROM images')->fetchColumn();
+$hasMediaTypeColumn = false;
+try {
+  $colSt = $pdo->query("SHOW COLUMNS FROM images LIKE 'media_type'");
+  $hasMediaTypeColumn = $colSt && (bool) $colSt->fetch(PDO::FETCH_ASSOC);
+} catch (Throwable $e) {
+  $hasMediaTypeColumn = false;
+}
+$totalImageFiles = $totalFiles;
+$totalVideoFiles = 0;
+if ($hasMediaTypeColumn) {
+  $mediaTotals = $pdo->query(
+    "SELECT
+      SUM(media_type = 'image') AS image_count,
+      SUM(media_type = 'video') AS video_count
+    FROM images"
+  )->fetch(PDO::FETCH_ASSOC);
+  $totalImageFiles = (int) ($mediaTotals['image_count'] ?? 0);
+  $totalVideoFiles = (int) ($mediaTotals['video_count'] ?? 0);
+}
 $totalFolders = (int) $pdo->query('SELECT COUNT(*) FROM folders')->fetchColumn();
 $totalDashboards = (int) $pdo->query('SELECT COUNT(*) FROM shared_dashboards')->fetchColumn();
 $totalTags = (int) $pdo->query('SELECT COALESCE(SUM(JSON_LENGTH(tags)), 0) FROM images WHERE tags IS NOT NULL')->fetchColumn();
@@ -650,7 +687,7 @@ $topUsers = array_slice($byUsed, 0, 5);
 $pageTitle = 'Admin — Dashboard';
 $adminNavCurrent = 'dashboard';
 
-function admin_sort_link(string $col, string $label, string $currentSort, string $currentDir, string $q): string
+function admin_sort_link(string $col, string $label, string $currentSort, string $currentDir, string $q, string $tier): string
 {
   $nextDir = 'asc';
   if ($currentSort === $col && $currentDir === 'ASC') {
@@ -659,6 +696,9 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
   $qs = ['sort' => $col, 'dir' => $nextDir];
   if ($q !== '') {
     $qs['q'] = $q;
+  }
+  if ($tier !== 'all') {
+    $qs['tier'] = $tier;
   }
   $arrow = '';
   if ($currentSort === $col) {
@@ -775,10 +815,21 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
           <dt>Total storage (images)</dt>
           <dd><?php echo htmlspecialchars(imagekpr_format_bytes($totalStorage), ENT_QUOTES, 'UTF-8'); ?></dd>
         </div>
+        <?php if ($hasMediaTypeColumn) { ?>
+        <div class="admin-stat">
+          <dt>Image files</dt>
+          <dd><?php echo number_format($totalImageFiles); ?></dd>
+        </div>
+        <div class="admin-stat">
+          <dt>Video files</dt>
+          <dd><?php echo number_format($totalVideoFiles); ?></dd>
+        </div>
+        <?php } else { ?>
         <div class="admin-stat">
           <dt>Files</dt>
           <dd><?php echo number_format($totalFiles); ?></dd>
         </div>
+        <?php } ?>
         <div class="admin-stat">
           <dt>Folders</dt>
           <dd><?php echo number_format($totalFolders); ?></dd>
@@ -858,12 +909,22 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
       <?php if ($sort !== 'email') { ?><input type="hidden" name="sort" value="<?php echo htmlspecialchars($sort, ENT_QUOTES, 'UTF-8'); ?>"><?php } ?>
       <?php if ($dir !== 'ASC') { ?><input type="hidden" name="dir" value="<?php echo htmlspecialchars(strtolower($dir), ENT_QUOTES, 'UTF-8'); ?>"><?php } ?>
       <label>Search <input type="search" name="q" value="<?php echo htmlspecialchars($qSearch, ENT_QUOTES, 'UTF-8'); ?>" placeholder="Email or name"></label>
+      <label>Tier
+        <select name="tier">
+          <option value="all"<?php echo $tierFilter === 'all' ? ' selected' : ''; ?>>All tiers</option>
+          <option value="free"<?php echo $tierFilter === 'free' ? ' selected' : ''; ?>>Free</option>
+          <option value="silver"<?php echo $tierFilter === 'silver' ? ' selected' : ''; ?>>Silver</option>
+          <option value="gold"<?php echo $tierFilter === 'gold' ? ' selected' : ''; ?>>Gold</option>
+          <option value="platinum"<?php echo $tierFilter === 'platinum' ? ' selected' : ''; ?>>Platinum</option>
+        </select>
+      </label>
       <button type="submit">Filter</button>
       <?php
       if ($qSearch !== '') {
         $clearQs = array_filter([
           'sort' => $sort !== 'email' ? $sort : null,
           'dir' => $dir !== 'ASC' ? strtolower($dir) : null,
+          'tier' => $tierFilter !== 'all' ? $tierFilter : null,
         ]);
         $clearHref = 'index.php' . (!empty($clearQs) ? '?' . http_build_query($clearQs) : '');
         ?>
@@ -876,6 +937,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
       'q' => $qSearch !== '' ? $qSearch : null,
       'sort' => $sort !== 'email' ? $sort : null,
       'dir' => $dir !== 'ASC' ? strtolower($dir) : null,
+      'tier' => $tierFilter !== 'all' ? $tierFilter : null,
     ]);
     $bulkAction = 'index.php' . (!empty($bulkActionQs) ? '?' . http_build_query($bulkActionQs) : '');
     ?>
@@ -944,14 +1006,14 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
         <thead>
           <tr>
             <th class="admin-col-cb"><input type="checkbox" id="admin-select-all" title="Select all on this page" aria-label="Select all users on this page"></th>
-            <th class="admin-col-email"><?php echo admin_sort_link('email', 'Email', $sort, $dir, $qSearch); ?></th>
-            <th class="admin-col-name"><?php echo admin_sort_link('name', 'Name', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-email"><?php echo admin_sort_link('email', 'Email', $sort, $dir, $qSearch, $tierFilter); ?></th>
+            <th class="admin-col-name"><?php echo admin_sort_link('name', 'Name', $sort, $dir, $qSearch, $tierFilter); ?></th>
             <th class="admin-col-plan" title="Match = exact storage cap + upload MB vs matrix; preset applies both">Plan preset<br><span class="admin-th-sub">matrix match</span></th>
-            <th class="admin-col-storage" title="Used storage / quota cap in MiB"><?php echo admin_sort_link('used', 'Storage', $sort, $dir, $qSearch); ?></th>
-            <th class="admin-col-files" title="Uploaded images / plan limit"><?php echo admin_sort_link('files', 'Files', $sort, $dir, $qSearch); ?></th>
-            <th class="admin-col-dashboards" title="Shared dashboards / plan limit"><?php echo admin_sort_link('dashes', 'Dashboards', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-storage" title="Used storage / quota cap in MiB"><?php echo admin_sort_link('used', 'Storage', $sort, $dir, $qSearch, $tierFilter); ?></th>
+            <th class="admin-col-files" title="Uploaded images / plan limit"><?php echo admin_sort_link('files', 'Files', $sort, $dir, $qSearch, $tierFilter); ?></th>
+            <th class="admin-col-dashboards" title="Shared dashboards / plan limit"><?php echo admin_sort_link('dashes', 'Dashboards', $sort, $dir, $qSearch, $tierFilter); ?></th>
             <th class="admin-col-days" title="Whole days since last sign-in (— if never)">Last access<br><span class="admin-th-sub">days ago</span></th>
-            <th class="admin-col-admin"><?php echo admin_sort_link('admin', 'Admin', $sort, $dir, $qSearch); ?></th>
+            <th class="admin-col-admin"><?php echo admin_sort_link('admin', 'Admin', $sort, $dir, $qSearch, $tierFilter); ?></th>
           </tr>
         </thead>
         <tbody>
@@ -1001,7 +1063,7 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
               <td class="admin-col-plan">
                 <div class="admin-tier-match"><?php echo htmlspecialchars($tierMatchLabel, ENT_QUOTES, 'UTF-8'); ?></div>
                 <form class="admin-preset-form" method="post" action="index.php<?php
-            $hiddenQ = array_filter(['q' => $qSearch !== '' ? $qSearch : null, 'sort' => $sort !== 'email' ? $sort : null, 'dir' => $dir !== 'ASC' ? strtolower($dir) : null]);
+            $hiddenQ = array_filter(['q' => $qSearch !== '' ? $qSearch : null, 'sort' => $sort !== 'email' ? $sort : null, 'dir' => $dir !== 'ASC' ? strtolower($dir) : null, 'tier' => $tierFilter !== 'all' ? $tierFilter : null]);
             if (!empty($hiddenQ)) {
               echo '?' . htmlspecialchars(http_build_query($hiddenQ), ENT_QUOTES, 'UTF-8');
             }

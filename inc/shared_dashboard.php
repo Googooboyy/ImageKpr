@@ -64,7 +64,7 @@ try {
 }
 
 try {
-  $imgSt = $pdo->prepare('SELECT i.id, i.filename, i.url, i.width, i.height
+  $imgSt = $pdo->prepare('SELECT i.id, i.filename, i.url, i.width, i.height, i.media_type
                           FROM shared_dashboard_images sdi
                           INNER JOIN images i ON i.id = sdi.image_id
                           WHERE sdi.dashboard_id = ?
@@ -140,7 +140,7 @@ try {
 $heroImageUrl = '';
 if (!empty($dashboard['hero_image_id'])) {
   foreach ($images as $img) {
-    if ((int) ($img['id'] ?? 0) === (int) $dashboard['hero_image_id']) {
+    if ((int) ($img['id'] ?? 0) === (int) $dashboard['hero_image_id'] && (string) ($img['media_type'] ?? 'image') !== 'video') {
       $heroImageUrl = (string) ($img['url'] ?? '');
       break;
     }
@@ -195,8 +195,13 @@ if (!empty($dashboard['hero_image_id'])) {
       </div>
       <section class="shared-dash-grid" id="shared-dash-grid">
         <?php foreach ($images as $idx => $img): ?>
-          <figure class="shared-dash-item" data-index="<?php echo (int) $idx; ?>" data-image-id="<?php echo (int) $img['id']; ?>">
-            <img src="<?php echo htmlspecialchars((string) $img['url'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars((string) $img['filename'], ENT_QUOTES, 'UTF-8'); ?>" loading="lazy">
+          <?php $isVideo = isset($img['media_type']) && (string) $img['media_type'] === 'video'; ?>
+          <figure class="shared-dash-item" data-index="<?php echo (int) $idx; ?>" data-image-id="<?php echo (int) $img['id']; ?>" data-url="<?php echo htmlspecialchars((string) $img['url'], ENT_QUOTES, 'UTF-8'); ?>" data-filename="<?php echo htmlspecialchars((string) $img['filename'], ENT_QUOTES, 'UTF-8'); ?>" data-media-type="<?php echo $isVideo ? 'video' : 'image'; ?>">
+            <?php if ($isVideo): ?>
+              <video src="<?php echo htmlspecialchars((string) $img['url'], ENT_QUOTES, 'UTF-8'); ?>" preload="metadata" controls muted playsinline></video>
+            <?php else: ?>
+              <img src="<?php echo htmlspecialchars((string) $img['url'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars((string) $img['filename'], ENT_QUOTES, 'UTF-8'); ?>" loading="lazy">
+            <?php endif; ?>
           </figure>
         <?php endforeach; ?>
       </section>
@@ -212,6 +217,7 @@ if (!empty($dashboard['hero_image_id'])) {
   <div id="shared-lightbox" class="shared-lightbox" hidden>
     <button type="button" id="shared-lightbox-prev" class="shared-lightbox-nav">‹</button>
     <img id="shared-lightbox-img" src="" alt="">
+    <video id="shared-lightbox-video" controls hidden></video>
     <button type="button" id="shared-lightbox-next" class="shared-lightbox-nav">›</button>
     <div class="shared-lightbox-top">
       <a id="shared-lightbox-download" href="#">Download</a>
@@ -250,7 +256,7 @@ if (!empty($dashboard['hero_image_id'])) {
       <label class="slideshow-check"><input type="checkbox" id="slideshow-fill-image"> Fill image (cover screen, crop overflow)</label>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-show-controller"> Show mini controller tray on start</label>
       <label class="slideshow-check"><input type="checkbox" id="slideshow-autoloop" checked> Loop (return to first after last)</label>
-      <label class="slideshow-check slideshow-check-nested" id="slideshow-randomize-loop-label"><input type="checkbox" id="slideshow-randomize-loop"> Randomize order each time the slideshow loops</label>
+      <label class="slideshow-check" id="slideshow-randomize-loop-label"><input type="checkbox" id="slideshow-randomize-loop"> Randomize slide order (turn off to restore grid order)</label>
       <fieldset class="slideshow-fieldset">
         <legend>Transition</legend>
         <label class="slideshow-radio"><input type="radio" name="slideshow-transition" id="slideshow-trans-diffuse" value="diffuse" checked> Diffuse (crossfade)</label>
@@ -266,14 +272,30 @@ if (!empty($dashboard['hero_image_id'])) {
         <label class="slideshow-radio"><input type="radio" name="slideshow-letterbox" id="slideshow-lb-blue" value="blue"> Blue</label>
       </fieldset>
       <div class="slideshow-settings-hint" aria-label="Slideshow keyboard help">
-        <div>Exit: click outside the picture, the × button, or press Esc.</div>
-        <div>M/A switches Manual/Auto.</div>
-        <div>P pauses/resumes in Auto mode.</div>
-        <div>↑ / ↓ changes seconds per slide.</div>
-        <div>F toggles Fill image.</div>
-        <div>L toggles Loop.</div>
-        <div>C shows/hides the mini controller tray.</div>
-        <div style="margin-top:0.45rem;font-style:italic">On mobile: swipe left/right to navigate, single tap to pause/resume (or advance in Manual), double tap to toggle Fill.</div>
+        <div class="ss-hint-group ss-hint-nav">
+          <span class="ss-hint-label">Navigate</span>
+          <span class="ss-hint-item"><kbd>&larr;</kbd> <kbd>&rarr;</kbd> previous / next slide</span>
+        </div>
+        <div class="ss-hint-group ss-hint-play">
+          <span class="ss-hint-label">Playback</span>
+          <span class="ss-hint-item"><kbd>M</kbd> / <kbd>A</kbd> switch Manual / Auto</span>
+          <span class="ss-hint-item"><kbd>P</kbd> pause / resume (Auto mode)</span>
+          <span class="ss-hint-item"><kbd>&uarr;</kbd> <kbd>&darr;</kbd> seconds per slide (Auto mode)</span>
+        </div>
+        <div class="ss-hint-group ss-hint-display">
+          <span class="ss-hint-label">Display</span>
+          <span class="ss-hint-item"><kbd>F</kbd> toggle Fill image</span>
+          <span class="ss-hint-item"><kbd>C</kbd> show / hide the mini controller tray</span>
+        </div>
+        <div class="ss-hint-group ss-hint-deck">
+          <span class="ss-hint-label">Deck</span>
+          <span class="ss-hint-item"><kbd>L</kbd> toggle Loop &middot; <kbd>R</kbd> toggle Randomize order</span>
+        </div>
+        <div class="ss-hint-group ss-hint-exit">
+          <span class="ss-hint-label">Exit</span>
+          <span class="ss-hint-item"><kbd>Esc</kbd> &middot; the &times; button &middot; click outside the picture</span>
+        </div>
+        <div class="ss-hint-mobile">On mobile: swipe left/right to navigate &middot; single tap to pause / resume (or advance in Manual) &middot; double tap to toggle Fill.</div>
       </div>
       <div class="slideshow-settings-actions">
         <button type="button" id="slideshow-start" class="slideshow-btn-primary">Start slideshow</button>
@@ -290,7 +312,7 @@ if (!empty($dashboard['hero_image_id'])) {
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-manual" data-active="false" title="Manual mode (M)">MAN</button>
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-auto" data-active="false" title="Auto mode (A)">AUTO</button>
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-loop" data-active="false" title="Loop (L)">LOOP</button>
-      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-rand" data-active="false" title="Randomize on each loop">RAND</button>
+      <button type="button" class="ss-ctrl-pill" id="ss-ctrl-rand" data-active="false" title="Randomize order (R)">RAND</button>
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-pause" data-active="false" title="Pause / resume (P)">PAUSE</button>
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-fill" data-active="false" title="Fill image (F)">FILL</button>
       <button type="button" class="ss-ctrl-pill" id="ss-ctrl-interval-dec" data-active="false" title="Decrease interval">-1s</button>
@@ -318,14 +340,16 @@ if (!empty($dashboard['hero_image_id'])) {
     <div class="slideshow-stage">
       <div class="slideshow-player-bg" id="slideshow-player-bg" aria-hidden="true"></div>
       <img id="slideshow-img" class="slideshow-img" src="" alt="">
+      <video id="slideshow-video" class="slideshow-video" controls preload="metadata" hidden></video>
     </div>
   </div>
   <script>
     (function () {
-      const items = Array.from(document.querySelectorAll('.shared-dash-item img'));
+      const items = Array.from(document.querySelectorAll('.shared-dash-item'));
       const lb = document.getElementById('shared-lightbox');
       if (!lb || items.length === 0) return;
       const imgEl = document.getElementById('shared-lightbox-img');
+      const videoEl = document.getElementById('shared-lightbox-video');
       const counterEl = document.getElementById('shared-lightbox-counter');
       const copyBtn = document.getElementById('shared-copy-image-url');
       const downloadEl = document.getElementById('shared-lightbox-download');
@@ -334,30 +358,65 @@ if (!empty($dashboard['hero_image_id'])) {
       let currentDownloadFilename = 'image';
       let idx = 0;
       let touchStartX = 0;
+      function closeLightbox() {
+        lb.hidden = true;
+        if (videoEl) {
+          videoEl.pause();
+          videoEl.removeAttribute('src');
+          videoEl.hidden = true;
+        }
+      }
+      const itemData = items.map((el) => ({
+        el,
+        id: Number(el.dataset.imageId || 0),
+        url: el.dataset.url || '',
+        filename: el.dataset.filename || '',
+        media_type: el.dataset.mediaType || 'image',
+      }));
       function openAt(i) {
-        idx = (i + items.length) % items.length;
-        const src = items[idx].src;
-        imgEl.src = src;
-        counterEl.textContent = (idx + 1) + '/' + items.length;
+        idx = (i + itemData.length) % itemData.length;
+        const item = itemData[idx];
+        const src = item.url;
+        const isVideo = item.media_type === 'video';
+        if (isVideo) {
+          if (imgEl) {
+            imgEl.hidden = true;
+            imgEl.removeAttribute('src');
+          }
+          if (videoEl) {
+            videoEl.hidden = false;
+            videoEl.src = src;
+            videoEl.controls = true;
+          }
+        } else {
+          if (videoEl) {
+            videoEl.pause();
+            videoEl.hidden = true;
+            videoEl.removeAttribute('src');
+          }
+          imgEl.hidden = false;
+          imgEl.src = src;
+        }
+        counterEl.textContent = (idx + 1) + '/' + itemData.length;
         currentDownloadUrl = src;
-        currentDownloadFilename = items[idx].getAttribute('alt') || ('image-' + (idx + 1));
+        currentDownloadFilename = item.filename || ('image-' + (idx + 1));
         if (downloadEl) {
           const q = new URLSearchParams();
           q.set('share', <?php echo json_encode($token); ?>);
           q.set('download', 'one');
-          q.set('image_id', items[idx].closest('.shared-dash-item').dataset.imageId || '');
+          q.set('image_id', String(item.id || ''));
           downloadEl.href = 'index.php?' + q.toString();
         }
         lb.hidden = false;
       }
-      items.forEach((img, i) => img.addEventListener('click', () => openAt(i)));
-      document.getElementById('shared-lightbox-close').addEventListener('click', () => { lb.hidden = true; });
+      items.forEach((itemEl, i) => itemEl.addEventListener('click', () => openAt(i)));
+      document.getElementById('shared-lightbox-close').addEventListener('click', closeLightbox);
       document.getElementById('shared-lightbox-prev').addEventListener('click', () => openAt(idx - 1));
       document.getElementById('shared-lightbox-next').addEventListener('click', () => openAt(idx + 1));
-      lb.addEventListener('click', (e) => { if (e.target === lb) lb.hidden = true; });
+      lb.addEventListener('click', (e) => { if (e.target === lb) closeLightbox(); });
       document.addEventListener('keydown', (e) => {
         if (lb.hidden) return;
-        if (e.key === 'Escape') lb.hidden = true;
+        if (e.key === 'Escape') closeLightbox();
         if (e.key === 'ArrowRight') openAt(idx + 1);
         if (e.key === 'ArrowLeft') openAt(idx - 1);
       });
@@ -369,7 +428,7 @@ if (!empty($dashboard['hero_image_id'])) {
       }, { passive: true });
       copyBtn.addEventListener('click', async () => {
         try {
-          await navigator.clipboard.writeText(imgEl.src);
+          await navigator.clipboard.writeText(currentDownloadUrl);
           copyBtn.textContent = 'Copied';
           setTimeout(() => { copyBtn.textContent = 'Copy URL'; }, 1200);
         } catch (_) {}
@@ -397,7 +456,12 @@ if (!empty($dashboard['hero_image_id'])) {
           }
         });
       }
-      const slides = items.map((img) => ({ url: img.src, filename: img.alt || '' }));
+      const slides = itemData.map((item) => ({
+        id: item.id,
+        url: item.url,
+        filename: item.filename,
+        media_type: item.media_type,
+      }));
       const LETTERBOX = { black: '#000', white: '#fff', red: '#b71c1c', green: '#1b5e20', blue: '#0d47a1' };
       let ss = null;
       function ssSetControllerVisible(visible) {
@@ -416,7 +480,7 @@ if (!empty($dashboard['hero_image_id'])) {
         setActive('ss-ctrl-manual', !ss.auto);
         setActive('ss-ctrl-auto', !!ss.auto);
         setActive('ss-ctrl-loop', !!ss.autoloop);
-        setActive('ss-ctrl-rand', !!ss.autoloop && !!ss.randomizeOnLoop);
+        setActive('ss-ctrl-rand', !!ss.randomizeOrder);
         setActive('ss-ctrl-pause', !!ss.auto && !!ss.paused);
         setActive('ss-ctrl-fill', !!ss.fillImage);
         setActive('ss-ctrl-transition', ss.transition === 'fly');
@@ -424,12 +488,55 @@ if (!empty($dashboard['hero_image_id'])) {
         const readout = document.getElementById('ss-ctrl-interval-value');
         if (readout) readout.textContent = String(Math.round(ss.intervalMs / 1000)) + 's';
       }
+      function ssShuffleInPlace(a) {
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const t = a[i];
+          a[i] = a[j];
+          a[j] = t;
+        }
+      }
+      function ssToggleRandomizeOrder() {
+        if (!ss) return;
+        const curKey = ss.slides[ss.index] ? ss.slides[ss.index].url : '';
+        ss.randomizeOrder = !ss.randomizeOrder;
+        if (ss.randomizeOrder) {
+          ssShuffleInPlace(ss.slides);
+          let i = ss.slides.findIndex((s) => s.url === curKey);
+          if (i < 0) i = 0;
+          ss.index = i;
+        } else {
+          ss.slides = ss.baselineSlides.slice();
+          let i = ss.slides.findIndex((s) => s.url === curKey);
+          if (i < 0) i = 0;
+          ss.index = i;
+        }
+        const randIn = document.getElementById('slideshow-randomize-loop');
+        if (randIn) randIn.checked = ss.randomizeOrder;
+        ssApplyUi();
+        ssSyncController();
+      }
       function ssClearTimer() {
         if (ss && ss.timerId) { clearInterval(ss.timerId); ss.timerId = null; }
+        if (ss && ss.videoEndedHandler) {
+          const sv = document.getElementById('slideshow-video');
+          if (sv) sv.removeEventListener('ended', ss.videoEndedHandler);
+          ss.videoEndedHandler = null;
+        }
       }
       function ssArmTimer() {
         ssClearTimer();
         if (!ss || !ss.auto || ss.paused) return;
+        const slide = ss.slides[ss.index];
+        if (slide && slide.media_type === 'video') {
+          const sv = document.getElementById('slideshow-video');
+          if (!sv) return;
+          ss.videoEndedHandler = () => ssMove(1);
+          sv.addEventListener('ended', ss.videoEndedHandler, { once: true });
+          sv.muted = true;
+          sv.play().catch(() => {});
+          return;
+        }
         ss.timerId = setInterval(() => ssMove(1), ss.intervalMs);
       }
       function ssApplyUi() {
@@ -437,13 +544,30 @@ if (!empty($dashboard['hero_image_id'])) {
         const player = document.getElementById('slideshow-player');
         const bg = document.getElementById('slideshow-player-bg');
         const img = document.getElementById('slideshow-img');
+        const video = document.getElementById('slideshow-video');
         const cap = document.getElementById('slideshow-filename-caption');
         const counter = document.getElementById('slideshow-counter');
-        if (!player || !img || !counter || !bg || !cap) return;
+        if (!player || !img || !counter || !bg || !cap || !video) return;
         const slide = ss.slides[ss.index];
-        img.src = slide.url;
-        img.alt = slide.filename || '';
-        img.style.objectFit = ss.fillImage ? 'cover' : 'contain';
+        const isVideo = slide && slide.media_type === 'video';
+        if (isVideo) {
+          img.hidden = true;
+          img.removeAttribute('src');
+          img.removeAttribute('alt');
+          video.hidden = false;
+          video.src = slide.url;
+          video.controls = true;
+          video.preload = 'metadata';
+          video.style.objectFit = ss.fillImage ? 'cover' : 'contain';
+        } else {
+          video.pause();
+          video.hidden = true;
+          video.removeAttribute('src');
+          img.hidden = false;
+          img.src = slide.url;
+          img.alt = slide.filename || '';
+          img.style.objectFit = ss.fillImage ? 'cover' : 'contain';
+        }
         bg.style.background = LETTERBOX[ss.letterboxKey] || LETTERBOX.black;
         counter.textContent = (ss.index + 1) + ' / ' + ss.slides.length;
         if (ss.showFilename && slide.filename) {
@@ -455,16 +579,18 @@ if (!empty($dashboard['hero_image_id'])) {
           cap.setAttribute('aria-hidden', 'true');
           cap.textContent = '';
         }
+        if (ss.auto && !ss.paused) ssArmTimer();
       }
       function ssMove(delta) {
         if (!ss || !ss.slides.length) return;
         const next = ss.index + delta;
         if (next < 0) {
           if (!ss.autoloop) return;
+          if (ss.randomizeOrder) ssShuffleInPlace(ss.slides);
           ss.index = ss.slides.length - 1;
         } else if (next >= ss.slides.length) {
           if (!ss.autoloop) { ssClearTimer(); return; }
-          if (ss.randomizeOnLoop) ss.slides = ss.slides.slice().sort(() => Math.random() - 0.5);
+          if (ss.randomizeOrder) ssShuffleInPlace(ss.slides);
           ss.index = 0;
         } else {
           ss.index = next;
@@ -473,6 +599,12 @@ if (!empty($dashboard['hero_image_id'])) {
       }
       function ssClosePlayer() {
         ssClearTimer();
+        const sv = document.getElementById('slideshow-video');
+        if (sv) {
+          sv.pause();
+          sv.hidden = true;
+          sv.removeAttribute('src');
+        }
         const player = document.getElementById('slideshow-player');
         if (player) {
           player.hidden = true;
@@ -484,19 +616,25 @@ if (!empty($dashboard['hero_image_id'])) {
         if (!slides.length) return;
         const auto = !!document.getElementById('slideshow-advance-auto')?.checked;
         const duration = Math.max(1, Math.min(600, Number(document.getElementById('slideshow-duration')?.value || 5)));
+        const baselineSlides = slides.slice();
+        const randomizeOrder = !!document.getElementById('slideshow-randomize-loop')?.checked;
+        const deck = slides.slice();
+        if (randomizeOrder) ssShuffleInPlace(deck);
         ss = {
-          slides: slides.slice(),
+          slides: deck,
+          baselineSlides,
           index: 0,
           auto: auto,
           paused: false,
           autoloop: !!document.getElementById('slideshow-autoloop')?.checked,
-          randomizeOnLoop: !!document.getElementById('slideshow-randomize-loop')?.checked,
+          randomizeOrder,
           showFilename: !!document.getElementById('slideshow-show-filename')?.checked,
           fillImage: !!document.getElementById('slideshow-fill-image')?.checked,
           transition: document.getElementById('slideshow-trans-fly')?.checked ? 'fly' : 'diffuse',
           letterboxKey: document.querySelector('input[name="slideshow-letterbox"]:checked')?.value || 'black',
           intervalMs: Math.round(duration * 1000),
           timerId: null,
+          videoEndedHandler: null,
           controllerVisible: !!document.getElementById('slideshow-show-controller')?.checked,
         };
         const wrap = document.getElementById('slideshow-settings-wrap');
@@ -541,7 +679,7 @@ if (!empty($dashboard['hero_image_id'])) {
       document.getElementById('ss-ctrl-manual')?.addEventListener('click', () => { if (!ss) return; ss.auto = false; ss.paused = false; ssClearTimer(); ssSyncController(); });
       document.getElementById('ss-ctrl-auto')?.addEventListener('click', () => { if (!ss) return; ss.auto = true; ss.paused = false; ssSyncController(); ssArmTimer(); });
       document.getElementById('ss-ctrl-loop')?.addEventListener('click', () => { if (!ss) return; ss.autoloop = !ss.autoloop; ssSyncController(); });
-      document.getElementById('ss-ctrl-rand')?.addEventListener('click', () => { if (!ss) return; ss.randomizeOnLoop = !ss.randomizeOnLoop; ssSyncController(); });
+      document.getElementById('ss-ctrl-rand')?.addEventListener('click', () => ssToggleRandomizeOrder());
       document.getElementById('ss-ctrl-pause')?.addEventListener('click', () => { if (!ss || !ss.auto) return; ss.paused = !ss.paused; ssSyncController(); ssArmTimer(); });
       document.getElementById('ss-ctrl-fill')?.addEventListener('click', () => { if (!ss) return; ss.fillImage = !ss.fillImage; ssApplyUi(); ssSyncController(); });
       document.getElementById('ss-ctrl-transition')?.addEventListener('click', () => { if (!ss) return; ss.transition = ss.transition === 'fly' ? 'diffuse' : 'fly'; ssSyncController(); });
@@ -572,6 +710,7 @@ if (!empty($dashboard['hero_image_id'])) {
         if (e.key.toLowerCase() === 'p' && ss.auto) { ss.paused = !ss.paused; ssSyncController(); ssArmTimer(); }
         if (e.key.toLowerCase() === 'f') { ss.fillImage = !ss.fillImage; ssApplyUi(); ssSyncController(); }
         if (e.key.toLowerCase() === 'l') { ss.autoloop = !ss.autoloop; ssSyncController(); }
+        if (e.key.toLowerCase() === 'r') { e.preventDefault(); ssToggleRandomizeOrder(); }
         if (e.key.toLowerCase() === 'c') { ssSetControllerVisible(!ss.controllerVisible); }
         if (e.key === 'ArrowUp') { ss.intervalMs = Math.min(600000, ss.intervalMs + 1000); ssSyncController(); ssArmTimer(); }
         if (e.key === 'ArrowDown') { ss.intervalMs = Math.max(1000, ss.intervalMs - 1000); ssSyncController(); ssArmTimer(); }

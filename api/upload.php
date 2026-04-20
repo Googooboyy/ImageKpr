@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../inc/auth.php';
 require_once __DIR__ . '/../inc/admin.php';
+require_once __DIR__ . '/../inc/tiers.php';
 require_once __DIR__ . '/../inc/maintenance.php';
 imagekpr_require_api_user();
 imagekpr_block_if_maintenance_json();
@@ -61,6 +62,10 @@ try {
   echo json_encode(['success' => false, 'error' => 'Database connection failed']);
   exit;
 }
+$userIsPaid = imagekpr_user_is_paid($pdo, (int) $uid);
+if ($userIsPaid) {
+  $allowedMimes[] = 'video/mp4';
+}
 $maxUploadBytes = imagekpr_user_max_upload_bytes($pdo, $uid);
 $maxUploadMb = (int) round($maxUploadBytes / (1024 * 1024));
 
@@ -76,7 +81,7 @@ foreach ($files as $file) {
   $finfo = finfo_open(FILEINFO_MIME_TYPE);
   $mime = finfo_file($finfo, $file['tmp_name']);
   finfo_close($finfo);
-  if (!in_array($mime, $allowedMimes)) {
+  if (!in_array($mime, $allowedMimes, true)) {
     continue;
   }
   $baseName = sanitizeFilename($file['name']);
@@ -113,8 +118,8 @@ foreach ($files as $file) {
   $finfo = finfo_open(FILEINFO_MIME_TYPE);
   $mime = finfo_file($finfo, $file['tmp_name']);
   finfo_close($finfo);
-  if (!in_array($mime, $allowedMimes)) {
-    $uploaded[] = ['success' => false, 'error' => 'Invalid image type'];
+  if (!in_array($mime, $allowedMimes, true)) {
+    $uploaded[] = ['success' => false, 'error' => 'Invalid file type'];
     continue;
   }
   $baseName = sanitizeFilename($file['name']);
@@ -142,14 +147,19 @@ foreach ($files as $file) {
     continue;
   }
   $size = filesize($path);
-  $info = @getimagesize($path);
-  $width = $info[0] ?? null;
-  $height = $info[1] ?? null;
+  $isVideo = ($mime === 'video/mp4');
+  $width = null;
+  $height = null;
+  if (!$isVideo) {
+    $info = @getimagesize($path);
+    $width = $info[0] ?? null;
+    $height = $info[1] ?? null;
+  }
   $url = imagekpr_user_images_url($uid) . '/' . $baseName;
   $date = date('Y-m-d H:i:s');
   $tagsJson = json_encode([]);
-  $stmt = $pdo->prepare('INSERT INTO images (filename, url, date_uploaded, size_bytes, width, height, tags, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-  $stmt->execute([$baseName, $url, $date, $size, $width, $height, $tagsJson, $uid]);
+  $stmt = $pdo->prepare('INSERT INTO images (filename, url, date_uploaded, size_bytes, width, height, tags, media_type, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  $stmt->execute([$baseName, $url, $date, $size, $width, $height, $tagsJson, $isVideo ? 'video' : 'image', $uid]);
   $id = (int) $pdo->lastInsertId();
   $uploaded[] = [
     'success' => true,
@@ -162,6 +172,7 @@ foreach ($files as $file) {
       'width' => $width,
       'height' => $height,
       'tags' => [],
+      'media_type' => $isVideo ? 'video' : 'image',
     ]
   ];
 }
