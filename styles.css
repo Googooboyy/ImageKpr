@@ -35,6 +35,84 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
 
 /* Sticky banner: grey hint bar + selection banner when active */
 .banner-sticky { position: sticky; top: 0; z-index: 100; margin: 0 -2rem 1rem -2rem; background: #c8c8c8; border-bottom: 1px solid #aaa; }
+
+/* Global upload status (videos / large batches) */
+.upload-global-status {
+  padding: 0.45rem 2rem 0.5rem;
+  border-bottom: 1px solid #9e9e9e;
+  background: #eceff1;
+}
+.upload-global-status[hidden] { display: none !important; }
+.upload-global-status-inner {
+  max-width: 56rem;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+.upload-global-status-text {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1a237e;
+  line-height: 1.35;
+}
+.upload-global-status-track {
+  flex: 2 1 14rem;
+  height: 8px;
+  background: #cfd8dc;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid #b0bec5;
+}
+.upload-global-status-fill {
+  height: 100%;
+  width: 0%;
+  background: #3949ab;
+  border-radius: 999px;
+  transition: width 0.15s ease-out;
+}
+.upload-global-status-pct {
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #37474f;
+  min-width: 2.75rem;
+  text-align: right;
+}
+.upload-global-status--processing .upload-global-status-text { color: #4a148c; }
+.upload-global-status--processing .upload-global-status-fill {
+  width: 100% !important;
+  background: linear-gradient(90deg, #7b1fa2, #ab47bc, #7b1fa2);
+  background-size: 200% 100%;
+  animation: ikprUploadPulse 1.1s ease-in-out infinite;
+}
+@keyframes ikprUploadPulse {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+.upload-global-status--success {
+  background: #e8f5e9;
+  border-bottom-color: #81c784;
+}
+.upload-global-status--success .upload-global-status-text {
+  color: #1b5e20;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+.upload-global-status--success .upload-global-status-track { display: none; }
+.upload-global-status--success .upload-global-status-pct { display: none; }
+.upload-global-status--error {
+  background: #ffebee;
+  border-bottom-color: #e57373;
+}
+.upload-global-status--error .upload-global-status-text { color: #b71c1c; }
+.upload-global-status--error .upload-global-status-fill { background: #c62828; }
+.upload-global-status--error .upload-global-status-track { display: none; }
+.upload-global-status--error .upload-global-status-pct { display: none; }
 .banner-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 2rem; }
 .user-hint-banner { flex: 1; display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 0 1rem; font-size: 0.875rem; color: #666; }
 .user-hint-text.user-hint-text--low-storage { color: #b45309; font-weight: 500; }
@@ -676,6 +754,11 @@ body.ikpr-maintenance #inbox-import-btn { pointer-events: none; opacity: 0.5; }
 .modal-img-wrap { position: relative; margin-bottom: 1rem; display: inline-block; max-width: 100%; }
 .modal-img-wrap img { max-width: 100%; max-height: 70vh; display: block; }
 .modal-img-wrap video { max-width: 100%; max-height: 70vh; display: block; border-radius: 4px; background: #000; }
+/* [hidden] alone loses to the rules above; without this, prev video + next image both stay visible */
+.modal-img-wrap img[hidden],
+.modal-img-wrap video[hidden] {
+  display: none !important;
+}
 .modal-nav-btn {
   position: absolute;
   top: 50%;

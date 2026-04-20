@@ -757,6 +757,7 @@
         videoEl.pause();
         videoEl.hidden = true;
         videoEl.removeAttribute('src');
+        try { videoEl.load(); } catch (_) {}
       }
       imgEl.hidden = false;
       imgEl.src = img.url;
@@ -1799,6 +1800,15 @@
           return;
         }
         if (slideshowState.fillImage) return;
+        const slide = slideshowState.slides[slideshowState.index];
+        const videoEl = document.getElementById('slideshow-video');
+        if (isVideoSlide(slide) && videoEl && !videoEl.hidden) {
+          if (e.target === videoEl || (videoEl.contains && videoEl.contains(e.target))) return;
+          const vr = videoEl.getBoundingClientRect();
+          const x = e.clientX;
+          const y = e.clientY;
+          if (vr.width > 0 && vr.height > 0 && x >= vr.left && x <= vr.right && y >= vr.top && y <= vr.bottom) return;
+        }
         const imgEl = document.getElementById('slideshow-img');
         const st = document.querySelector('#slideshow-player .slideshow-stage');
         if (!imgEl || !st) return;
@@ -2334,6 +2344,7 @@
     if (videoEl) {
       videoEl.pause();
       videoEl.removeAttribute('src');
+      try { videoEl.load(); } catch (_) {}
       videoEl.hidden = true;
     }
     document.getElementById('modal').hidden = true;
@@ -2369,7 +2380,7 @@
 
   function loadGrid(params, append) {
     const q = new URLSearchParams(params || {});
-    fetchJSON(API_BASE + '/images.php?' + q).then(data => {
+    return fetchJSON(API_BASE + '/images.php?' + q).then(data => {
       const grid = document.getElementById('grid');
       const loadMore = document.getElementById('load-more');
       const total = data.total || 0;
@@ -2453,6 +2464,7 @@
     }).catch((err) => {
       showApiImagesError(err, append);
       updateHintBanner();
+      throw err;
     });
   }
 
@@ -2489,44 +2501,40 @@
     if (filterVal === LATEST_FILTER) {
       const ids = getLastBatchIds();
       if (ids.length > 0) {
-        loadGridFiltered(ids, append);
-      } else {
-        const grid = document.getElementById('grid');
-        if (!append) grid.innerHTML = '<p class="empty">No last batch — upload to see your most recent batch here.</p>';
-        document.getElementById('load-more').innerHTML = '';
-        gridState.total = 0;
-        updateHintBanner();
+        return loadGridFiltered(ids, append);
       }
-      return;
+      const grid = document.getElementById('grid');
+      if (!append) grid.innerHTML = '<p class="empty">No last batch — upload to see your most recent batch here.</p>';
+      document.getElementById('load-more').innerHTML = '';
+      gridState.total = 0;
+      updateHintBanner();
+      return Promise.resolve();
     }
     if (filterVal === UNCATEGORIZED_FILTER) {
-      loadUncategorizedGrid(append);
-      return;
+      return loadUncategorizedGrid(append);
     }
     const ids = (window.ImageKprFolders && window.ImageKprFolders.getFilterIds && window.ImageKprFolders.getFilterIds()) || null;
     if (ids && ids.length > 0) {
-      loadGridFiltered(ids, append);
-      return;
+      return loadGridFiltered(ids, append);
     }
     const p = { page: gridState.page, per_page: gridState.perPage, sort: gridState.sort };
     if (gridState.search) p.search = gridState.search;
     if (gridState.tagFilter) p.tag = gridState.tagFilter;
-    loadGrid(p, append);
+    return loadGrid(p, append);
   }
 
   function loadGridFiltered(ids, append) {
     let url = API_BASE + '/images.php?per_page=5000&sort=' + gridState.sort;
     if (gridState.tagFilter) url += '&tag=' + encodeURIComponent(gridState.tagFilter);
     if (gridState.search) url += '&search=' + encodeURIComponent(gridState.search);
-    fetchJSON(url).then(data => {
+    return fetchJSON(url).then(data => {
       let filtered = (data.images || []).filter(img => ids.includes(Number(img.id)));
       if (!append && filtered.length === 0 && (data.total || 0) > 0 && ids.length > 0) {
         showToast('This folder’s saved IDs do not match your library (often after DB changes). Showing all images.', true);
         const fi = document.getElementById('folder-filter');
         if (fi) fi.value = '';
         populateFolderIcons('');
-        refreshGrid(false);
-        return;
+        return refreshGrid(false);
       }
       const grid = document.getElementById('grid');
       if (!append) grid.innerHTML = '';
@@ -2559,6 +2567,7 @@
     }).catch((err) => {
       showApiImagesError(err, append);
       updateHintBanner();
+      throw err;
     });
   }
 
@@ -2571,7 +2580,7 @@
     let url = API_BASE + '/images.php?per_page=5000&sort=' + gridState.sort;
     if (gridState.tagFilter) url += '&tag=' + encodeURIComponent(gridState.tagFilter);
     if (gridState.search) url += '&search=' + encodeURIComponent(gridState.search);
-    fetchJSON(url).then(data => {
+    return fetchJSON(url).then(data => {
       const filtered = (data.images || []).filter(img => !idsInFolders.has(Number(img.id)));
       const grid = document.getElementById('grid');
       if (!append) grid.innerHTML = '';
@@ -2601,6 +2610,7 @@
     }).catch((err) => {
       showApiImagesError(err, append);
       updateHintBanner();
+      throw err;
     });
   }
 
@@ -2614,6 +2624,7 @@
   const MAX_WIDTH = 1920;
   let ALLOWED_UPLOAD_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
   let CAN_UPLOAD_VIDEO = false;
+  const ALLOWED_VIDEO_UPLOAD_MIMES = ['video/mp4', 'video/x-m4v'];
 
   function canvasToBlob(canvas, type, quality) {
     return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
@@ -2676,6 +2687,81 @@
     return ids;
   }
 
+  let uploadGlobalStatusHideTimer = null;
+
+  function clearUploadGlobalStatusTimer() {
+    if (uploadGlobalStatusHideTimer) {
+      clearTimeout(uploadGlobalStatusHideTimer);
+      uploadGlobalStatusHideTimer = null;
+    }
+  }
+
+  function hideUploadGlobalStatus() {
+    clearUploadGlobalStatusTimer();
+    const wrap = document.getElementById('upload-global-status');
+    const fill = document.getElementById('upload-global-status-fill');
+    if (fill) fill.style.width = '0%';
+    const pctEl = document.getElementById('upload-global-status-pct');
+    if (pctEl) pctEl.textContent = '';
+    if (wrap) {
+      wrap.hidden = true;
+      wrap.className = 'upload-global-status';
+    }
+  }
+
+  function setUploadGlobalProgress(pct) {
+    const fill = document.getElementById('upload-global-status-fill');
+    const pctEl = document.getElementById('upload-global-status-pct');
+    const p = Math.max(0, Math.min(100, Math.round(pct)));
+    if (fill) fill.style.width = p + '%';
+    if (pctEl) pctEl.textContent = p + '%';
+  }
+
+  function scheduleUploadGlobalSuccessHide() {
+    clearUploadGlobalStatusTimer();
+    uploadGlobalStatusHideTimer = setTimeout(() => {
+      uploadGlobalStatusHideTimer = null;
+      hideUploadGlobalStatus();
+    }, 4500);
+  }
+
+  function showUploadGlobalStatus(state, message, opts) {
+    opts = opts || {};
+    const wrap = document.getElementById('upload-global-status');
+    const textEl = document.getElementById('upload-global-status-text');
+    const track = document.getElementById('upload-global-status-track');
+    const pctEl = document.getElementById('upload-global-status-pct');
+    if (!wrap || !textEl) return;
+    clearUploadGlobalStatusTimer();
+    wrap.hidden = false;
+    wrap.className = 'upload-global-status upload-global-status--' + state;
+    textEl.textContent = message;
+    const showTrack = state === 'uploading' || state === 'processing';
+    if (track) track.style.display = showTrack ? '' : 'none';
+    if (pctEl) {
+      pctEl.style.display = state === 'uploading' ? '' : 'none';
+      if (state === 'uploading' && typeof opts.pct === 'number') setUploadGlobalProgress(opts.pct);
+      else if (state === 'processing') setUploadGlobalProgress(100);
+    }
+    if (state === 'success') scheduleUploadGlobalSuccessHide();
+  }
+
+  function buildUploadSuccessMessage(validItems) {
+    const n = validItems.length;
+    let videoCount = 0;
+    validItems.forEach(it => {
+      if (it.file && ALLOWED_VIDEO_UPLOAD_MIMES.includes(it.file.type)) videoCount++;
+    });
+    const imageCount = n - videoCount;
+    if (n === 1) {
+      if (videoCount === 1) return 'Your video is in the library.';
+      return 'Your image is in the library.';
+    }
+    if (videoCount === n) return 'All videos are in the library.';
+    if (imageCount === n) return 'All images are in the library.';
+    return 'All files are in the library.';
+  }
+
   function uploadFiles(items, addToFolderName) {
     const prog = document.getElementById('upload-progress');
     const text = document.getElementById('upload-text');
@@ -2685,29 +2771,41 @@
     prog.hidden = false;
     prog.innerHTML = '<div class="upload-progress-bar" id="upload-bar"></div>';
     const bar = document.getElementById('upload-bar');
+    const uploadLabel = validItems.length === 1 ? 'Uploading file…' : 'Uploading ' + validItems.length + ' files…';
+    showUploadGlobalStatus('uploading', uploadLabel, { pct: 0 });
     const fd = new FormData();
     validItems.forEach((it, i) => fd.append('file[]', it.file, it.newName || it.file.name));
     const xhr = new XMLHttpRequest();
     xhr.withCredentials = true;
     xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) bar.style.width = (e.loaded / e.total * 100) + '%';
+      if (e.lengthComputable) {
+        const pct = e.loaded / e.total * 100;
+        bar.style.width = pct + '%';
+        setUploadGlobalProgress(pct);
+      }
     };
     xhr.onload = () => {
-      prog.hidden = true;
-      text.hidden = false;
       if (xhr.status === 401) {
+        prog.hidden = true;
+        text.hidden = false;
+        hideUploadGlobalStatus();
         redirectToLogin();
         return;
       }
       try {
         const d = JSON.parse(xhr.responseText);
         if (xhr.status === 507 && d.quota) {
+          prog.hidden = true;
+          text.hidden = false;
+          showUploadGlobalStatus('error', d.error || 'Storage quota exceeded. Free some space or upgrade your plan.');
           loadStats();
           showToast(d.error || 'Storage quota exceeded', true);
           return;
         }
         if (d.success !== false) {
-          showToast('Uploaded');
+          prog.hidden = true;
+          text.hidden = false;
+          showUploadGlobalStatus('processing', 'Almost done — adding to your library…');
           const ids = extractUploadedIds(d);
           if (ids.length > 0) setLastBatchIds(ids);
           const folderPromises = [];
@@ -2733,22 +2831,42 @@
             if (folderFilter) folderFilter.value = '';
             populateFolderIcons('');
             gridState.page = 1;
-            refreshGrid(false);
-            loadStats();
-            setTimeout(loadStats, 300);
+            return refreshGrid(false).then(() => {
+              loadStats();
+              setTimeout(loadStats, 300);
+            });
+          };
+          const finish = () => {
+            afterFolders().then(() => {
+              showUploadGlobalStatus('success', buildUploadSuccessMessage(validItems));
+              showToast('Upload complete');
+            }).catch(() => {
+              showUploadGlobalStatus('error', 'Uploaded, but the library could not refresh. Try reloading the page.');
+            });
           };
           if (folderPromises.length) {
-            Promise.all(folderPromises).then(afterFolders).catch(() => afterFolders());
+            Promise.all(folderPromises).then(finish).catch(() => finish());
           } else {
-            afterFolders();
+            finish();
           }
-        } else showToast(d.error || 'Upload failed');
-      } catch (_) { showToast('Upload failed'); }
+        } else {
+          prog.hidden = true;
+          text.hidden = false;
+          showUploadGlobalStatus('error', d.error || 'Upload failed');
+          showToast(d.error || 'Upload failed', true);
+        }
+      } catch (_) {
+        prog.hidden = true;
+        text.hidden = false;
+        showUploadGlobalStatus('error', 'Upload failed — the server sent an unexpected response.');
+        showToast('Upload failed', true);
+      }
     };
     xhr.onerror = () => {
       prog.hidden = true;
       text.hidden = false;
-      showToast('Upload failed');
+      showUploadGlobalStatus('error', 'Network error — upload could not complete.');
+      showToast('Upload failed', true);
     };
     xhr.open('POST', API_BASE + '/upload.php');
     xhr.send(fd);
@@ -2847,9 +2965,9 @@
   async function showUploadConfirmModal(files) {
     const arr = Array.from(files).filter((f) => f.type.startsWith('image/') || f.type.startsWith('video/'));
     if (arr.length === 0) return;
-    const mp4Files = arr.filter((f) => f.type === 'video/mp4');
+    const mp4Files = arr.filter((f) => ALLOWED_VIDEO_UPLOAD_MIMES.includes(f.type));
     if (mp4Files.length > 0 && !CAN_UPLOAD_VIDEO) {
-      const nonMp4Accepted = arr.filter((f) => f.type !== 'video/mp4');
+      const nonMp4Accepted = arr.filter((f) => !ALLOWED_VIDEO_UPLOAD_MIMES.includes(f.type));
       const proceedWithoutMp4 = await warnNonPaidMp4(mp4Files, nonMp4Accepted.length);
       if (!proceedWithoutMp4) {
         showToast('Upload cancelled');
@@ -3018,7 +3136,7 @@
         objectUrls.push(url);
         const thumbWrap = document.createElement('div');
         thumbWrap.className = 'upload-confirm-thumb';
-        if (item.file.type === 'video/mp4') {
+        if (ALLOWED_VIDEO_UPLOAD_MIMES.includes(item.file.type)) {
           const vm = document.createElement('video');
           vm.src = url;
           vm.preload = 'metadata';
@@ -3123,7 +3241,7 @@
     if (t === 'image/gif') return '.gif';
     if (t === 'image/webp') return '.webp';
     if (t === 'image/avif') return '.avif';
-    if (t === 'video/mp4') return '.mp4';
+    if (t === 'video/mp4' || t === 'video/x-m4v') return '.mp4';
     return '';
   }
 
@@ -3763,8 +3881,12 @@
         ALLOWED_UPLOAD_MIMES = d.supported_mime_types.slice();
       }
       CAN_UPLOAD_VIDEO = d.can_upload_video === true;
-      if (CAN_UPLOAD_VIDEO && !ALLOWED_UPLOAD_MIMES.includes('video/mp4')) {
-        ALLOWED_UPLOAD_MIMES.push('video/mp4');
+      if (CAN_UPLOAD_VIDEO) {
+        ALLOWED_VIDEO_UPLOAD_MIMES.forEach((mime) => {
+          if (!ALLOWED_UPLOAD_MIMES.includes(mime)) {
+            ALLOWED_UPLOAD_MIMES.push(mime);
+          }
+        });
       }
       const uploadInput = document.getElementById('upload-input');
       if (uploadInput) uploadInput.accept = ALLOWED_UPLOAD_MIMES.join(',');

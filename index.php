@@ -158,6 +158,15 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
 
   <main class="main-content">
     <div class="banner-sticky">
+      <div id="upload-global-status" class="upload-global-status" hidden aria-live="polite" aria-atomic="true">
+        <div class="upload-global-status-inner">
+          <span class="upload-global-status-text" id="upload-global-status-text"></span>
+          <div class="upload-global-status-track" id="upload-global-status-track">
+            <div class="upload-global-status-fill" id="upload-global-status-fill"></div>
+          </div>
+          <span class="upload-global-status-pct" id="upload-global-status-pct" aria-hidden="true"></span>
+        </div>
+      </div>
       <div class="banner-row" id="hint-banner-row">
         <div class="user-hint-banner">
           <span class="user-hint-text" id="user-hint-text">Loading…</span>

@@ -62,9 +62,14 @@ try {
   echo json_encode(['success' => false, 'error' => 'Database connection failed']);
   exit;
 }
+$allowedVideoMimes = ['video/mp4', 'video/x-m4v'];
 $userIsPaid = imagekpr_user_is_paid($pdo, (int) $uid);
 if ($userIsPaid) {
-  $allowedMimes[] = 'video/mp4';
+  foreach ($allowedVideoMimes as $videoMime) {
+    if (!in_array($videoMime, $allowedMimes, true)) {
+      $allowedMimes[] = $videoMime;
+    }
+  }
 }
 $maxUploadBytes = imagekpr_user_max_upload_bytes($pdo, $uid);
 $maxUploadMb = (int) round($maxUploadBytes / (1024 * 1024));
@@ -119,7 +124,7 @@ foreach ($files as $file) {
   $mime = finfo_file($finfo, $file['tmp_name']);
   finfo_close($finfo);
   if (!in_array($mime, $allowedMimes, true)) {
-    $uploaded[] = ['success' => false, 'error' => 'Invalid file type'];
+    $uploaded[] = ['success' => false, 'error' => 'Invalid file type (' . ($mime ?: 'unknown') . ')'];
     continue;
   }
   $baseName = sanitizeFilename($file['name']);
@@ -147,7 +152,7 @@ foreach ($files as $file) {
     continue;
   }
   $size = filesize($path);
-  $isVideo = ($mime === 'video/mp4');
+  $isVideo = in_array($mime, $allowedVideoMimes, true);
   $width = null;
   $height = null;
   if (!$isVideo) {
