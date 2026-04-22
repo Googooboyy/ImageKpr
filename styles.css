@@ -3607,6 +3607,37 @@ body.ikpr-account-body {
   font-size: 0.88rem;
 }
 
+.ikpr-account-plan-copy {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e8ecf0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.ikpr-account-plan-copy-block {
+  min-width: 0;
+}
+
+.ikpr-account-plan-copy-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.ikpr-account-plan-copy-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #475569;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.ikpr-account-plan-copy-list li + li {
+  margin-top: 0.3rem;
+}
+
 .ikpr-account-upgrade {
   margin-top: 1rem;
   padding-top: 1rem;

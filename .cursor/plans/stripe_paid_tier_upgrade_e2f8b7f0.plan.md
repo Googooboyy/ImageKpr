@@ -105,11 +105,12 @@ isProject: false
 
 ## Tier specification matrix (source of truth — edit here)
 
-**Purpose:** One place to define what each named plan means for product, engineering, and Stripe. When you change limits, update the tables below first, then align code (`imagekpr_allowed_upload_size_tiers_mb()`, webhook tier mapping, copy on Account / legal pages).
+**Purpose:** One place to define what each named plan means for product, engineering, and Stripe. When you change limits, update the tables below first, then align code, especially [`inc/plan_catalog.php`](inc/plan_catalog.php) as the centralized product catalog, plus webhook tier mapping and copy on Account / legal pages.
 
 **Conventions**
 
 - **Per-file limit** maps to `users.upload_size_mb` (MiB). Allowed values in app code today: **3, 10, 50, 500** (see `[inc/admin.php](inc/admin.php)` `imagekpr_allowed_upload_size_tiers_mb()`). Legacy `100` is normalized to `50`, so Stripe migration / webhook code should tolerate old rows that still carry `100`.
+- **Central source of truth:** Treat [`inc/plan_catalog.php`](inc/plan_catalog.php) as the **product / pricing / entitlement catalog** for shared SaaS tiers. Stripe should map **Price IDs → plan keys** (`free|silver|gold|platinum|pro`) and then resolve limits from the **effective catalog row** (defaults + overrides), not from hardcoded MB/byte values copied into webhook code.
 - **Total storage** maps to `users.storage_quota_bytes` (binary bytes). Use the **Bytes (decimal)** column for config/constants, or compute as `MiB * 1024 * 1024`.
 - **Max images** is the optional **account-wide** image count cap planned for Phase 3 (total images in library), not the shared-dashboard column.
 - **Shared dashboard images (per dashboard):** Max **selected images on a single** shared dashboard ([Shared Dashboard feature](shared_dashboard_feature_6fe7f508.plan.md)). The limit is **per dashboard**, not pooled across dashboards — e.g. on Free, two dashboards with 20 different images each is valid.
@@ -138,8 +139,8 @@ Recommended helper response shape (example):
 
 Implementation rule by phase:
 
-- **Before Stripe webhooks are active:** helper resolves from current DB fields (`users.upload_size_mb`, `users.storage_quota_bytes`, downgrade timestamps) so existing app behavior is unchanged.
-- **After Stripe wiring (Phases 1–2):** webhook handlers update billing state; helper maps Stripe billing state to the same output shape.
+- **Before Stripe webhooks are active:** helper resolves from current DB fields (`users.upload_size_mb`, `users.storage_quota_bytes`, downgrade timestamps) so existing app behavior is unchanged, but plan labels / preset expectations should still be derived from [`inc/plan_catalog.php`](inc/plan_catalog.php).
+- **After Stripe wiring (Phases 1–2):** webhook handlers map Stripe billing state to a **plan key**, load the matching row from the **effective plan catalog**, and sync the same output shape plus the operational DB fields the app already uses.
 - **Feature code stays unchanged:** dashboard limits/watermark/password rules, `whoami`, upload/storage gates call the helper only.
 
 ### Entitlements (product → database fields)
@@ -176,7 +177,7 @@ Implementation rule by phase:
 
 1. Change **Entitlements** table (storage, upload MB, account max images, **shared dashboard per-dashboard** image cap).
 2. If `upload_size_mb` values change set: update `imagekpr_allowed_upload_size_tiers_mb()` and any admin UI copy.
-3. If storage changes: ensure Phase 3 enforcement and default for new subscribers use the new `storage_quota_bytes`.
+3. If storage or pricing changes: update [`inc/plan_catalog.php`](inc/plan_catalog.php) first, then ensure Phase 3 enforcement and default for new subscribers use the new `storage_quota_bytes`.
 4. Fill **Stripe catalog** Price IDs (Test then Live): **six** subscription lines (Silver, Gold, Platinum monthly/yearly) plus optional Ultra contract/payment rows if kept in Stripe; keep webhook mapping in sync. Optionally fill **List price (SGD)** (must match Stripe).
 5. Grep the repo for old numbers in UX copy (`account.php`, `billing-policy.php`, terms, marketing).
 
@@ -186,6 +187,7 @@ These plans do **not** change the Stripe technical phases below, but implementat
 
 - **[Shared Dashboard](shared_dashboard_feature_6fe7f508.plan.md)** — Per-dashboard image limits on the **shared SaaS** are now **Free 20, Silver 40, Gold 200, Platinum 2000**, matching the current operational matrix. Ultra customers are on a **separate deployment**; cap rules there are deploy-time / contract, not this shared-SaaS matrix. Paid-only behavior still uses the interim proxy `upload_size_mb >= 10`; when billing columns and canonical `plan_key` exist, replace that proxy and enforce dashboard caps from plan state.
 - **[API Readiness](api_readiness_roadmap_1202a95e.plan.md)** — Phase 3 of this Stripe plan extends `**whoami`** with tier and usage; if external PAT + CORS access is live by then, reflect new fields in `**docs/API.md`** (API roadmap Phase 4). Any new billing endpoints (`create-checkout-session`, webhooks, etc.) should follow the same **session vs Bearer** rules and rate limiting as the rest of `api/*` (especially if called from a separate origin). Webhooks stay **server-to-server** (Stripe signature), not PAT-authenticated.
+- **[Plan catalog](inc/plan_catalog.php)** — This is now the centralized product catalog already used by the pricing page and admin-derived helpers. Keep the Stripe plan matrix, public pricing copy, admin preset logic, and account display aligned with this file (including any app-setting overrides). If Stripe introduces a new sellable plan, add it here first.
 
 ---
 
@@ -335,7 +337,7 @@ Do this in **Test mode** first so Price IDs and webhook secrets can be copied in
 
 ### Products and Prices (map to app tiers)
 
-- **Products** -- Create one Product per sellable line matching the **Stripe catalog** table in the Tier specification matrix (top of this doc). Names can change later; stable **metadata** on Product or Price (e.g. `tier: silver`) helps webhook code stay maintainable.
+- **Products** -- Create one Product per sellable line matching the **effective plan catalog** in [`inc/plan_catalog.php`](inc/plan_catalog.php) and the Stripe catalog table in this doc. Names can change later; stable **metadata** on Product or Price (e.g. `tier: silver`) helps webhook code stay maintainable.
 - **Recurring Prices** -- For **Silver / Gold / Platinum**: create **subscription** prices for **both** **monthly** and **yearly** billing (six Price IDs total unless you later drop an interval). Each gets a **Price ID** (`price_...`) for `config.php` / env and should carry stable metadata like `tier=silver`.
 - **Ultra / contract Price** -- If you keep Ultra in Stripe, create a **one-time** or **invoice-style** Price linked to its Product; record any Price ID separately from SaaS subscriptions. If deals are invoiced manually, document that outside the repo and keep the plan row as commercial reference only.
 - **Copy Price IDs** -- Store test Price IDs for Silver monthly/yearly, Gold monthly/yearly, Platinum monthly/yearly, and any Ultra payment SKU in a secure note or env template until `config.example.php` documents the exact variable names (Phase 1).
@@ -372,15 +374,17 @@ Do this in **Test mode** first so Price IDs and webhook secrets can be copied in
 
 - Initialize Composer, install Stripe PHP SDK
 - DB migrations: billing columns on `users`, new `billing_membership_periods` and `billing_events` tables
+- **Prerequisite:** run [`migrations/phase20_upload_size_mb_smallint.sql`](migrations/phase20_upload_size_mb_smallint.sql) before enabling Platinum / 500 MB entitlements in production, so `users.upload_size_mb = 500` persists correctly
 - Add Stripe keys to `config.example.php` and `config.php`
 - Align Stripe wiring with current `imagekpr_allowed_upload_size_tiers_mb()` = `[3, 10, 50, 500]`
-- Add canonical entitlements helper and switch app gates to consume helper output
+- Add canonical entitlements helper and switch app gates to consume helper output, with plan-key resolution sourced from [`inc/plan_catalog.php`](inc/plan_catalog.php)
 - Extract `upload.js` and `slideshow.js` from `app.js` (pure reorg)
 
 ### Phase 2: Checkout + webhooks
 
 - `create-checkout-session` and `create-customer-portal-session` endpoints
 - Webhook endpoint with Stripe signature verification, idempotent event handling, and tier mapping for `silver|gold|platinum` SaaS products
+- Webhook mapping rule: resolve Stripe Price ID to a **plan key**, then load the matching row from [`inc/plan_catalog.php`](inc/plan_catalog.php) and sync operational fields (`upload_size_mb`, `storage_quota_bytes`, etc.) from that row
 - Billing summary endpoint for Account page
 - `billing_membership_periods` open/close logic in webhook handlers
 

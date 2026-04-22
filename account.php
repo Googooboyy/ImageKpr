@@ -138,34 +138,30 @@ try {
 
   $quotaStatus = imagekpr_user_storage_quota_status($pdo, $uid);
   $uploadMbRaw = (int) ($userRow['upload_size_mb'] ?? 3);
-  $uploadMb = imagekpr_normalize_upload_size_mb($uploadMbRaw);
-  $downgradedAt = isset($userRow['upload_tier_downgraded_at']) ? (string) $userRow['upload_tier_downgraded_at'] : null;
+  $tierInfo = imagekpr_user_upload_tier($pdo, $uid);
+  $uploadMb = (int) ($tierInfo['upload_size_mb'] ?? imagekpr_normalize_upload_size_mb($uploadMbRaw));
+  $downgradedAt = isset($tierInfo['upload_tier_downgraded_at']) ? (string) $tierInfo['upload_tier_downgraded_at'] : null;
   if ($downgradedAt !== null && trim($downgradedAt) === '') {
     $downgradedAt = null;
   }
 
   $dbq = $userRow['storage_quota_bytes'];
   $dbq = $dbq === null ? null : (int) $dbq;
-  $tierEnt = imagekpr_plan_admin_tier_entitlements($dbq, $uploadMbRaw);
-  if ($tierEnt['matrix_key'] !== null) {
-    $mk = (string) $tierEnt['matrix_key'];
-    $planLabelDisplay = imagekpr_plan_tier_display_label(imagekpr_plan_tier_matrix_reference()[$mk]);
-    $planCapMaxImages = (int) $tierEnt['max_images'];
-    $planCapSharedDashboard = (int) $tierEnt['shared_dashboard_cap'];
-  } else {
-    $preset = imagekpr_infer_saas_tier_preset_match($dbq, $uploadMb);
-    if ($preset === null) {
-      $planLabelDisplay = 'Ultra';
-    } elseif ($preset === 'custom') {
-      $planLabelDisplay = 'Custom';
-    } else {
-      $refLabel = imagekpr_plan_tier_matrix_reference()[$preset];
-      $planLabelDisplay = imagekpr_plan_tier_display_label($refLabel);
-    }
-    $planCapMaxImages = null;
-    $planCapSharedDashboard = null;
+  $planSnapshot = imagekpr_user_plan_snapshot_from_row($dbq, $uploadMbRaw);
+  $resolvedTierRow = is_array($planSnapshot['row']) ? $planSnapshot['row'] : null;
+  $planLabelDisplay = (string) ($planSnapshot['label'] ?? '—');
+  $planCapMaxImages = $planSnapshot['max_images'];
+  $planCapSharedDashboard = $planSnapshot['shared_dashboard_cap'];
+  $maxFileSizeDisplay = 'Up to ' . (int) ($planSnapshot['upload_mb'] ?? $uploadMb) . ' MB per file';
+  if (($planSnapshot['storage_bytes'] ?? null) !== null) {
+    $resolvedBytes = (int) $planSnapshot['storage_bytes'];
+    $quotaStatus = [
+      'effective_bytes' => $resolvedBytes,
+      'unlimited' => false,
+      'remaining_bytes' => max(0, $resolvedBytes - $totalStorageBytes),
+      'used_bytes' => $totalStorageBytes,
+    ];
   }
-  $maxFileSizeDisplay = 'Up to ' . (int) $uploadMb . ' MB per file';
 
   $createdRaw = $userRow['created_at'] ?? null;
   if ($createdRaw !== null && trim((string) $createdRaw) !== '') {
@@ -273,6 +269,38 @@ $headerLabel = imagekpr_user_header_display_label(
         <div class="ikpr-account-grace"><dt></dt><dd><?php echo htmlspecialchars($graceNote, ENT_QUOTES, 'UTF-8'); ?></dd></div>
         <?php } ?>
       </dl>
+      <?php if (is_array($resolvedTierRow) && (!empty($resolvedTierRow['show_recommended']) || !empty($resolvedTierRow['show_included']))) { ?>
+      <div class="ikpr-account-plan-copy">
+        <?php if (!empty($resolvedTierRow['show_recommended']) && !empty($resolvedTierRow['recommended_for_bullets']) && is_array($resolvedTierRow['recommended_for_bullets'])) { ?>
+        <div class="ikpr-account-plan-copy-block">
+          <h3 class="ikpr-account-plan-copy-title"><?php echo htmlspecialchars((string) ($resolvedTierRow['recommended_for_title'] ?? 'Recommended for'), ENT_QUOTES, 'UTF-8'); ?></h3>
+          <ul class="ikpr-account-plan-copy-list">
+            <?php foreach ($resolvedTierRow['recommended_for_bullets'] as $item) {
+              if (!is_string($item) || trim($item) === '') {
+                continue;
+              }
+              ?>
+            <li><?php echo imagekpr_plan_format_text($item); ?></li>
+            <?php } ?>
+          </ul>
+        </div>
+        <?php } ?>
+        <?php if (!empty($resolvedTierRow['show_included']) && !empty($resolvedTierRow['included_bullets']) && is_array($resolvedTierRow['included_bullets'])) { ?>
+        <div class="ikpr-account-plan-copy-block">
+          <h3 class="ikpr-account-plan-copy-title"><?php echo htmlspecialchars((string) ($resolvedTierRow['included_title'] ?? 'Included'), ENT_QUOTES, 'UTF-8'); ?></h3>
+          <ul class="ikpr-account-plan-copy-list">
+            <?php foreach ($resolvedTierRow['included_bullets'] as $item) {
+              if (!is_string($item) || trim($item) === '') {
+                continue;
+              }
+              ?>
+            <li><?php echo imagekpr_plan_format_text($item); ?></li>
+            <?php } ?>
+          </ul>
+        </div>
+        <?php } ?>
+      </div>
+      <?php } ?>
       <p class="ikpr-account-features-cta"><a href="features.php">See the Features page</a><?php echo htmlspecialchars(' for how library limits, shared dashboards, and plans work.', ENT_QUOTES, 'UTF-8'); ?></p>
       <p class="ikpr-account-features-cta ikpr-account-pricing-cta"><a href="pricing.php">Compare pricing</a><?php echo htmlspecialchars(' and see what fits your needs.', ENT_QUOTES, 'UTF-8'); ?></p>
       <div class="ikpr-account-upgrade">

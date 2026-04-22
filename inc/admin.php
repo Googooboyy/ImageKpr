@@ -259,12 +259,145 @@ function imagekpr_plan_tier_storage_reference(): array
 }
 
 /**
+ * Legacy/default SaaS preset bytes+upload pairs used before plan catalog overrides.
+ * This lets standard users keep mapping to their tier even after the catalog changes.
+ *
+ * @return array<string, array{bytes:int, upload_mb:int}>
+ */
+function imagekpr_plan_legacy_tier_storage_reference(): array
+{
+  return [
+    'free' => ['bytes' => 52428800, 'upload_mb' => 3],
+    'silver' => ['bytes' => 209715200, 'upload_mb' => 10],
+    'gold' => ['bytes' => 1048576000, 'upload_mb' => 50],
+    'platinum' => ['bytes' => 10737418240, 'upload_mb' => 500],
+  ];
+}
+
+/**
+ * Resolve a standard SaaS tier key from either the current matrix or the original legacy preset values.
+ * Returns null for unlimited/custom rows that should continue using their explicit DB settings.
+ */
+function imagekpr_resolved_saas_tier_key(?int $storageQuotaColumn, int $uploadMbRaw): ?string
+{
+  $uploadMb = imagekpr_normalize_upload_size_mb($uploadMbRaw);
+  $eff = imagekpr_effective_quota_bytes($storageQuotaColumn);
+  if ($eff === null && $storageQuotaColumn !== null) {
+    return null;
+  }
+
+  foreach ([imagekpr_plan_tier_storage_reference(), imagekpr_plan_legacy_tier_storage_reference()] as $ref) {
+    foreach ($ref as $key => $row) {
+      if ((int) $row['bytes'] === (int) $eff && (int) $row['upload_mb'] === $uploadMb) {
+        return (string) $key;
+      }
+    }
+  }
+
+  if ($storageQuotaColumn === null) {
+    foreach ([imagekpr_plan_tier_storage_reference(), imagekpr_plan_legacy_tier_storage_reference()] as $ref) {
+      foreach ($ref as $key => $row) {
+        if ((int) $row['upload_mb'] === $uploadMb) {
+          return (string) $key;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Return the current catalog row for a standard SaaS user identified by current or legacy preset values.
+ *
+ * @return array<string, mixed>|null
+ */
+function imagekpr_resolved_saas_tier_row(?int $storageQuotaColumn, int $uploadMbRaw): ?array
+{
+  $key = imagekpr_resolved_saas_tier_key($storageQuotaColumn, $uploadMbRaw);
+  if ($key === null) {
+    return null;
+  }
+  return imagekpr_plan_catalog_row($key);
+}
+
+function imagekpr_effective_quota_bytes_for_user_row(?int $storageQuotaColumn, int $uploadMbRaw): ?int
+{
+  $row = imagekpr_resolved_saas_tier_row($storageQuotaColumn, $uploadMbRaw);
+  if (is_array($row) && isset($row['storage_bytes']) && $row['storage_bytes'] !== null) {
+    return (int) $row['storage_bytes'];
+  }
+  return imagekpr_effective_quota_bytes($storageQuotaColumn);
+}
+
+function imagekpr_effective_upload_mb_for_user_row(?int $storageQuotaColumn, int $uploadMbRaw): int
+{
+  $row = imagekpr_resolved_saas_tier_row($storageQuotaColumn, $uploadMbRaw);
+  if (is_array($row) && isset($row['upload_mb']) && $row['upload_mb'] !== null) {
+    return (int) $row['upload_mb'];
+  }
+  return imagekpr_normalize_upload_size_mb($uploadMbRaw);
+}
+
+/**
+ * Resolve the current account-facing plan snapshot for a user row.
+ *
+ * @return array{
+ *   tier_key:?string,
+ *   label:string,
+ *   upload_mb:int,
+ *   storage_bytes:?int,
+ *   max_images:?int,
+ *   shared_dashboard_cap:?int,
+ *   row:?array<string,mixed>
+ * }
+ */
+function imagekpr_user_plan_snapshot_from_row(?int $storageQuotaColumn, int $uploadMbRaw): array
+{
+  $resolvedRow = imagekpr_resolved_saas_tier_row($storageQuotaColumn, $uploadMbRaw);
+  if (is_array($resolvedRow)) {
+    return [
+      'tier_key' => imagekpr_resolved_saas_tier_key($storageQuotaColumn, $uploadMbRaw),
+      'label' => imagekpr_plan_tier_display_label($resolvedRow),
+      'upload_mb' => isset($resolvedRow['upload_mb']) && $resolvedRow['upload_mb'] !== null ? (int) $resolvedRow['upload_mb'] : imagekpr_normalize_upload_size_mb($uploadMbRaw),
+      'storage_bytes' => isset($resolvedRow['storage_bytes']) && $resolvedRow['storage_bytes'] !== null ? (int) $resolvedRow['storage_bytes'] : null,
+      'max_images' => isset($resolvedRow['max_images']) && $resolvedRow['max_images'] !== null ? (int) $resolvedRow['max_images'] : null,
+      'shared_dashboard_cap' => isset($resolvedRow['shared_dashboard_cap']) && $resolvedRow['shared_dashboard_cap'] !== null ? (int) $resolvedRow['shared_dashboard_cap'] : null,
+      'row' => $resolvedRow,
+    ];
+  }
+
+  $preset = imagekpr_infer_saas_tier_preset_match($storageQuotaColumn, $uploadMbRaw);
+  $label = 'Ultra';
+  if ($preset === 'custom') {
+    $label = 'Custom';
+  } elseif (is_string($preset) && $preset !== '') {
+    $refLabel = imagekpr_plan_tier_matrix_reference()[$preset] ?? ['label' => $preset];
+    $label = imagekpr_plan_tier_display_label($refLabel);
+  }
+
+  return [
+    'tier_key' => null,
+    'label' => $label,
+    'upload_mb' => imagekpr_normalize_upload_size_mb($uploadMbRaw),
+    'storage_bytes' => imagekpr_effective_quota_bytes($storageQuotaColumn),
+    'max_images' => null,
+    'shared_dashboard_cap' => null,
+    'row' => null,
+  ];
+}
+
+/**
  * Match effective storage cap + upload tier to a SaaS preset (exact bytes and MB).
  *
  * @return string|null Preset key free|silver|gold|platinum, 'custom' if capped but no match, null if unlimited.
  */
 function imagekpr_infer_saas_tier_preset_match(?int $storageQuotaColumn, int $uploadMb): ?string
 {
+  $resolved = imagekpr_resolved_saas_tier_key($storageQuotaColumn, $uploadMb);
+  if ($resolved !== null) {
+    return $resolved;
+  }
   $uploadMb = imagekpr_normalize_upload_size_mb($uploadMb);
   $dbq = $storageQuotaColumn;
   $eff = imagekpr_effective_quota_bytes($dbq === null ? null : (int) $dbq);
@@ -343,7 +476,7 @@ function imagekpr_user_storage_quota_status(PDO $pdo, int $userId): array
   if ($userId < 1) {
     return ['effective_bytes' => null, 'unlimited' => true, 'remaining_bytes' => null, 'used_bytes' => 0];
   }
-  $st = $pdo->prepare('SELECT storage_quota_bytes FROM users WHERE id = ? LIMIT 1');
+  $st = $pdo->prepare('SELECT storage_quota_bytes, upload_size_mb FROM users WHERE id = ? LIMIT 1');
   $st->execute([$userId]);
   $row = $st->fetch(PDO::FETCH_ASSOC);
   if ($row === false) {
@@ -351,7 +484,8 @@ function imagekpr_user_storage_quota_status(PDO $pdo, int $userId): array
   }
   $dbq = $row['storage_quota_bytes'];
   $dbq = $dbq === null ? null : (int) $dbq;
-  $eff = imagekpr_effective_quota_bytes($dbq);
+  $uploadMbRaw = (int) ($row['upload_size_mb'] ?? 3);
+  $eff = imagekpr_effective_quota_bytes_for_user_row($dbq, $uploadMbRaw);
   $unlimited = $eff === null;
   $used = imagekpr_user_storage_used($pdo, $userId);
   $remaining = $unlimited ? null : max(0, $eff - $used);
@@ -446,21 +580,9 @@ function imagekpr_user_upload_tier(PDO $pdo, int $userId): ?array
     return null;
   }
   $rawMb = (int) ($row['upload_size_mb'] ?? 3);
-  $mb = imagekpr_normalize_upload_size_mb($rawMb);
-  if ($mb === 3 && $rawMb !== 3) {
-    $dbq = $row['storage_quota_bytes'];
-    $dbq = $dbq === null ? null : (int) $dbq;
-    $eff = imagekpr_effective_quota_bytes($dbq);
-    if ($eff !== null) {
-      $matrix = imagekpr_plan_tier_matrix_reference();
-      foreach (['free', 'silver', 'gold', 'platinum'] as $k) {
-        if ((int) $matrix[$k]['storage_bytes'] === (int) $eff) {
-          $mb = (int) $matrix[$k]['upload_mb'];
-          break;
-        }
-      }
-    }
-  }
+  $dbq = $row['storage_quota_bytes'];
+  $dbq = $dbq === null ? null : (int) $dbq;
+  $mb = imagekpr_effective_upload_mb_for_user_row($dbq, $rawMb);
   $downgradedAt = isset($row['upload_tier_downgraded_at']) ? (string) $row['upload_tier_downgraded_at'] : null;
   if ($downgradedAt !== null && trim($downgradedAt) === '') {
     $downgradedAt = null;
@@ -495,7 +617,7 @@ function imagekpr_storage_quota_remaining(PDO $pdo, int $userId): ?int
   if ($userId < 1) {
     return null;
   }
-  $st = $pdo->prepare('SELECT storage_quota_bytes FROM users WHERE id = ? LIMIT 1');
+  $st = $pdo->prepare('SELECT storage_quota_bytes, upload_size_mb FROM users WHERE id = ? LIMIT 1');
   $st->execute([$userId]);
   $row = $st->fetch(PDO::FETCH_ASSOC);
   if ($row === false) {
@@ -503,7 +625,8 @@ function imagekpr_storage_quota_remaining(PDO $pdo, int $userId): ?int
   }
   $dbq = $row['storage_quota_bytes'];
   $dbq = $dbq === null ? null : (int) $dbq;
-  $eff = imagekpr_effective_quota_bytes($dbq);
+  $uploadMbRaw = (int) ($row['upload_size_mb'] ?? 3);
+  $eff = imagekpr_effective_quota_bytes_for_user_row($dbq, $uploadMbRaw);
   if ($eff === null) {
     return null;
   }

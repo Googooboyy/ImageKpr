@@ -741,7 +741,7 @@ foreach ($allRows as $r) {
   } elseif ($tierEnt['matrix_key'] === 'platinum') {
     $platinumUsers++;
   }
-  $eff = imagekpr_effective_quota_bytes($dbq);
+  $eff = imagekpr_effective_quota_bytes_for_user_row($dbq, (int) ($r['upload_size_mb'] ?? 3));
   if ($eff !== null && $used > $eff) {
     $overQuota++;
   }
@@ -1213,7 +1213,7 @@ function admin_th_hint(string $tip): string
             $used = (int) $r['used_bytes'];
             $dbq = $r['storage_quota_bytes'];
             $dbq = $dbq === null ? null : (int) $dbq;
-            $eff = imagekpr_effective_quota_bytes($dbq);
+            $eff = imagekpr_effective_quota_bytes_for_user_row($dbq, (int) ($r['upload_size_mb'] ?? 3));
             $over = $eff !== null && $used > $eff;
             $displayQuota = 'Default';
             if ($dbq === 0) {

@@ -14,7 +14,7 @@ function imagekpr_plan_catalog(): array
     return $catalog;
   }
 
-  $catalog = [
+  $defaults = [
     'free' => [
       'key' => 'free',
       'label' => 'Free',
@@ -210,7 +210,8 @@ function imagekpr_plan_catalog(): array
     ],
   ];
 
-  return imagekpr_plan_catalog_apply_overrides($catalog);
+  $catalog = imagekpr_plan_catalog_apply_overrides($defaults);
+  return $catalog;
 }
 
 /**
