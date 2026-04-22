@@ -334,6 +334,53 @@
     });
   }
 
+  function renameFolderDialog(defaultValue) {
+    return new Promise((resolve) => {
+      const d = document.getElementById('rename-folder-dialog');
+      const input = document.getElementById('rename-folder-input');
+      const okBtn = document.getElementById('rename-folder-ok');
+      const cancelBtn = document.getElementById('rename-folder-cancel');
+      if (!d || !input || !okBtn || !cancelBtn) {
+        resolve(null);
+        return;
+      }
+      input.value = defaultValue || '';
+      d.hidden = false;
+      document.body.style.overflow = 'hidden';
+      input.focus();
+      input.select();
+      const cleanup = () => {
+        d.hidden = true;
+        document.body.style.overflow = '';
+        input.onkeydown = null;
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        d.onclick = null;
+        document.removeEventListener('keydown', onEscape);
+      };
+      const submit = () => {
+        const value = input.value.trim();
+        cleanup();
+        resolve(value || null);
+      };
+      const cancel = () => {
+        cleanup();
+        resolve(null);
+      };
+      const onEscape = (e) => { if (e.key === 'Escape') cancel(); };
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submit();
+        }
+      };
+      okBtn.onclick = submit;
+      cancelBtn.onclick = cancel;
+      d.onclick = (e) => { if (e.target === d) cancel(); };
+      document.addEventListener('keydown', onEscape);
+    });
+  }
+
   function copyUrl(url, prominent) {
     if (!url) return;
     try {
@@ -3758,6 +3805,24 @@
       btn.setAttribute('aria-label', title || label);
       btnWrap.appendChild(tooltip);
       btnWrap.appendChild(btn);
+      if (isDropTarget && cur === value && window.ImageKprFolders) {
+        const renameBtn = document.createElement('button');
+        renameBtn.type = 'button';
+        renameBtn.className = 'folder-icon-rename';
+        renameBtn.setAttribute('aria-label', 'Rename folder ' + value);
+        renameBtn.title = 'Rename folder';
+        renameBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3.5l1 .4.6 1.8 1.8.7 1.7-.8 1.4 1.4-.8 1.7.7 1.8 1.8.6.4 1-.4 1-.8.3-1 .3-.7 1.8.8 1.7-1.4 1.4-1.7-.8-1.8.7-.6 1.8-1 .4-1-.4-.6-1.8-1.8-.7-1.7.8-1.4-1.4.8-1.7-.7-1.8-1.8-.6-.4-1 .4-1 1.8-.6.7-1.8-.8-1.7 1.4-1.4 1.7.8 1.8-.7.6-1.8 1-.4zM12 9a3 3 0 100 6 3 3 0 000-6z" fill="currentColor"/></svg>';
+        renameBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            await renameFolderFlow(value);
+          } catch (err) {
+            showToast((err && err.message) || 'Rename failed', true);
+          }
+        });
+        btnWrap.appendChild(renameBtn);
+      }
       if (isDropTarget && window.ImageKprFolders) {
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
@@ -3881,6 +3946,21 @@
       div.appendChild(delBtn);
       listEl.appendChild(div);
     });
+  }
+
+  async function renameFolderFlow(name) {
+    if (!name || !window.ImageKprFolders) return;
+    const newName = await renameFolderDialog(name);
+    if (!newName || newName === name) return;
+    await window.ImageKprFolders.renameFolder(name, newName);
+    const folderFilter = document.getElementById('folder-filter');
+    if (folderFilter && folderFilter.value === name) {
+      folderFilter.value = newName;
+    }
+    renderManageFoldersList();
+    populateFolderIcons(newName);
+    refreshGrid(false);
+    showToast('Renamed to "' + newName + '"');
   }
 
   function syncMaintenanceUiFromWhoami() {
@@ -4335,16 +4415,7 @@
       const name = e.target.dataset.name;
       if (!name || !window.ImageKprFolders) return;
       if (e.target.classList.contains('manage-rename')) {
-        addToFolderDialog(name).then(newName => {
-          if (!newName || newName === name) return;
-          window.ImageKprFolders.renameFolder(name, newName).then(() => {
-            const ff = document.getElementById('folder-filter');
-            if (ff && ff.value === name) ff.value = newName;
-            renderManageFoldersList();
-            populateFolderIcons();
-            showToast('Renamed to "' + newName + '"');
-          }).catch(err => showToast(err.message || 'Rename failed', true));
-        });
+        renameFolderFlow(name).catch(err => showToast(err.message || 'Rename failed', true));
       } else if (e.target.classList.contains('manage-delete')) {
         if (!(await confirmDialog('Delete folder "' + name + '"? Items will be removed from this folder.'))) return;
         window.ImageKprFolders.deleteFolder(name).then(() => {

@@ -101,7 +101,7 @@ require_once __DIR__ . '/inc/marketing_illustration.php';
       <?php ikpr_marketing_render_illustration('Illustration: short video clips and photos', 'default'); ?>
     </section>
 
-    <section class="ikpr-features-row ikpr-features-row--flip">
+    <section class="ikpr-features-row">
       <div class="ikpr-features-copy">
         <h3>Organize without friction</h3>
         <p>Folders and tags work together so you can browse visually or filter precisely. Manage folder lists as your library grows.</p>
@@ -115,7 +115,7 @@ require_once __DIR__ . '/inc/marketing_illustration.php';
       <?php ikpr_marketing_render_illustration('Illustration: folders and tags', 'folders'); ?>
     </section>
 
-    <section class="ikpr-features-row">
+    <section class="ikpr-features-row ikpr-features-row--flip">
       <div class="ikpr-features-copy">
         <h3>Controlled sharing</h3>
         <p>Sign in with Google keeps the gallery private to approved accounts. Generate links for individual images when collaboration calls for it — and skip sharing when it does not.</p>
@@ -129,7 +129,7 @@ require_once __DIR__ . '/inc/marketing_illustration.php';
       <?php ikpr_marketing_render_illustration('Illustration: sharing and private links', 'link'); ?>
     </section>
 
-    <section class="ikpr-features-row ikpr-features-row--flip">
+    <section class="ikpr-features-row">
       <div class="ikpr-features-copy">
         <h3>Find in seconds</h3>
         <p>Search across your library so you are not hunting through nested folders during a deadline. Pair search with tags for a fast, repeatable workflow.</p>
@@ -143,7 +143,7 @@ require_once __DIR__ . '/inc/marketing_illustration.php';
       <?php ikpr_marketing_render_illustration('Illustration: search', 'search'); ?>
     </section>
 
-    <section class="ikpr-features-row">
+    <section class="ikpr-features-row ikpr-features-row--flip">
       <div class="ikpr-features-copy">
         <h3>Present &amp; slideshow</h3>
         <p>Move from library to presentation without exporting to another tool for every review. Use slideshow mode when you need to walk someone through a set.</p>
@@ -157,7 +157,7 @@ require_once __DIR__ . '/inc/marketing_illustration.php';
       <?php ikpr_marketing_render_illustration('Illustration: slideshow or presentation view', 'slideshow'); ?>
     </section>
 
-    <section class="ikpr-features-row ikpr-features-row--flip">
+    <section class="ikpr-features-row">
       <div class="ikpr-features-copy">
         <h3>Export batches</h3>
         <p>Zip a selection when you need files on disk for email, handoff, or archive — without manually downloading one image at a time.</p>

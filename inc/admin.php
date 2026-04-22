@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/plan_catalog.php';
 
 function imagekpr_user_is_admin(PDO $pdo, int $userId): bool
 {
@@ -200,42 +201,33 @@ function imagekpr_allowed_upload_size_tiers_mb(): array
  */
 function imagekpr_plan_tier_matrix_reference(): array
 {
-  return [
-    'free' => [
-      'label' => 'Free',
-      'upload_mb' => 3,
-      'storage_bytes' => 52428800,
-      'max_images' => 100,
-      'shared_dashboard_cap' => 20,
-    ],
-    'silver' => [
-      'label' => 'Silver',
-      'upload_mb' => 10,
-      'storage_bytes' => 209715200,
-      'max_images' => 200,
-      'shared_dashboard_cap' => 40,
-    ],
-    'gold' => [
-      'label' => 'Gold',
-      'upload_mb' => 50,
-      'storage_bytes' => 1048576000,
-      'max_images' => 1000,
-      'shared_dashboard_cap' => 200,
-    ],
-    'platinum' => [
-      'label' => 'Platinum',
-      'upload_mb' => 500,
-      'storage_bytes' => 10737418240,
-      'max_images' => 10000,
-      'shared_dashboard_cap' => 2000,
-    ],
-    'pro' => [
-      'label' => 'Pro',
-      'display_label' => 'Ultra',
-      'storage_bytes' => 20971520000,
-      'commercial_note' => 'S$999 list per 3-year license; renewal at end of term',
-    ],
-  ];
+  $catalog = imagekpr_plan_catalog();
+  $out = [];
+  foreach ($catalog as $key => $row) {
+    $mapped = [
+      'label' => (string) ($row['label'] ?? ''),
+    ];
+    if (isset($row['display_label'])) {
+      $mapped['display_label'] = (string) $row['display_label'];
+    }
+    if (isset($row['upload_mb']) && $row['upload_mb'] !== null) {
+      $mapped['upload_mb'] = (int) $row['upload_mb'];
+    }
+    if (isset($row['storage_bytes']) && $row['storage_bytes'] !== null) {
+      $mapped['storage_bytes'] = (int) $row['storage_bytes'];
+    }
+    if (isset($row['max_images']) && $row['max_images'] !== null) {
+      $mapped['max_images'] = (int) $row['max_images'];
+    }
+    if (isset($row['shared_dashboard_cap']) && $row['shared_dashboard_cap'] !== null) {
+      $mapped['shared_dashboard_cap'] = (int) $row['shared_dashboard_cap'];
+    }
+    if (isset($row['commercial_note'])) {
+      $mapped['commercial_note'] = (string) $row['commercial_note'];
+    }
+    $out[(string) $key] = $mapped;
+  }
+  return $out;
 }
 
 /** Public-facing tier name (e.g. Ultra for the dedicated `pro` matrix row). */
@@ -253,13 +245,7 @@ function imagekpr_plan_tier_display_label(array $row): string
 function imagekpr_plan_max_images_for_upload_mb(int $uploadMb): ?int
 {
   $uploadMb = imagekpr_normalize_upload_size_mb($uploadMb);
-  $m = imagekpr_plan_tier_matrix_reference();
-  foreach (['free', 'silver', 'gold', 'platinum'] as $k) {
-    if ((int) $m[$k]['upload_mb'] === $uploadMb) {
-      return (int) $m[$k]['max_images'];
-    }
-  }
-  return null;
+  return imagekpr_plan_max_images_for_upload_mb_from_catalog($uploadMb);
 }
 
 /**
@@ -269,13 +255,7 @@ function imagekpr_plan_max_images_for_upload_mb(int $uploadMb): ?int
  */
 function imagekpr_plan_tier_storage_reference(): array
 {
-  $m = imagekpr_plan_tier_matrix_reference();
-  $out = [];
-  foreach (['free', 'silver', 'gold', 'platinum'] as $k) {
-    $r = $m[$k];
-    $out[$k] = ['label' => $r['label'], 'bytes' => $r['storage_bytes'], 'upload_mb' => $r['upload_mb']];
-  }
-  return $out;
+  return imagekpr_plan_saas_storage_reference();
 }
 
 /**
@@ -459,13 +439,28 @@ function imagekpr_user_upload_tier(PDO $pdo, int $userId): ?array
   if ($userId < 1) {
     return null;
   }
-  $st = $pdo->prepare('SELECT upload_size_mb, upload_tier_downgraded_at FROM users WHERE id = ? LIMIT 1');
+  $st = $pdo->prepare('SELECT upload_size_mb, storage_quota_bytes, upload_tier_downgraded_at FROM users WHERE id = ? LIMIT 1');
   $st->execute([$userId]);
   $row = $st->fetch(PDO::FETCH_ASSOC);
   if ($row === false) {
     return null;
   }
-  $mb = imagekpr_normalize_upload_size_mb($row['upload_size_mb'] ?? 3);
+  $rawMb = (int) ($row['upload_size_mb'] ?? 3);
+  $mb = imagekpr_normalize_upload_size_mb($rawMb);
+  if ($mb === 3 && $rawMb !== 3) {
+    $dbq = $row['storage_quota_bytes'];
+    $dbq = $dbq === null ? null : (int) $dbq;
+    $eff = imagekpr_effective_quota_bytes($dbq);
+    if ($eff !== null) {
+      $matrix = imagekpr_plan_tier_matrix_reference();
+      foreach (['free', 'silver', 'gold', 'platinum'] as $k) {
+        if ((int) $matrix[$k]['storage_bytes'] === (int) $eff) {
+          $mb = (int) $matrix[$k]['upload_mb'];
+          break;
+        }
+      }
+    }
+  }
   $downgradedAt = isset($row['upload_tier_downgraded_at']) ? (string) $row['upload_tier_downgraded_at'] : null;
   if ($downgradedAt !== null && trim($downgradedAt) === '') {
     $downgradedAt = null;

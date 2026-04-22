@@ -630,6 +630,18 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
     </div>
   </div>
 
+  <div id="rename-folder-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="rename-folder-title">
+    <div class="dialog-content">
+      <h3 id="rename-folder-title">Rename folder</h3>
+      <label for="rename-folder-input" class="dialog-label">New folder name:</label>
+      <input type="text" id="rename-folder-input" placeholder="e.g. Project Alpha" autocomplete="off">
+      <div class="dialog-actions">
+        <button type="button" id="rename-folder-ok" class="ikpr-btn-folders">Rename</button>
+        <button type="button" id="rename-folder-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <div id="add-to-folder-select-dialog" class="dialog" hidden aria-modal="true" aria-labelledby="add-to-folder-select-title">
     <div class="dialog-content">
       <h3 id="add-to-folder-select-title">Add to folder</h3>

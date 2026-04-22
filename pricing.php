@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/inc/plan_catalog.php';
 
 /** Public pricing page; linked from the site footer. */
 function ikpr_render_pricing_laptop_mockup(): void
@@ -23,6 +24,38 @@ function ikpr_render_pricing_laptop_mockup(): void
   </div>
   <?php
 }
+
+function ikpr_render_pricing_tier_media(array $plan): void
+{
+  $imageUrl = trim((string) ($plan['tier_image_url'] ?? ''));
+  if ($imageUrl !== '') {
+    $alt = trim((string) (($plan['display_label'] ?? $plan['label'] ?? 'Plan') . ' tier image'));
+    echo '<img class="ikpr-pricing-tier-image" src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" alt="' . htmlspecialchars($alt, ENT_QUOTES, 'UTF-8') . '">';
+    return;
+  }
+  ikpr_render_pricing_laptop_mockup();
+}
+
+/**
+ * @param string[] $items
+ */
+function ikpr_render_pricing_list(array $items, string $itemClass = 'ikpr-pricing-feat'): void
+{
+  foreach ($items as $item) {
+    if (!is_string($item) || trim($item) === '') {
+      continue;
+    }
+    echo '<li class="' . htmlspecialchars($itemClass, ENT_QUOTES, 'UTF-8') . '">' . imagekpr_plan_format_text($item) . '</li>';
+  }
+}
+
+$planCatalog = imagekpr_plan_catalog();
+$pageContent = imagekpr_plan_page_content();
+$freePlan = $planCatalog['free'];
+$silverPlan = $planCatalog['silver'];
+$goldPlan = $planCatalog['gold'];
+$platinumPlan = $planCatalog['platinum'];
+$ultraPlan = $planCatalog['pro'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -39,10 +72,9 @@ function ikpr_render_pricing_laptop_mockup(): void
   ?>
   <main class="ikpr-pricing-main">
     <header class="ikpr-pricing-intro">
-      <h1>Pricing</h1>
-      <p class="ikpr-pricing-intro-lead"><strong>Free</strong> is always available—full core experience at <strong>S$0</strong>.</p>
-      <p class="ikpr-pricing-intro-lead"><strong>Silver</strong>, <strong>Gold</strong>, and <strong>Platinum</strong> add headroom as your library grows.</p>
-      <p>All prices are in <strong>SGD</strong>.</p>
+      <h1><?php echo imagekpr_plan_format_text((string) ($pageContent['page_title'] ?? 'Pricing')); ?></h1>
+      <div class="ikpr-pricing-intro-copy ikpr-pricing-intro-copy--lead"><?php echo imagekpr_plan_format_rich_text((string) ($pageContent['page_sub_title'] ?? '')); ?></div>
+      <div class="ikpr-pricing-intro-copy"><?php echo imagekpr_plan_format_rich_text((string) ($pageContent['page_super_sub_title'] ?? '')); ?></div>
     </header>
 
     <div class="ikpr-pricing-tier-band">
@@ -59,36 +91,43 @@ function ikpr_render_pricing_laptop_mockup(): void
           </div>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--title">
-          <h2 class="ikpr-pricing-tier">Free</h2>
+          <h2 class="ikpr-pricing-tier"><?php echo htmlspecialchars((string) $freePlan['display_label'], ENT_QUOTES, 'UTF-8'); ?></h2>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--price">
           <div class="ikpr-pricing-price">
-            <sup class="ikpr-pricing-dollar">S$</sup><span class="ikpr-pricing-amount">0</span>
-            <span class="ikpr-pricing-period">/ month</span>
+            <sup class="ikpr-pricing-dollar">S$</sup><span class="ikpr-pricing-amount"><?php echo htmlspecialchars((string) $freePlan['monthly_price'], ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="ikpr-pricing-period"><?php echo htmlspecialchars((string) $freePlan['price_period'], ENT_QUOTES, 'UTF-8'); ?></span>
           </div>
         </div>
+        <?php if (!empty($freePlan['show_tier_image'])) { ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--mockup">
-          <?php ikpr_render_pricing_laptop_mockup(); ?>
+          <?php ikpr_render_pricing_tier_media($freePlan); ?>
         </div>
+        <?php } ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--primary">
-          <h3 class="ikpr-pricing-features-title">Limits</h3>
+          <h3 class="ikpr-pricing-features-title"><?php echo htmlspecialchars((string) $freePlan['primary_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
           <ul class="ikpr-pricing-features">
-            <li class="ikpr-pricing-feat">Up to <strong>3 MB</strong> per image file</li>
-            <li class="ikpr-pricing-feat"><strong>50 MB</strong> total library storage</li>
-            <li class="ikpr-pricing-feat">Up to <strong>100</strong> images in your library</li>
-            <li class="ikpr-pricing-feat">Shared dashboard: up to <strong>20</strong> images per dashboard</li>
+            <?php ikpr_render_pricing_list(imagekpr_plan_primary_bullets($freePlan)); ?>
           </ul>
         </div>
-        <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
-          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub">Included</h3>
+        <?php if (!empty($freePlan['show_recommended'])) { ?>
+        <div class="ikpr-pricing-sec ikpr-pricing-sec--recommended">
+          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub"><?php echo htmlspecialchars((string) $freePlan['recommended_for_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
           <ul class="ikpr-pricing-features ikpr-pricing-features--compact">
-            <li class="ikpr-pricing-feat">Sign in with Google; private gallery</li>
-            <li class="ikpr-pricing-feat">Folders, tags, search, copyable links</li>
-            <li class="ikpr-pricing-feat">Slideshows, bulk zip download, and sharing controls</li>
+            <?php ikpr_render_pricing_list((array) ($freePlan['recommended_for_bullets'] ?? [])); ?>
           </ul>
         </div>
+        <?php } ?>
+        <?php if (!empty($freePlan['show_included'])) { ?>
+        <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
+          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub"><?php echo htmlspecialchars((string) $freePlan['included_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
+          <ul class="ikpr-pricing-features ikpr-pricing-features--compact">
+            <?php ikpr_render_pricing_list((array) ($freePlan['included_bullets'] ?? [])); ?>
+          </ul>
+        </div>
+        <?php } ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--cta">
-          <a class="ikpr-pricing-cta" href="/">Get started</a>
+          <a class="ikpr-pricing-cta" href="<?php echo htmlspecialchars((string) $freePlan['cta_href'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $freePlan['cta_label'], ENT_QUOTES, 'UTF-8'); ?></a>
         </div>
       </article>
 
@@ -105,37 +144,44 @@ function ikpr_render_pricing_laptop_mockup(): void
           </div>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--title">
-          <h2 class="ikpr-pricing-tier">Silver</h2>
+          <h2 class="ikpr-pricing-tier"><?php echo htmlspecialchars((string) $silverPlan['display_label'], ENT_QUOTES, 'UTF-8'); ?></h2>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--price">
           <div class="ikpr-pricing-price">
-            <sup class="ikpr-pricing-dollar">S$</sup><span class="ikpr-pricing-amount">2.99</span>
-            <span class="ikpr-pricing-period">/ month</span>
-            <span class="ikpr-pricing-annual">(or S$29.90/yr)</span>
+            <sup class="ikpr-pricing-dollar">S$</sup><span class="ikpr-pricing-amount"><?php echo htmlspecialchars((string) $silverPlan['monthly_price'], ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="ikpr-pricing-period"><?php echo htmlspecialchars((string) $silverPlan['price_period'], ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="ikpr-pricing-annual"><?php echo htmlspecialchars('(or S$' . (string) $silverPlan['annual_price'] . '/yr)', ENT_QUOTES, 'UTF-8'); ?></span>
           </div>
         </div>
+        <?php if (!empty($silverPlan['show_tier_image'])) { ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--mockup">
-          <?php ikpr_render_pricing_laptop_mockup(); ?>
+          <?php ikpr_render_pricing_tier_media($silverPlan); ?>
         </div>
+        <?php } ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--primary">
-          <h3 class="ikpr-pricing-features-title">Upgrades</h3>
+          <h3 class="ikpr-pricing-features-title"><?php echo htmlspecialchars((string) $silverPlan['primary_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
           <ul class="ikpr-pricing-features">
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos">Up to <strong>10 MB</strong> per image file</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos"><strong>200 MB</strong> total library storage</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos">Up to <strong>200</strong> images in your library</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos">Shared dashboard: up to <strong>40</strong> images per dashboard</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos">MP4 video uploads (up to <strong>10 MB</strong> per clip)</li>
+            <?php ikpr_render_pricing_list(imagekpr_plan_primary_bullets($silverPlan), 'ikpr-pricing-feat ikpr-pricing-feat--pos'); ?>
           </ul>
         </div>
-        <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
-          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub">Included</h3>
+        <?php if (!empty($silverPlan['show_recommended'])) { ?>
+        <div class="ikpr-pricing-sec ikpr-pricing-sec--recommended">
+          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub"><?php echo htmlspecialchars((string) $silverPlan['recommended_for_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
           <ul class="ikpr-pricing-features ikpr-pricing-features--compact">
-            <li class="ikpr-pricing-feat">Everything in Free, with higher limits above</li>
-            <li class="ikpr-pricing-feat">Billed monthly or yearly via Stripe (when checkout is enabled)</li>
+            <?php ikpr_render_pricing_list((array) ($silverPlan['recommended_for_bullets'] ?? [])); ?>
           </ul>
         </div>
+        <?php } ?>
+        <?php if (!empty($silverPlan['show_included'])) { ?>
+        <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
+          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub"><?php echo htmlspecialchars((string) $silverPlan['included_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
+          <ul class="ikpr-pricing-features ikpr-pricing-features--compact">
+            <?php ikpr_render_pricing_list((array) ($silverPlan['included_bullets'] ?? [])); ?>
+          </ul>
+        </div>
+        <?php } ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--cta">
-          <a class="ikpr-pricing-cta" href="contact.php">Contact us</a>
+          <a class="ikpr-pricing-cta" href="<?php echo htmlspecialchars((string) $silverPlan['cta_href'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $silverPlan['cta_label'], ENT_QUOTES, 'UTF-8'); ?></a>
         </div>
       </article>
 
@@ -153,37 +199,44 @@ function ikpr_render_pricing_laptop_mockup(): void
           </div>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--title">
-          <h2 class="ikpr-pricing-tier">Gold</h2>
+          <h2 class="ikpr-pricing-tier"><?php echo htmlspecialchars((string) $goldPlan['display_label'], ENT_QUOTES, 'UTF-8'); ?></h2>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--price">
           <div class="ikpr-pricing-price">
-            <sup class="ikpr-pricing-dollar">S$</sup><span class="ikpr-pricing-amount">9.99</span>
-            <span class="ikpr-pricing-period">/ month</span>
-            <span class="ikpr-pricing-annual">(or S$99.90/yr)</span>
+            <sup class="ikpr-pricing-dollar">S$</sup><span class="ikpr-pricing-amount"><?php echo htmlspecialchars((string) $goldPlan['monthly_price'], ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="ikpr-pricing-period"><?php echo htmlspecialchars((string) $goldPlan['price_period'], ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="ikpr-pricing-annual"><?php echo htmlspecialchars('(or S$' . (string) $goldPlan['annual_price'] . '/yr)', ENT_QUOTES, 'UTF-8'); ?></span>
           </div>
         </div>
+        <?php if (!empty($goldPlan['show_tier_image'])) { ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--mockup">
-          <?php ikpr_render_pricing_laptop_mockup(); ?>
+          <?php ikpr_render_pricing_tier_media($goldPlan); ?>
         </div>
+        <?php } ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--primary">
-          <h3 class="ikpr-pricing-features-title">Upgrades</h3>
+          <h3 class="ikpr-pricing-features-title"><?php echo htmlspecialchars((string) $goldPlan['primary_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
           <ul class="ikpr-pricing-features">
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--bright">Up to <strong>50 MB</strong> per image file</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--bright"><strong>1 GB</strong> total library storage</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--bright">Up to <strong>1,000</strong> images in your library</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--bright">Shared dashboard: up to <strong>200</strong> images per dashboard</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--bright">MP4 video uploads (up to <strong>50 MB</strong> per clip)</li>
+            <?php ikpr_render_pricing_list(imagekpr_plan_primary_bullets($goldPlan), 'ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--bright'); ?>
           </ul>
         </div>
-        <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
-          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub">Included</h3>
+        <?php if (!empty($goldPlan['show_recommended'])) { ?>
+        <div class="ikpr-pricing-sec ikpr-pricing-sec--recommended">
+          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub"><?php echo htmlspecialchars((string) $goldPlan['recommended_for_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
           <ul class="ikpr-pricing-features ikpr-pricing-features--compact">
-            <li class="ikpr-pricing-feat">Everything in Silver, with higher limits above</li>
-            <li class="ikpr-pricing-feat">Same core app; strong fit before Platinum for very large libraries and short MP4 clips</li>
+            <?php ikpr_render_pricing_list((array) ($goldPlan['recommended_for_bullets'] ?? [])); ?>
           </ul>
         </div>
+        <?php } ?>
+        <?php if (!empty($goldPlan['show_included'])) { ?>
+        <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
+          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub"><?php echo htmlspecialchars((string) $goldPlan['included_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
+          <ul class="ikpr-pricing-features ikpr-pricing-features--compact">
+            <?php ikpr_render_pricing_list((array) ($goldPlan['included_bullets'] ?? [])); ?>
+          </ul>
+        </div>
+        <?php } ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--cta">
-          <a class="ikpr-pricing-cta" href="contact.php">Contact us</a>
+          <a class="ikpr-pricing-cta" href="<?php echo htmlspecialchars((string) $goldPlan['cta_href'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $goldPlan['cta_label'], ENT_QUOTES, 'UTF-8'); ?></a>
         </div>
       </article>
 
@@ -198,37 +251,44 @@ function ikpr_render_pricing_laptop_mockup(): void
           </div>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--title">
-          <h2 class="ikpr-pricing-tier">Platinum</h2>
+          <h2 class="ikpr-pricing-tier"><?php echo htmlspecialchars((string) $platinumPlan['display_label'], ENT_QUOTES, 'UTF-8'); ?></h2>
         </div>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--price">
           <div class="ikpr-pricing-price">
-            <sup class="ikpr-pricing-dollar">S$</sup><span class="ikpr-pricing-amount">49.90</span>
-            <span class="ikpr-pricing-period">/ month</span>
-            <span class="ikpr-pricing-annual">(or S$499/yr)</span>
+            <sup class="ikpr-pricing-dollar">S$</sup><span class="ikpr-pricing-amount"><?php echo htmlspecialchars((string) $platinumPlan['monthly_price'], ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="ikpr-pricing-period"><?php echo htmlspecialchars((string) $platinumPlan['price_period'], ENT_QUOTES, 'UTF-8'); ?></span>
+            <span class="ikpr-pricing-annual"><?php echo htmlspecialchars('(or S$' . (string) $platinumPlan['annual_price'] . '/yr)', ENT_QUOTES, 'UTF-8'); ?></span>
           </div>
         </div>
+        <?php if (!empty($platinumPlan['show_tier_image'])) { ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--mockup">
-          <?php ikpr_render_pricing_laptop_mockup(); ?>
+          <?php ikpr_render_pricing_tier_media($platinumPlan); ?>
         </div>
+        <?php } ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--primary">
-          <h3 class="ikpr-pricing-features-title">Upgrades</h3>
+          <h3 class="ikpr-pricing-features-title"><?php echo htmlspecialchars((string) $platinumPlan['primary_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
           <ul class="ikpr-pricing-features">
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum">Up to <strong>500 MB</strong> per image file</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum"><strong>10 GB</strong> total library storage</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum">Up to <strong>10,000</strong> images in your library</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum">Shared dashboard: up to <strong>2,000</strong> images per dashboard</li>
-            <li class="ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum">MP4 video uploads (up to <strong>500 MB</strong> per clip)</li>
+            <?php ikpr_render_pricing_list(imagekpr_plan_primary_bullets($platinumPlan), 'ikpr-pricing-feat ikpr-pricing-feat--pos ikpr-pricing-feat--platinum'); ?>
           </ul>
         </div>
-        <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
-          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub">Included</h3>
+        <?php if (!empty($platinumPlan['show_recommended'])) { ?>
+        <div class="ikpr-pricing-sec ikpr-pricing-sec--recommended">
+          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub"><?php echo htmlspecialchars((string) $platinumPlan['recommended_for_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
           <ul class="ikpr-pricing-features ikpr-pricing-features--compact">
-            <li class="ikpr-pricing-feat">Everything in Gold, with the highest self-serve limits on this service</li>
-            <li class="ikpr-pricing-feat">Billed monthly or yearly via Stripe (when checkout is enabled)</li>
+            <?php ikpr_render_pricing_list((array) ($platinumPlan['recommended_for_bullets'] ?? [])); ?>
           </ul>
         </div>
+        <?php } ?>
+        <?php if (!empty($platinumPlan['show_included'])) { ?>
+        <div class="ikpr-pricing-sec ikpr-pricing-sec--included">
+          <h3 class="ikpr-pricing-features-title ikpr-pricing-features-title--sub"><?php echo htmlspecialchars((string) $platinumPlan['included_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
+          <ul class="ikpr-pricing-features ikpr-pricing-features--compact">
+            <?php ikpr_render_pricing_list((array) ($platinumPlan['included_bullets'] ?? [])); ?>
+          </ul>
+        </div>
+        <?php } ?>
         <div class="ikpr-pricing-sec ikpr-pricing-sec--cta">
-          <a class="ikpr-pricing-cta" href="contact.php">Contact us</a>
+          <a class="ikpr-pricing-cta" href="<?php echo htmlspecialchars((string) $platinumPlan['cta_href'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $platinumPlan['cta_label'], ENT_QUOTES, 'UTF-8'); ?></a>
         </div>
       </article>
     </div>
@@ -247,7 +307,7 @@ function ikpr_render_pricing_laptop_mockup(): void
               </div>
             </div>
             <div class="ikpr-pricing-sec ikpr-pricing-sec--title">
-              <h2 class="ikpr-pricing-tier">Ultra</h2>
+              <h2 class="ikpr-pricing-tier"><?php echo htmlspecialchars((string) $ultraPlan['display_label'], ENT_QUOTES, 'UTF-8'); ?></h2>
             </div>
             <div class="ikpr-pricing-sec ikpr-pricing-sec--price">
               <p class="ikpr-pricing-pro-tagline">Dedicated white-label deployment</p>
@@ -258,24 +318,23 @@ function ikpr_render_pricing_laptop_mockup(): void
             </div>
           </div>
           <div class="ikpr-pricing-ultra-col ikpr-pricing-ultra-col--visual">
+            <?php if (!empty($ultraPlan['show_tier_image'])) { ?>
             <div class="ikpr-pricing-sec ikpr-pricing-sec--mockup">
-              <?php ikpr_render_pricing_laptop_mockup(); ?>
+              <?php ikpr_render_pricing_tier_media($ultraPlan); ?>
             </div>
+            <?php } ?>
           </div>
           <div class="ikpr-pricing-ultra-col ikpr-pricing-ultra-col--summary">
             <div class="ikpr-pricing-sec ikpr-pricing-sec--primary">
-              <h3 class="ikpr-pricing-features-title">Summary</h3>
+              <h3 class="ikpr-pricing-features-title"><?php echo htmlspecialchars((string) $ultraPlan['summary_title'], ENT_QUOTES, 'UTF-8'); ?></h3>
               <ul class="ikpr-pricing-features ikpr-pricing-features--ultra-summary">
-                <li class="ikpr-pricing-feat">For teams that need <strong>their own</strong> infrastructure—not just an upgrade.</li>
-                <li class="ikpr-pricing-feat">White label with <strong>your own branding</strong> and technical setup.</li>
-                <li class="ikpr-pricing-feat"><strong>~20&nbsp;GiB</strong> storage and your own curated limits.</li>
-                <li class="ikpr-pricing-feat"><strong>Unlimited limits</strong> or as you see fit for your organisation.</li>
+                <?php ikpr_render_pricing_list((array) ($ultraPlan['summary_bullets'] ?? [])); ?>
               </ul>
             </div>
           </div>
           <div class="ikpr-pricing-ultra-col ikpr-pricing-ultra-col--cta">
             <div class="ikpr-pricing-sec ikpr-pricing-sec--cta">
-              <a class="ikpr-pricing-cta ikpr-pricing-cta--pro" href="contact.php">Contact us</a>
+              <a class="ikpr-pricing-cta ikpr-pricing-cta--pro" href="<?php echo htmlspecialchars((string) $ultraPlan['cta_href'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars((string) $ultraPlan['cta_label'], ENT_QUOTES, 'UTF-8'); ?></a>
             </div>
           </div>
         </div>

@@ -268,7 +268,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'apply
     $newDown = null;
   }
   $up = $pdo->prepare('UPDATE users SET storage_quota_bytes = ?, upload_size_mb = ?, upload_tier_downgraded_at = ? WHERE id = ?');
+  $stCheck = $pdo->prepare('SELECT storage_quota_bytes, upload_size_mb FROM users WHERE id = ? LIMIT 1');
   $up->execute([$newBytes, $newMb, $newDown, $targetId]);
+  $stCheck->execute([$targetId]);
+  $checkRow = $stCheck->fetch(PDO::FETCH_ASSOC);
+  $appliedBytes = $checkRow === false || $checkRow['storage_quota_bytes'] === null ? null : (int) $checkRow['storage_quota_bytes'];
+  $appliedMb = $checkRow === false ? null : (int) ($checkRow['upload_size_mb'] ?? 0);
+  if ($checkRow === false || $appliedBytes !== $newBytes || $appliedMb !== $newMb) {
+    $_SESSION['admin_flash'] = [
+      'type' => 'error',
+      'msg' => 'Could not fully apply ' . $ref[$tier]['label'] . ' preset for ' . $oldRow['email'] . '. Run migrations/phase20_upload_size_mb_smallint.sql and try again.'
+    ];
+    $redir = 'index.php';
+    $q = $_GET;
+    if (!empty($q)) {
+      $redir .= '?' . http_build_query($q);
+    }
+    header('Location: ' . $redir, true, 303);
+    exit;
+  }
   imagekpr_admin_audit_log($pdo, $actorId, 'user_saas_tier_applied', [
     'target_user_id' => $targetId,
     'target_email' => $oldRow['email'],
@@ -334,7 +352,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
   $newBytes = (int) $ref[$tier]['bytes'];
   $newMb = (int) $ref[$tier]['upload_mb'];
   $stOld = $pdo->prepare('SELECT id, email, upload_size_mb, upload_tier_downgraded_at FROM users WHERE id = ? LIMIT 1');
+  $stCheck = $pdo->prepare('SELECT email, storage_quota_bytes, upload_size_mb FROM users WHERE id = ? LIMIT 1');
   $up = $pdo->prepare('UPDATE users SET storage_quota_bytes = ?, upload_size_mb = ?, upload_tier_downgraded_at = ? WHERE id = ?');
+  $okIds = [];
+  $failedEmails = [];
   foreach ($ids as $tid) {
     $stOld->execute([$tid]);
     $oldRow = $stOld->fetch(PDO::FETCH_ASSOC);
@@ -353,14 +374,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'bulk_
       $newDown = null;
     }
     $up->execute([$newBytes, $newMb, $newDown, $tid]);
+    $stCheck->execute([$tid]);
+    $checkRow = $stCheck->fetch(PDO::FETCH_ASSOC);
+    $appliedBytes = $checkRow === false || $checkRow['storage_quota_bytes'] === null ? null : (int) $checkRow['storage_quota_bytes'];
+    $appliedMb = $checkRow === false ? null : (int) ($checkRow['upload_size_mb'] ?? 0);
+    if ($checkRow !== false && $appliedBytes === $newBytes && $appliedMb === $newMb) {
+      $okIds[] = $tid;
+    } else {
+      $failedEmails[] = (string) ($oldRow['email'] ?? ('user #' . $tid));
+    }
   }
   imagekpr_admin_audit_log($pdo, $actorId, 'bulk_saas_tier_applied', [
     'target_user_ids' => $ids,
+    'applied_user_ids' => $okIds,
+    'failed_emails' => $failedEmails,
     'saas_tier' => $tier,
     'new_storage_quota_bytes' => $newBytes,
     'new_upload_size_mb' => $newMb,
   ]);
-  $_SESSION['admin_flash'] = ['type' => 'ok', 'msg' => 'Applied ' . $ref[$tier]['label'] . ' preset to ' . count($ids) . ' user(s).'];
+  if ($failedEmails !== []) {
+    $_SESSION['admin_flash'] = [
+      'type' => 'error',
+      'msg' => 'Applied ' . $ref[$tier]['label'] . ' preset to ' . count($okIds) . ' user(s), but ' . count($failedEmails) . ' row(s) did not persist correctly. Run migrations/phase20_upload_size_mb_smallint.sql and try again. Failed: ' . implode(', ', $failedEmails) . '.'
+    ];
+  } else {
+    $_SESSION['admin_flash'] = ['type' => 'ok', 'msg' => 'Applied ' . $ref[$tier]['label'] . ' preset to ' . count($okIds) . ' user(s).'];
+  }
   $redir = 'index.php';
   $q = $_GET;
   if (!empty($q)) {
@@ -657,18 +696,10 @@ $totalFolders = (int) $pdo->query('SELECT COUNT(*) FROM folders')->fetchColumn()
 $totalDashboards = (int) $pdo->query('SELECT COUNT(*) FROM shared_dashboards')->fetchColumn();
 $totalTags = (int) $pdo->query('SELECT COALESCE(SUM(JSON_LENGTH(tags)), 0) FROM images WHERE tags IS NOT NULL')->fetchColumn();
 $userCount = (int) $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
-$tierCounts = $pdo->query(
-  'SELECT
-    SUM(upload_size_mb <= 3) AS free_count,
-    SUM(upload_size_mb = 10) AS silver_count,
-    SUM(upload_size_mb = 50) AS gold_count,
-    SUM(upload_size_mb = 500) AS platinum_count
-  FROM users'
-)->fetch(PDO::FETCH_ASSOC);
-$freeUsers     = (int) ($tierCounts['free_count'] ?? 0);
-$silverUsers   = (int) ($tierCounts['silver_count'] ?? 0);
-$goldUsers     = (int) ($tierCounts['gold_count'] ?? 0);
-$platinumUsers = (int) ($tierCounts['platinum_count'] ?? 0);
+$freeUsers = 0;
+$silverUsers = 0;
+$goldUsers = 0;
+$platinumUsers = 0;
 
 $sqlAll = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at,
   COALESCE(SUM(i.size_bytes), 0) AS used_bytes,
@@ -700,6 +731,16 @@ foreach ($allRows as $r) {
   $used = (int) $r['used_bytes'];
   $dbq = $r['storage_quota_bytes'];
   $dbq = $dbq === null ? null : (int) $dbq;
+  $tierEnt = imagekpr_plan_admin_tier_entitlements($dbq, (int) ($r['upload_size_mb'] ?? 3));
+  if ($tierEnt['matrix_key'] === 'free') {
+    $freeUsers++;
+  } elseif ($tierEnt['matrix_key'] === 'silver') {
+    $silverUsers++;
+  } elseif ($tierEnt['matrix_key'] === 'gold') {
+    $goldUsers++;
+  } elseif ($tierEnt['matrix_key'] === 'platinum') {
+    $platinumUsers++;
+  }
   $eff = imagekpr_effective_quota_bytes($dbq);
   if ($eff !== null && $used > $eff) {
     $overQuota++;
@@ -737,12 +778,12 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
   return '<a href="index.php?' . htmlspecialchars(http_build_query($qs), ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . $arrow . '</a>';
 }
 
-/** Circled “i” — tooltip via native title on hover (cursor: help). */
+/** Circled “i” — hover says click for more; click opens the shared info modal. */
 function admin_th_hint(string $tip): string
 {
   $e = htmlspecialchars($tip, ENT_QUOTES, 'UTF-8');
 
-  return '<span class="admin-th-hint" title="' . $e . '" aria-label="Column info: ' . $e . '"><span aria-hidden="true">i</span></span>';
+  return '<button type="button" class="admin-th-hint" title="Click for more" data-admin-info="' . $e . '" aria-label="More info"><span aria-hidden="true">i</span></button>';
 }
 
 ?>
@@ -813,14 +854,81 @@ function admin_th_hint(string $tip): string
       font-style: italic;
       font-family: Georgia, 'Times New Roman', serif;
       line-height: 1;
-      cursor: help;
+      cursor: pointer;
       flex-shrink: 0;
       user-select: none;
+      padding: 0;
+      appearance: none;
+      -webkit-appearance: none;
     }
     .admin-th-hint:hover {
       border-color: #546e7a;
       background: #cfd8dc;
       color: #102027;
+    }
+    .admin-th-hint:focus-visible {
+      outline: 2px solid rgba(21, 101, 192, 0.45);
+      outline-offset: 2px;
+    }
+    .admin-info-modal[hidden] { display: none; }
+    .admin-info-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+    .admin-info-modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(17, 24, 39, 0.48);
+    }
+    .admin-info-modal-card {
+      position: relative;
+      width: min(32rem, calc(100vw - 2rem));
+      max-height: min(80vh, 36rem);
+      overflow: auto;
+      background: #fff;
+      border: 1px solid #d8e1e8;
+      border-radius: 14px;
+      box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22);
+      padding: 1rem 1rem 1.1rem;
+    }
+    .admin-info-modal-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.65rem;
+    }
+    .admin-info-modal-title {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.3;
+      color: #111827;
+    }
+    .admin-info-modal-close {
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #334155;
+      border-radius: 8px;
+      padding: 0.28rem 0.55rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .admin-info-modal-close:hover {
+      background: #eef2f7;
+    }
+    .admin-info-modal-body {
+      margin: 0;
+      color: #334155;
+      font-size: 0.94rem;
+      line-height: 1.6;
+      white-space: pre-line;
     }
     table.admin-users tr:last-child td { border-bottom: none; }
     table.admin-users .admin-col-cb { width: 2.25rem; box-sizing: border-box; }
@@ -1197,6 +1305,16 @@ function admin_th_hint(string $tip): string
       </table>
     </div>
   </div>
+  <div class="admin-info-modal" id="admin-info-modal" hidden aria-hidden="true">
+    <div class="admin-info-modal-backdrop" id="admin-info-modal-backdrop"></div>
+    <div class="admin-info-modal-card" role="dialog" aria-modal="true" aria-labelledby="admin-info-modal-title">
+      <div class="admin-info-modal-top">
+        <h2 class="admin-info-modal-title" id="admin-info-modal-title">Column info</h2>
+        <button type="button" class="admin-info-modal-close" id="admin-info-modal-close" aria-label="Close info">Close</button>
+      </div>
+      <p class="admin-info-modal-body" id="admin-info-modal-body"></p>
+    </div>
+  </div>
   <script>
     (function () {
       var all = document.getElementById('admin-select-all');
@@ -1292,6 +1410,46 @@ function admin_th_hint(string $tip): string
           window.localStorage.setItem(key, hidden ? '1' : '0');
         } catch (e) {
           // Ignore storage errors and keep the current UI state.
+        }
+      });
+    })();
+
+    (function () {
+      var modal = document.getElementById('admin-info-modal');
+      var body = document.getElementById('admin-info-modal-body');
+      var closeBtn = document.getElementById('admin-info-modal-close');
+      var backdrop = document.getElementById('admin-info-modal-backdrop');
+      if (!modal || !body || !closeBtn || !backdrop) return;
+
+      var lastTrigger = null;
+      var closeModal = function () {
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        body.textContent = '';
+        if (lastTrigger && typeof lastTrigger.focus === 'function') {
+          lastTrigger.focus();
+        }
+        lastTrigger = null;
+      };
+      var openModal = function (text, trigger) {
+        body.textContent = text || '';
+        lastTrigger = trigger || null;
+        modal.hidden = false;
+        modal.setAttribute('aria-hidden', 'false');
+        closeBtn.focus();
+      };
+
+      document.querySelectorAll('.admin-th-hint[data-admin-info]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openModal(btn.getAttribute('data-admin-info') || '', btn);
+        });
+      });
+
+      closeBtn.addEventListener('click', closeModal);
+      backdrop.addEventListener('click', closeModal);
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !modal.hidden) {
+          closeModal();
         }
       });
     })();

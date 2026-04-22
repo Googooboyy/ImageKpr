@@ -80,6 +80,8 @@ $userRow = null;
 $totalImages = 0;
 $totalVideos = 0;
 $totalFolders = 0;
+$totalSharedDashboards = 0;
+$sharedDashboardsAvailable = true;
 $totalStorageBytes = 0;
 $quotaStatus = ['effective_bytes' => null, 'unlimited' => true, 'remaining_bytes' => null, 'used_bytes' => 0];
 $planLabelDisplay = '—';
@@ -126,6 +128,12 @@ try {
     $totalVideos = 0;
   }
   $totalFolders = (int) $pdo->query('SELECT COUNT(*) FROM folders WHERE user_id = ' . $uid)->fetchColumn();
+  try {
+    $totalSharedDashboards = (int) $pdo->query('SELECT COUNT(*) FROM shared_dashboards WHERE user_id = ' . $uid)->fetchColumn();
+  } catch (Throwable $e) {
+    $sharedDashboardsAvailable = false;
+    $totalSharedDashboards = 0;
+  }
   $totalStorageBytes = (int) $pdo->query('SELECT COALESCE(SUM(size_bytes), 0) FROM images WHERE ' . $userWhere)->fetchColumn();
 
   $quotaStatus = imagekpr_user_storage_quota_status($pdo, $uid);
@@ -254,7 +262,13 @@ $headerLabel = imagekpr_user_header_display_label(
         <div><dt>Max library images</dt><dd class="ikpr-account-dl-note"><?php echo htmlspecialchars('Not listed — your quota does not match a standard Free, Silver, Gold, or Platinum preset.', ENT_QUOTES, 'UTF-8'); ?></dd></div>
         <div><dt>Shared dashboards</dt><dd class="ikpr-account-dl-note"><?php echo htmlspecialchars('Not listed for the same reason.', ENT_QUOTES, 'UTF-8'); ?></dd></div>
         <?php } ?>
-        <div><dt>Total shared dashboards</dt><dd class="ikpr-account-dl-note"><?php echo htmlspecialchars('Coming soon..', ENT_QUOTES, 'UTF-8'); ?></dd></div>
+        <div><dt>Total shared dashboards</dt><dd<?php echo $sharedDashboardsAvailable ? '' : ' class="ikpr-account-dl-note"'; ?>><?php
+          if ($sharedDashboardsAvailable) {
+            echo (int) $totalSharedDashboards;
+          } else {
+            echo htmlspecialchars('Unavailable — run shared dashboards migration.', ENT_QUOTES, 'UTF-8');
+          }
+        ?></dd></div>
         <?php if ($graceNote !== '') { ?>
         <div class="ikpr-account-grace"><dt></dt><dd><?php echo htmlspecialchars($graceNote, ENT_QUOTES, 'UTF-8'); ?></dd></div>
         <?php } ?>
