@@ -1887,6 +1887,24 @@
         syncSlideshowMiniControllerUi();
         return;
       }
+      {
+        const curSlide = slideshowState.slides[slideshowState.index];
+        if (isVideoSlide(curSlide) && (e.key === '[' || e.key === ']')) {
+          e.preventDefault();
+          const v = document.getElementById('slideshow-video');
+          if (v && !v.hidden) {
+            const scrub = 4;
+            if (e.key === '[') {
+              v.currentTime = Math.max(0, v.currentTime - scrub);
+            } else {
+              const dur = v.duration;
+              const t = v.currentTime + scrub;
+              v.currentTime = isFinite(dur) && dur > 0 ? Math.min(dur, t) : t;
+            }
+          }
+          return;
+        }
+      }
       if (e.key === 'ArrowRight') {
         e.preventDefault();
         if (slideshowAdvance(1) && slideshowState.auto && !slideshowState.paused) armSlideshowAutoTimer();

@@ -300,6 +300,60 @@ function imagekpr_infer_saas_tier_preset_match(?int $storageQuotaColumn, int $up
 }
 
 /**
+ * Resolve SaaS matrix caps for admin user rows: full storage+upload match first, then effective storage-only
+ * (so Platinum storage without upload_size_mb = 500 still maps to Platinum caps), then upload-only.
+ *
+ * @return array{matrix_key: ?string, max_images: ?int, shared_dashboard_cap: ?int}
+ */
+function imagekpr_plan_admin_tier_entitlements(?int $storageQuotaColumn, int $uploadMbRaw): array
+{
+  $uploadMb = imagekpr_normalize_upload_size_mb($uploadMbRaw);
+  $m = imagekpr_plan_tier_matrix_reference();
+
+  $eff = imagekpr_effective_quota_bytes($storageQuotaColumn);
+  if ($eff === null) {
+    return ['matrix_key' => null, 'max_images' => null, 'shared_dashboard_cap' => null];
+  }
+
+  $preset = imagekpr_infer_saas_tier_preset_match($storageQuotaColumn, $uploadMb);
+  if (is_string($preset) && in_array($preset, ['free', 'silver', 'gold', 'platinum'], true)) {
+    $row = $m[$preset];
+
+    return [
+      'matrix_key' => $preset,
+      'max_images' => (int) $row['max_images'],
+      'shared_dashboard_cap' => (int) $row['shared_dashboard_cap'],
+    ];
+  }
+
+  foreach (['free', 'silver', 'gold', 'platinum'] as $k) {
+    if ((int) $m[$k]['storage_bytes'] === (int) $eff) {
+      $row = $m[$k];
+
+      return [
+        'matrix_key' => $k,
+        'max_images' => (int) $row['max_images'],
+        'shared_dashboard_cap' => (int) $row['shared_dashboard_cap'],
+      ];
+    }
+  }
+
+  foreach (['free', 'silver', 'gold', 'platinum'] as $k) {
+    if ((int) $m[$k]['upload_mb'] === $uploadMb) {
+      $row = $m[$k];
+
+      return [
+        'matrix_key' => $k,
+        'max_images' => (int) $row['max_images'],
+        'shared_dashboard_cap' => (int) $row['shared_dashboard_cap'],
+      ];
+    }
+  }
+
+  return ['matrix_key' => null, 'max_images' => null, 'shared_dashboard_cap' => null];
+}
+
+/**
  * Storage quota status for the signed-in API user (same used-bytes basis as upload/inbox enforcement).
  *
  * @return array{effective_bytes: ?int, unlimited: bool, remaining_bytes: ?int, used_bytes: int}

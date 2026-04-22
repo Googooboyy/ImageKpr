@@ -78,6 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action']) && (st
 
 $userRow = null;
 $totalImages = 0;
+$totalVideos = 0;
 $totalFolders = 0;
 $totalStorageBytes = 0;
 $quotaStatus = ['effective_bytes' => null, 'unlimited' => true, 'remaining_bytes' => null, 'used_bytes' => 0];
@@ -106,12 +107,30 @@ try {
   if (imagekpr_share_null_user_rows_enabled()) {
     $userWhere = '(user_id = ' . $uid . ' OR user_id IS NULL)';
   }
-  $totalImages = (int) $pdo->query('SELECT COUNT(*) FROM images WHERE ' . $userWhere)->fetchColumn();
+  $hasMediaTypeCol = false;
+  try {
+    $colChk = $pdo->query("SHOW COLUMNS FROM images LIKE 'media_type'");
+    $hasMediaTypeCol = $colChk && $colChk->rowCount() > 0;
+  } catch (Throwable $e) {
+    $hasMediaTypeCol = false;
+  }
+  if ($hasMediaTypeCol) {
+    $totalImages = (int) $pdo->query(
+      'SELECT COUNT(*) FROM images WHERE ' . $userWhere . " AND (media_type IS NULL OR media_type = 'image')"
+    )->fetchColumn();
+    $totalVideos = (int) $pdo->query(
+      'SELECT COUNT(*) FROM images WHERE ' . $userWhere . " AND media_type = 'video'"
+    )->fetchColumn();
+  } else {
+    $totalImages = (int) $pdo->query('SELECT COUNT(*) FROM images WHERE ' . $userWhere)->fetchColumn();
+    $totalVideos = 0;
+  }
   $totalFolders = (int) $pdo->query('SELECT COUNT(*) FROM folders WHERE user_id = ' . $uid)->fetchColumn();
   $totalStorageBytes = (int) $pdo->query('SELECT COALESCE(SUM(size_bytes), 0) FROM images WHERE ' . $userWhere)->fetchColumn();
 
   $quotaStatus = imagekpr_user_storage_quota_status($pdo, $uid);
-  $uploadMb = imagekpr_normalize_upload_size_mb($userRow['upload_size_mb'] ?? 3);
+  $uploadMbRaw = (int) ($userRow['upload_size_mb'] ?? 3);
+  $uploadMb = imagekpr_normalize_upload_size_mb($uploadMbRaw);
   $downgradedAt = isset($userRow['upload_tier_downgraded_at']) ? (string) $userRow['upload_tier_downgraded_at'] : null;
   if ($downgradedAt !== null && trim($downgradedAt) === '') {
     $downgradedAt = null;
@@ -119,22 +138,26 @@ try {
 
   $dbq = $userRow['storage_quota_bytes'];
   $dbq = $dbq === null ? null : (int) $dbq;
-  $preset = imagekpr_infer_saas_tier_preset_match($dbq, $uploadMb);
-  if ($preset === null) {
-    $planLabelDisplay = 'Ultra';
-  } elseif ($preset === 'custom') {
-    $planLabelDisplay = 'Custom';
+  $tierEnt = imagekpr_plan_admin_tier_entitlements($dbq, $uploadMbRaw);
+  if ($tierEnt['matrix_key'] !== null) {
+    $mk = (string) $tierEnt['matrix_key'];
+    $planLabelDisplay = imagekpr_plan_tier_display_label(imagekpr_plan_tier_matrix_reference()[$mk]);
+    $planCapMaxImages = (int) $tierEnt['max_images'];
+    $planCapSharedDashboard = (int) $tierEnt['shared_dashboard_cap'];
   } else {
-    $refLabel = imagekpr_plan_tier_matrix_reference()[$preset];
-    $planLabelDisplay = imagekpr_plan_tier_display_label($refLabel);
+    $preset = imagekpr_infer_saas_tier_preset_match($dbq, $uploadMb);
+    if ($preset === null) {
+      $planLabelDisplay = 'Ultra';
+    } elseif ($preset === 'custom') {
+      $planLabelDisplay = 'Custom';
+    } else {
+      $refLabel = imagekpr_plan_tier_matrix_reference()[$preset];
+      $planLabelDisplay = imagekpr_plan_tier_display_label($refLabel);
+    }
+    $planCapMaxImages = null;
+    $planCapSharedDashboard = null;
   }
   $maxFileSizeDisplay = 'Up to ' . (int) $uploadMb . ' MB per file';
-
-  if (in_array($preset, ['free', 'silver', 'gold', 'platinum'], true)) {
-    $refCaps = imagekpr_plan_tier_matrix_reference()[$preset];
-    $planCapMaxImages = (int) $refCaps['max_images'];
-    $planCapSharedDashboard = (int) $refCaps['shared_dashboard_cap'];
-  }
 
   $createdRaw = $userRow['created_at'] ?? null;
   if ($createdRaw !== null && trim((string) $createdRaw) !== '') {
@@ -220,6 +243,7 @@ $headerLabel = imagekpr_user_header_display_label(
       <dl class="ikpr-account-dl">
         <div><dt>Plan</dt><dd><?php echo htmlspecialchars($planLabelDisplay, ENT_QUOTES, 'UTF-8'); ?></dd></div>
         <div><dt>Total images</dt><dd><?php echo (int) $totalImages; ?></dd></div>
+        <div><dt>Total videos</dt><dd><?php echo (int) $totalVideos; ?></dd></div>
         <div><dt>Folders</dt><dd><?php echo (int) $totalFolders; ?></dd></div>
         <div><dt>Storage</dt><dd><?php echo htmlspecialchars($storageHint, ENT_QUOTES, 'UTF-8'); ?></dd></div>
         <div><dt>Max file size</dt><dd><?php echo htmlspecialchars($maxFileSizeDisplay, ENT_QUOTES, 'UTF-8'); ?></dd></div>

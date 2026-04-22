@@ -606,11 +606,26 @@ if (!empty($whereParts)) {
 $sql = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at,
   COALESCE(SUM(i.size_bytes), 0) AS used_bytes,
   COUNT(i.id) AS image_count,
-  (SELECT COUNT(*) FROM shared_dashboards sd WHERE sd.user_id = u.id) AS dashboard_count
+  COALESCE(dc.dashboard_count, 0) AS dashboard_count,
+  COALESCE(dm.dashboard_max_images_one_board, 0) AS dashboard_max_images_one_board
   FROM users u
+  LEFT JOIN (
+    SELECT user_id, COUNT(*) AS dashboard_count FROM shared_dashboards GROUP BY user_id
+  ) dc ON dc.user_id = u.id
+  LEFT JOIN (
+    SELECT t.user_id, MAX(t.slot_cnt) AS dashboard_max_images_one_board
+    FROM (
+      SELECT sd.user_id, sd.id, COUNT(sdi.image_id) AS slot_cnt
+      FROM shared_dashboards sd
+      LEFT JOIN shared_dashboard_images sdi ON sdi.dashboard_id = sd.id
+      GROUP BY sd.user_id, sd.id
+    ) t
+    GROUP BY t.user_id
+  ) dm ON dm.user_id = u.id
   LEFT JOIN images i ON i.user_id = u.id'
   . $whereSql .
-  ' GROUP BY u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at
+  ' GROUP BY u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at,
+    dc.dashboard_count, dm.dashboard_max_images_one_board
   ORDER BY ' . $orderCol . ' ' . $dir . ', u.id ASC';
 
 $st = $pdo->prepare($sql);
@@ -658,10 +673,25 @@ $platinumUsers = (int) ($tierCounts['platinum_count'] ?? 0);
 $sqlAll = 'SELECT u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at,
   COALESCE(SUM(i.size_bytes), 0) AS used_bytes,
   COUNT(i.id) AS image_count,
-  (SELECT COUNT(*) FROM shared_dashboards sd WHERE sd.user_id = u.id) AS dashboard_count
+  COALESCE(dc.dashboard_count, 0) AS dashboard_count,
+  COALESCE(dm.dashboard_max_images_one_board, 0) AS dashboard_max_images_one_board
   FROM users u
+  LEFT JOIN (
+    SELECT user_id, COUNT(*) AS dashboard_count FROM shared_dashboards GROUP BY user_id
+  ) dc ON dc.user_id = u.id
+  LEFT JOIN (
+    SELECT t.user_id, MAX(t.slot_cnt) AS dashboard_max_images_one_board
+    FROM (
+      SELECT sd.user_id, sd.id, COUNT(sdi.image_id) AS slot_cnt
+      FROM shared_dashboards sd
+      LEFT JOIN shared_dashboard_images sdi ON sdi.dashboard_id = sd.id
+      GROUP BY sd.user_id, sd.id
+    ) t
+    GROUP BY t.user_id
+  ) dm ON dm.user_id = u.id
   LEFT JOIN images i ON i.user_id = u.id
-  GROUP BY u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at';
+  GROUP BY u.id, u.email, u.name, u.is_admin, u.created_at, u.last_login_at, u.storage_quota_bytes, u.upload_size_mb, u.upload_tier_downgraded_at,
+    dc.dashboard_count, dm.dashboard_max_images_one_board';
 $allRows = $pdo->query($sqlAll)->fetchAll(PDO::FETCH_ASSOC);
 
 $overQuota = 0;
@@ -705,6 +735,14 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     $arrow = $currentDir === 'ASC' ? ' ▲' : ' ▼';
   }
   return '<a href="index.php?' . htmlspecialchars(http_build_query($qs), ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . $arrow . '</a>';
+}
+
+/** Circled “i” — tooltip via native title on hover (cursor: help). */
+function admin_th_hint(string $tip): string
+{
+  $e = htmlspecialchars($tip, ENT_QUOTES, 'UTF-8');
+
+  return '<span class="admin-th-hint" title="' . $e . '" aria-label="Column info: ' . $e . '"><span aria-hidden="true">i</span></span>';
 }
 
 ?>
@@ -753,6 +791,37 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
     table.admin-users .admin-th-sub { font-weight: 500; color: #666; font-size: 0.72rem; }
     table.admin-users th a { color: #1565c0; text-decoration: none; }
     table.admin-users th a:hover { text-decoration: underline; }
+    table.admin-users th .admin-th-head { display: inline-flex; align-items: center; gap: 0.28rem; flex-wrap: wrap; max-width: 100%; box-sizing: border-box; }
+    table.admin-users th.admin-col-storage .admin-th-head,
+    table.admin-users th.admin-col-files .admin-th-head,
+    table.admin-users th.admin-col-dashboards .admin-th-head,
+    table.admin-users th.admin-col-days .admin-th-head { justify-content: flex-end; width: 100%; }
+    table.admin-users th .admin-th-head--plan { flex-direction: column; align-items: stretch; gap: 0.15rem; }
+    table.admin-users th .admin-th-plan-line { display: flex; align-items: center; justify-content: space-between; gap: 0.25rem; }
+    .admin-th-hint {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 0.95rem;
+      height: 0.95rem;
+      border-radius: 50%;
+      border: 1px solid #90a4ae;
+      background: #eceff1;
+      color: #37474f;
+      font-size: 0.58rem;
+      font-weight: 700;
+      font-style: italic;
+      font-family: Georgia, 'Times New Roman', serif;
+      line-height: 1;
+      cursor: help;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .admin-th-hint:hover {
+      border-color: #546e7a;
+      background: #cfd8dc;
+      color: #102027;
+    }
     table.admin-users tr:last-child td { border-bottom: none; }
     table.admin-users .admin-col-cb { width: 2.25rem; box-sizing: border-box; }
     table.admin-users .admin-col-email { width: 20%; max-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1008,11 +1077,26 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
             <th class="admin-col-cb"><input type="checkbox" id="admin-select-all" title="Select all on this page" aria-label="Select all users on this page"></th>
             <th class="admin-col-email"><?php echo admin_sort_link('email', 'Email', $sort, $dir, $qSearch, $tierFilter); ?></th>
             <th class="admin-col-name"><?php echo admin_sort_link('name', 'Name', $sort, $dir, $qSearch, $tierFilter); ?></th>
-            <th class="admin-col-plan" title="Match = exact storage cap + upload MB vs matrix; preset applies both">Plan preset<br><span class="admin-th-sub">matrix match</span></th>
-            <th class="admin-col-storage" title="Used storage / quota cap in MiB"><?php echo admin_sort_link('used', 'Storage', $sort, $dir, $qSearch, $tierFilter); ?></th>
-            <th class="admin-col-files" title="Uploaded images / plan limit"><?php echo admin_sort_link('files', 'Files', $sort, $dir, $qSearch, $tierFilter); ?></th>
-            <th class="admin-col-dashboards" title="Shared dashboards / plan limit"><?php echo admin_sort_link('dashes', 'Dashboards', $sort, $dir, $qSearch, $tierFilter); ?></th>
-            <th class="admin-col-days" title="Whole days since last sign-in (— if never)">Last access<br><span class="admin-th-sub">days ago</span></th>
+            <th class="admin-col-plan">
+              <span class="admin-th-head admin-th-head--plan">
+                <span class="admin-th-plan-line"><span>Plan preset</span><?php echo admin_th_hint('Matrix label from storage + upload when they match; otherwise storage-only or upload-only. Preset buttons apply both quota and upload tier.'); ?></span>
+                <span class="admin-th-sub">matrix match</span>
+              </span>
+            </th>
+            <th class="admin-col-storage">
+              <span class="admin-th-head"><?php echo admin_sort_link('used', 'Storage', $sort, $dir, $qSearch, $tierFilter); ?><?php echo admin_th_hint('Used library bytes / effective quota cap (MiB). Red if over cap.'); ?></span>
+            </th>
+            <th class="admin-col-files">
+              <span class="admin-th-head"><?php echo admin_sort_link('files', 'Files', $sort, $dir, $qSearch, $tierFilter); ?><?php echo admin_th_hint('Gallery file count / max library images for the resolved SaaS tier (storage + upload, or storage-only match).'); ?></span>
+            </th>
+            <th class="admin-col-dashboards">
+              <span class="admin-th-head"><?php echo admin_sort_link('dashes', 'Dashboards', $sort, $dir, $qSearch, $tierFilter); ?><?php echo admin_th_hint('Boards owned · largest image count on any one board / per-board image cap from the tier matrix. Red if any board exceeds its cap.'); ?></span>
+            </th>
+            <th class="admin-col-days">
+              <span class="admin-th-head">
+                <span>Last access<br><span class="admin-th-sub">days ago</span></span> <?php echo admin_th_hint('Whole days since last sign-in (0 = today). A dash in a cell means never logged in.'); ?>
+              </span>
+            </th>
             <th class="admin-col-admin"><?php echo admin_sort_link('admin', 'Admin', $sort, $dir, $qSearch, $tierFilter); ?></th>
           </tr>
         </thead>
@@ -1043,13 +1127,19 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
               $tierDownAt = null;
             }
             $tierGraceExpired = imagekpr_upload_tier_grace_expired($tierDownAt);
-            $tierKey = imagekpr_infer_saas_tier_preset_match($dbq, $uploadMb);
-            if ($tierKey === null) {
-              $tierMatchLabel = 'Unlimited';
-            } elseif ($tierKey === 'custom') {
-              $tierMatchLabel = 'Custom';
+            $tierEnt = imagekpr_plan_admin_tier_entitlements($dbq, (int) ($r['upload_size_mb'] ?? 3));
+            if ($tierEnt['matrix_key'] !== null) {
+              $mk = (string) $tierEnt['matrix_key'];
+              $tierMatchLabel = imagekpr_plan_tier_display_label(imagekpr_plan_tier_matrix_reference()[$mk]);
             } else {
-              $tierMatchLabel = (string) ($saasRef[$tierKey]['label'] ?? $tierKey);
+              $tierKey = imagekpr_infer_saas_tier_preset_match($dbq, $uploadMb);
+              if ($tierKey === null) {
+                $tierMatchLabel = 'Unlimited';
+              } elseif ($tierKey === 'custom') {
+                $tierMatchLabel = 'Custom';
+              } else {
+                $tierMatchLabel = (string) ($saasRef[$tierKey]['label'] ?? $tierKey);
+              }
             }
             ?>
             <tr>
@@ -1079,19 +1169,23 @@ function admin_sort_link(string $col, string $label, string $currentSort, string
               <?php
               $ll = $r['last_login_at'];
               $imageCount = (int) ($r['image_count'] ?? 0);
-              $maxImages = imagekpr_plan_max_images_for_upload_mb($uploadMb);
-              $maxImagesDisp = $maxImages !== null ? (string) $maxImages : '—';
+              $maxImages = $tierEnt['max_images'];
+              $maxImagesDisp = $maxImages !== null ? (string) (int) $maxImages : '—';
               $dashCount = (int) ($r['dashboard_count'] ?? 0);
-              $dashLimit = imagekpr_dashboard_limit_for_tier($uploadMb);
+              $dashSlotMax = (int) ($r['dashboard_max_images_one_board'] ?? 0);
+              $perDashCap = $tierEnt['shared_dashboard_cap'];
               $usedMib = round($used / (1024 * 1024), 1);
               $quotaMibStr = $eff === null ? '∞' : (string) (int) round($eff / (1024 * 1024));
               $storageDisp = $usedMib . ' / ' . $quotaMibStr . ' MiB';
               $imagesOver = $maxImages !== null && $imageCount >= $maxImages;
-              $dashOver = $dashCount >= $dashLimit;
+              $dashOver = $perDashCap !== null && $dashSlotMax > $perDashCap;
+              $dashDisp = $perDashCap !== null
+                ? $dashCount . ' · ' . $dashSlotMax . '/' . (int) $perDashCap
+                : $dashCount . ' · —';
               ?>
               <td class="admin-col-storage <?php echo $over ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars($storageDisp, ENT_QUOTES, 'UTF-8'); ?></td>
               <td class="admin-col-files <?php echo $imagesOver ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars($imageCount . ' / ' . $maxImagesDisp, ENT_QUOTES, 'UTF-8'); ?></td>
-              <td class="admin-col-dashboards <?php echo $dashOver ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars($dashCount . ' / ' . $dashLimit, ENT_QUOTES, 'UTF-8'); ?></td>
+              <td class="admin-col-dashboards <?php echo $dashOver ? 'admin-over' : ''; ?>"><?php echo htmlspecialchars($dashDisp, ENT_QUOTES, 'UTF-8'); ?></td>
               <td class="admin-muted admin-col-days"><?php
                 $dl = imagekpr_days_since_mysql_datetime($ll !== null && $ll !== '' ? (string) $ll : null);
             echo $dl !== null ? (string) (int) $dl : '—';

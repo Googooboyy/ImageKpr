@@ -373,6 +373,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
           <span class="ss-hint-item"><kbd>P</kbd> pause / resume (Auto mode)</span>
           <span class="ss-hint-item"><kbd>&uarr;</kbd> <kbd>&darr;</kbd> seconds per slide (Auto mode)</span>
           <span class="ss-hint-item"><kbd>O</kbd> toggle "replay video on end" (MP4 loops instead of advancing)</span>
+          <span class="ss-hint-item"><kbd>[</kbd> <kbd>]</kbd> scrub video 4s back / forward (video slides only)</span>
           <span class="ss-hint-item"><span class="ss-hint-pill">REPLAY</span> tray button restarts the current video (videos only)</span>
         </div>
         <div class="ss-hint-group ss-hint-display">

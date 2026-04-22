@@ -281,6 +281,7 @@ if (!empty($dashboard['hero_image_id'])) {
           <span class="ss-hint-item"><kbd>M</kbd> / <kbd>A</kbd> switch Manual / Auto</span>
           <span class="ss-hint-item"><kbd>P</kbd> pause / resume (Auto mode)</span>
           <span class="ss-hint-item"><kbd>&uarr;</kbd> <kbd>&darr;</kbd> seconds per slide (Auto mode)</span>
+          <span class="ss-hint-item"><kbd>[</kbd> <kbd>]</kbd> scrub video 4s back / forward (video slides only)</span>
         </div>
         <div class="ss-hint-group ss-hint-display">
           <span class="ss-hint-label">Display</span>
