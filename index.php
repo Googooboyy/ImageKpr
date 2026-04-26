@@ -139,9 +139,27 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
 
   <section class="folders-filter">
     <input type="hidden" id="folder-filter" value="" aria-label="Filter by folder">
-    <div id="folder-icons" class="folder-icons"></div>
-    <section id="my-dashboards" class="my-dashboards">
-      <div id="my-dashboards-cards" class="my-dashboards-list" aria-label="Dashboards"></div>
+    <section class="collapsible-panel is-collapsed" data-collapsible-id="folders">
+      <button type="button" class="collapsible-panel-toggle" id="folders-toggle" aria-expanded="false" aria-controls="folders-panel-body" title="Expand folders for more details">
+        <span class="collapsible-panel-title">Folders</span>
+        <span class="collapsible-panel-hint">Collapsed. Click to expand for more details.</span>
+        <span class="collapsible-panel-chevron" aria-hidden="true">▾</span>
+      </button>
+      <div id="folders-panel-body" class="collapsible-panel-body" hidden>
+        <input type="search" id="folder-icons-search" class="section-search-input" placeholder="Search folders..." aria-label="Search folders" autocomplete="off">
+        <div id="folder-icons" class="folder-icons"></div>
+      </div>
+    </section>
+    <section id="my-dashboards" class="my-dashboards collapsible-panel is-collapsed" data-collapsible-id="owner-dashboards">
+      <button type="button" class="collapsible-panel-toggle" id="my-dashboards-toggle" aria-expanded="false" aria-controls="my-dashboards-body" title="Expand shared dashboard tiles for more details">
+        <span class="collapsible-panel-title">Shared dashboard tiles</span>
+        <span class="collapsible-panel-hint">Collapsed. Click to expand for more details.</span>
+        <span class="collapsible-panel-chevron" aria-hidden="true">▾</span>
+      </button>
+      <div id="my-dashboards-body" class="collapsible-panel-body" hidden>
+        <input type="search" id="my-dashboards-search" class="section-search-input" placeholder="Search shared dashboards..." aria-label="Search shared dashboards" autocomplete="off">
+        <div id="my-dashboards-cards" class="my-dashboards-list" aria-label="Dashboards"></div>
+      </div>
     </section>
   </section>
 

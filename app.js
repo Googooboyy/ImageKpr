@@ -3747,6 +3747,11 @@
   const FOLDER_IMG_CLOSED = 'assets/folder-closed-icon.png';
   const FOLDER_IMG_OPEN = 'assets/folder-open-icon.png';
   const CLOCK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+  const sectionUiState = {
+    folderSearch: '',
+    dashboardSearch: '',
+    topSectionsMode: 'collapsible',
+  };
 
   function populateTagsRow() {
     const container = document.getElementById('tag-filters');
@@ -3913,7 +3918,9 @@
     addFolderIcon('All', '', 'Show all images', 'folder', false);
     addFolderIcon('Last uploaded', LATEST_FILTER, 'Show only the last uploaded batch of images', CLOCK_SVG, false);
     addFolderIcon('Uncategorized', UNCATEGORIZED_FILTER, 'Show images not in any folder', 'folder', false);
+    const query = (sectionUiState.folderSearch || '').toLowerCase();
     Object.keys(data).sort().forEach(name => {
+      if (query && String(name).toLowerCase().indexOf(query) === -1) return;
       const label = name + ' (' + (data[name]?.length || 0) + ')';
       addFolderIcon(label, name, label, 'folder', true);
     });
@@ -4039,8 +4046,19 @@
       wrap.innerHTML = '<div class="empty">No dashboards yet.</div>';
       return;
     }
+    const query = (sectionUiState.dashboardSearch || '').toLowerCase();
+    const visibleDashboards = dashboardState.list.filter((dash) => {
+      if (!query) return true;
+      const title = dash && dash.title ? String(dash.title) : '';
+      const subtitle = dash && dash.subtitle ? String(dash.subtitle) : '';
+      return title.toLowerCase().indexOf(query) !== -1 || subtitle.toLowerCase().indexOf(query) !== -1;
+    });
+    if (!visibleDashboards.length) {
+      wrap.innerHTML = '<div class="empty">No shared dashboards match your search.</div>';
+      return;
+    }
     wrap.innerHTML = '';
-    dashboardState.list.forEach((dash) => {
+    visibleDashboards.forEach((dash) => {
       const iconWrap = document.createElement('div');
       const isActive = Number(dash.id) === Number(dashboardState.activeId);
       iconWrap.className = 'folder-icon-wrap dashboard-icon-wrap' + (isActive ? ' active' : '');
@@ -4124,6 +4142,47 @@
       });
 
       wrap.appendChild(iconWrap);
+    });
+  }
+
+  function initCollapsiblePanel(options) {
+    const root = document.querySelector(options.rootSelector);
+    if (!root) return;
+    const toggle = document.getElementById(options.toggleId);
+    const body = document.getElementById(options.bodyId);
+    if (!toggle || !body) return;
+    const setCollapsed = (collapsed) => {
+      root.classList.toggle('is-collapsed', !!collapsed);
+      toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      toggle.title = collapsed ? options.expandTitle : options.collapseTitle;
+      body.hidden = !!collapsed;
+    };
+    setCollapsed(true);
+    toggle.addEventListener('click', () => {
+      setCollapsed(toggle.getAttribute('aria-expanded') === 'true');
+    });
+    return {
+      root,
+      toggle,
+      body,
+      setCollapsed,
+    };
+  }
+
+  function applyTopSectionsMode(mode, panels) {
+    const normalized = mode === 'classic' ? 'classic' : 'collapsible';
+    sectionUiState.topSectionsMode = normalized;
+    document.body.classList.toggle('ikpr-top-sections-classic', normalized === 'classic');
+    panels.forEach((panel) => {
+      if (!panel) return;
+      if (normalized === 'classic') {
+        panel.toggle.hidden = true;
+        panel.body.hidden = false;
+        panel.root.classList.remove('is-collapsed');
+      } else {
+        panel.toggle.hidden = false;
+        panel.setCollapsed(true);
+      }
     });
   }
 
@@ -4367,13 +4426,14 @@
   }
 
   document.addEventListener('DOMContentLoaded', async () => {
+    let who = null;
     try {
       if (window.ImageKprFolders && window.ImageKprFolders.refresh) {
         await window.ImageKprFolders.refresh();
       }
     } catch (_) {}
     try {
-      const who = await fetchJSON(API_BASE + '/whoami.php');
+      who = await fetchJSON(API_BASE + '/whoami.php');
       dashboardState.isPaid = Number(who.upload_size_mb || 0) >= 10;
       dashboardState.imageLimit = Number(who.dashboard_image_limit || DASHBOARD_FREE_LIMIT);
     } catch (_) {}
@@ -4381,6 +4441,35 @@
     /* Reset folder filter on load (IDs are server-backed; avoid a stale hidden filter). */
     const folderFilterBoot = document.getElementById('folder-filter');
     if (folderFilterBoot) folderFilterBoot.value = '';
+    const foldersPanel = initCollapsiblePanel({
+      rootSelector: '[data-collapsible-id="folders"]',
+      toggleId: 'folders-toggle',
+      bodyId: 'folders-panel-body',
+      expandTitle: 'Expand folders for more details',
+      collapseTitle: 'Collapse folders',
+    });
+    const ownerDashboardsPanel = initCollapsiblePanel({
+      rootSelector: '[data-collapsible-id="owner-dashboards"]',
+      toggleId: 'my-dashboards-toggle',
+      bodyId: 'my-dashboards-body',
+      expandTitle: 'Expand shared dashboard tiles for more details',
+      collapseTitle: 'Collapse shared dashboard tiles',
+    });
+    applyTopSectionsMode((who && who.top_sections_mode) || 'collapsible', [foldersPanel, ownerDashboardsPanel]);
+    const folderSearchInput = document.getElementById('folder-icons-search');
+    if (folderSearchInput) {
+      folderSearchInput.addEventListener('input', () => {
+        sectionUiState.folderSearch = folderSearchInput.value.trim();
+        populateFolderIcons();
+      });
+    }
+    const dashboardsSearchInput = document.getElementById('my-dashboards-search');
+    if (dashboardsSearchInput) {
+      dashboardsSearchInput.addEventListener('input', () => {
+        sectionUiState.dashboardSearch = dashboardsSearchInput.value.trim();
+        renderDashboardCards();
+      });
+    }
     populateFolderIcons();
     populateSortPills();
     if (window.ImageKprFolders) window.ImageKprFolders.onChange = () => { populateFolderIcons(); refreshGrid(false); };

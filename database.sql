@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) NOT NULL,
   name VARCHAR(255) DEFAULT NULL,
   display_name VARCHAR(255) DEFAULT NULL,
+  top_sections_mode ENUM('collapsible','classic') NOT NULL DEFAULT 'collapsible',
   avatar_url VARCHAR(512) DEFAULT NULL,
   is_admin TINYINT(1) NOT NULL DEFAULT 0,
   storage_quota_bytes BIGINT UNSIGNED NULL DEFAULT NULL,

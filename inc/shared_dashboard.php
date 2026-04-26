@@ -193,7 +193,15 @@ if (!empty($dashboard['hero_image_id'])) {
         <button type="button" id="shared-start-slideshow">Start Slideshow</button>
         <a href="<?php echo htmlspecialchars('index.php?share=' . rawurlencode($token) . '&download=all', ENT_QUOTES, 'UTF-8'); ?>">Download all ZIP</a>
       </div>
-      <section class="shared-dash-grid" id="shared-dash-grid">
+      <section class="collapsible-panel is-collapsed shared-dash-collapsible" data-collapsible-id="public-shared-tiles">
+        <button type="button" class="collapsible-panel-toggle" id="shared-tiles-toggle" aria-expanded="false" aria-controls="shared-tiles-body" title="Expand shared tiles for more details">
+          <span class="collapsible-panel-title">Shared dashboard tiles</span>
+          <span class="collapsible-panel-hint">Collapsed. Click to expand for more details.</span>
+          <span class="collapsible-panel-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div id="shared-tiles-body" class="collapsible-panel-body" hidden>
+          <input type="search" id="shared-tiles-search" class="section-search-input" placeholder="Search shared tiles..." aria-label="Search shared tiles" autocomplete="off">
+          <section class="shared-dash-grid" id="shared-dash-grid">
         <?php foreach ($images as $idx => $img): ?>
           <?php $isVideo = isset($img['media_type']) && (string) $img['media_type'] === 'video'; ?>
           <figure class="shared-dash-item" data-index="<?php echo (int) $idx; ?>" data-image-id="<?php echo (int) $img['id']; ?>" data-url="<?php echo htmlspecialchars((string) $img['url'], ENT_QUOTES, 'UTF-8'); ?>" data-filename="<?php echo htmlspecialchars((string) $img['filename'], ENT_QUOTES, 'UTF-8'); ?>" data-media-type="<?php echo $isVideo ? 'video' : 'image'; ?>">
@@ -204,6 +212,9 @@ if (!empty($dashboard['hero_image_id'])) {
             <?php endif; ?>
           </figure>
         <?php endforeach; ?>
+          </section>
+          <div id="shared-tiles-empty" class="shared-dash-empty" hidden>No shared tiles match your search.</div>
+        </div>
       </section>
     <?php endif; ?>
   </main>
@@ -347,6 +358,38 @@ if (!empty($dashboard['hero_image_id'])) {
   <script>
     (function () {
       const items = Array.from(document.querySelectorAll('.shared-dash-item'));
+      const tilesRoot = document.querySelector('[data-collapsible-id="public-shared-tiles"]');
+      const tilesToggle = document.getElementById('shared-tiles-toggle');
+      const tilesBody = document.getElementById('shared-tiles-body');
+      const tilesSearch = document.getElementById('shared-tiles-search');
+      const tilesEmpty = document.getElementById('shared-tiles-empty');
+      function setTilesCollapsed(collapsed) {
+        if (!tilesRoot || !tilesToggle || !tilesBody) return;
+        tilesRoot.classList.toggle('is-collapsed', !!collapsed);
+        tilesToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        tilesToggle.title = collapsed ? 'Expand shared tiles for more details' : 'Collapse shared tiles';
+        tilesBody.hidden = !!collapsed;
+      }
+      if (tilesToggle) {
+        setTilesCollapsed(true);
+        tilesToggle.addEventListener('click', () => {
+          setTilesCollapsed(tilesToggle.getAttribute('aria-expanded') === 'true');
+        });
+      }
+      function applySharedTilesFilter() {
+        if (!tilesSearch || !tilesEmpty) return;
+        const q = tilesSearch.value.trim().toLowerCase();
+        let visibleCount = 0;
+        items.forEach((el) => {
+          const filename = String(el.dataset.filename || '').toLowerCase();
+          const mediaType = String(el.dataset.mediaType || '').toLowerCase();
+          const match = !q || filename.indexOf(q) !== -1 || mediaType.indexOf(q) !== -1;
+          el.hidden = !match;
+          if (match) visibleCount++;
+        });
+        tilesEmpty.hidden = visibleCount > 0;
+      }
+      if (tilesSearch) tilesSearch.addEventListener('input', applySharedTilesFilter);
       const lb = document.getElementById('shared-lightbox');
       if (!lb || items.length === 0) return;
       const imgEl = document.getElementById('shared-lightbox-img');

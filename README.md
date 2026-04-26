@@ -35,6 +35,7 @@ Today the product spans **images** plus **short MP4 uploads for paid accounts**,
    - **`phase17_shared_dashboards.sql`** — adds `shared_dashboards` / `shared_dashboard_images` (required for share links).
    - **`phase17_updates_posts.sql`** — adds `updates_posts` (if not already present).
    - **`phase18_user_display_name.sql`** — adds `users.display_name` (if not already in your schema).
+   - **`phase21_top_sections_mode.sql`** — adds `users.top_sections_mode` so each account can choose collapsible vs classic top sections.
    - **`phase19_video_support.sql`** — adds `images.media_type` (skip if your `images` table already has that column, e.g. after importing the current `database.sql`).
 3. Copy **`config.example.php` → `config.php`** and set DB credentials, **`IMAGES_DIR`**, **`IMAGES_URL`**, **`INBOX_DIR`**, and **Google OAuth** (`GOOGLE_*`). Optionally set `ADMIN_GOOGLE_SUB`, mail constants for `contact.php`, session TTL, etc. (comments in the example file).
 4. Ensure **`images/`** and **`inbox/`** exist and are writable by the web user.

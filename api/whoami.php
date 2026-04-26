@@ -11,11 +11,18 @@ imagekpr_ensure_config();
 $maint = imagekpr_maintenance_enabled();
 $uploadTierMb = 3;
 $uploadTierDowngradedAt = null;
+$topSectionsMode = 'collapsible';
 try {
   $pdo = imagekpr_pdo();
   $tier = imagekpr_user_upload_tier($pdo, imagekpr_user_id());
   $uploadTierMb = (int) ($tier['upload_size_mb'] ?? 3);
   $uploadTierDowngradedAt = $tier['upload_tier_downgraded_at'] ?? null;
+  $prefSt = $pdo->prepare('SELECT top_sections_mode FROM users WHERE id = ? LIMIT 1');
+  $prefSt->execute([(int) imagekpr_user_id()]);
+  $prefRow = $prefSt->fetch(PDO::FETCH_ASSOC);
+  if ($prefRow && isset($prefRow['top_sections_mode']) && (string) $prefRow['top_sections_mode'] === 'classic') {
+    $topSectionsMode = 'classic';
+  }
 } catch (Throwable $e) {
   // Keep safe defaults if DB read fails.
 }
@@ -59,6 +66,7 @@ echo json_encode([
   'storage_remaining_bytes' => imagekpr_json_byte_string($quotaPayload['remaining_bytes']),
   'storage_quota_used_bytes' => imagekpr_json_byte_string($quotaPayload['used_bytes']),
   'dashboard_image_limit' => $dashboardImageLimit,
+  'top_sections_mode' => $topSectionsMode,
   'supported_mime_types' => imagekpr_supported_upload_mimes(),
   'can_upload_video' => isset($pdo) ? imagekpr_user_is_paid($pdo, (int) imagekpr_user_id()) : false,
 ], JSON_UNESCAPED_UNICODE);

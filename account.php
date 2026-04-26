@@ -45,14 +45,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action']) && (st
   } else {
     $rawDn = isset($_POST['display_name']) ? (string) $_POST['display_name'] : '';
     $trimDn = trim($rawDn);
+    $rawTopSectionsMode = isset($_POST['top_sections_mode']) ? (string) $_POST['top_sections_mode'] : 'collapsible';
+    $topSectionsMode = $rawTopSectionsMode === 'classic' ? 'classic' : 'collapsible';
     if (strlen($trimDn) > 255) {
       $formError = 'Display name must be 255 characters or fewer.';
     } else {
       $storeDn = $trimDn === '' ? null : $trimDn;
       try {
-        $up = $pdo->prepare('UPDATE users SET display_name = ? WHERE id = ?');
-        $up->execute([$storeDn, $uid]);
-        $st = $pdo->prepare('SELECT display_name, name, email FROM users WHERE id = ? LIMIT 1');
+        $up = $pdo->prepare('UPDATE users SET display_name = ?, top_sections_mode = ? WHERE id = ?');
+        $up->execute([$storeDn, $topSectionsMode, $uid]);
+        $st = $pdo->prepare('SELECT display_name, name, email, top_sections_mode FROM users WHERE id = ? LIMIT 1');
         $st->execute([$uid]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
         if ($row !== false) {
@@ -70,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action']) && (st
         header('Location: ' . imagekpr_public_path('account.php', 0), true, 302);
         exit;
       } catch (Throwable $e) {
-        $schemaError = 'Could not save your profile. If this is a new install, run the database migration migrations/phase18_user_display_name.sql.';
+        $schemaError = 'Could not save your profile. If this is a new install, run database migrations phase18_user_display_name.sql and phase21_top_sections_mode.sql.';
       }
     }
   }
@@ -93,10 +95,11 @@ $preset = null;
 $planCapMaxImages = null;
 $planCapSharedDashboard = null;
 $dateJoinedDisplay = '—';
+$topSectionsModeInput = 'collapsible';
 
 try {
   $st = $pdo->prepare(
-    'SELECT email, name, display_name, storage_quota_bytes, upload_size_mb, upload_tier_downgraded_at, created_at
+    'SELECT email, name, display_name, top_sections_mode, storage_quota_bytes, upload_size_mb, upload_tier_downgraded_at, created_at
      FROM users WHERE id = ? LIMIT 1'
   );
   $st->execute([$uid]);
@@ -175,7 +178,7 @@ try {
   $gName = trim((string) ($userRow['name'] ?? ''));
   $googleNameLine = $gName !== '' ? $gName : '—';
 } catch (Throwable $e) {
-  $schemaError = $schemaError !== '' ? $schemaError : 'Could not load account data. Run migrations/phase18_user_display_name.sql if you have not yet.';
+  $schemaError = $schemaError !== '' ? $schemaError : 'Could not load account data. Run migrations/phase18_user_display_name.sql and phase21_top_sections_mode.sql if needed.';
 }
 
 $emailShown = $userRow ? (string) ($userRow['email'] ?? '') : (string) ($_SESSION['email'] ?? '');
@@ -187,6 +190,14 @@ if ($userRow !== null) {
 }
 if ($formError !== '' && isset($_POST['display_name'])) {
   $displayInput = (string) $_POST['display_name'];
+}
+if ($userRow !== null) {
+  $topSectionsModeInput = (isset($userRow['top_sections_mode']) && (string) $userRow['top_sections_mode'] === 'classic')
+    ? 'classic'
+    : 'collapsible';
+}
+if ($formError !== '' && isset($_POST['top_sections_mode'])) {
+  $topSectionsModeInput = (string) $_POST['top_sections_mode'] === 'classic' ? 'classic' : 'collapsible';
 }
 
 $storageHint = $userRow !== null ? imagekpr_stats_storage_hint_line($totalStorageBytes, $quotaStatus) : '';
@@ -324,7 +335,13 @@ $headerLabel = imagekpr_user_header_display_label(
           value="<?php echo htmlspecialchars($displayInput, ENT_QUOTES, 'UTF-8'); ?>"
           autocomplete="name" placeholder="How your name appears in the app">
         <p class="ikpr-account-hint">Shown in the top bar. Leave blank to use your Google name.</p>
-        <button type="submit" class="ikpr-account-submit">Save display name</button>
+        <label class="ikpr-account-label" for="top_sections_mode">Top sections layout</label>
+        <select id="top_sections_mode" name="top_sections_mode" class="ikpr-account-input">
+          <option value="collapsible"<?php echo $topSectionsModeInput === 'collapsible' ? ' selected' : ''; ?>>Collapsible sections</option>
+          <option value="classic"<?php echo $topSectionsModeInput === 'classic' ? ' selected' : ''; ?>>Original always-expanded style</option>
+        </select>
+        <p class="ikpr-account-hint">Controls how Folders and Shared dashboard tiles appear on your main library page.</p>
+        <button type="submit" class="ikpr-account-submit">Save profile settings</button>
       </form>
     </section>
     <?php } ?>
