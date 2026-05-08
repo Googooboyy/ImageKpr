@@ -70,12 +70,24 @@ $ikMaintenance = imagekpr_maintenance_enabled();
 $ikMaintenanceMsg = $ikMaintenance ? imagekpr_maintenance_banner_text() : '';
 $ikName = isset($_SESSION['name']) ? (string) $_SESSION['name'] : '';
 $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
+$ikServerTheme = imagekpr_user_theme_preference($pdo, (int) imagekpr_user_id());
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?php echo htmlspecialchars($ikServerTheme, ENT_QUOTES, 'UTF-8'); ?>">
 <head>
   <meta charset="UTF-8">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('ikpr-theme-override');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="ikpr-app-csrf" content="<?php echo htmlspecialchars(imagekpr_app_csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
   <title>ImageKpr</title>
   <link rel="apple-touch-icon" sizes="180x180" href="favicons/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="favicons/favicon-32x32.png">
@@ -118,6 +130,10 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
         </div>
       </div>
       <div class="user-session-bar">
+        <button type="button" id="ikpr-theme-toggle" class="ikpr-theme-toggle" aria-pressed="<?php echo $ikServerTheme === 'dark' ? 'true' : 'false'; ?>" aria-label="<?php echo $ikServerTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'; ?>" title="Switch theme">
+          <svg class="ikpr-theme-toggle-icon ikpr-theme-toggle-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          <svg class="ikpr-theme-toggle-icon ikpr-theme-toggle-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        </button>
         <a href="account.php" class="user-session-email user-session-profile-link" title="Account &amp; profile — <?php echo htmlspecialchars($ikEmail, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($ikName !== '' ? $ikName : $ikEmail, ENT_QUOTES, 'UTF-8'); ?></a>
         <span class="user-session-profile-hint" aria-hidden="true">Profile</span>
         <div class="user-session-actions">
@@ -235,6 +251,12 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
           </label>
           <label id="dashboard-password-wrap" class="dashboard-field-password" hidden>Password (paid)
             <input type="password" id="dashboard-password" maxlength="100" placeholder="Leave blank to remove password">
+          </label>
+          <label>Default theme (guest view)
+            <select id="dashboard-default-theme">
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
           </label>
         </div>
         <div class="dashboard-editor-hero">
@@ -730,6 +752,7 @@ $ikEmail = isset($_SESSION['email']) ? (string) $_SESSION['email'] : '';
   ?>
 
   <script src="folders.js"></script>
+  <script src="theme.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

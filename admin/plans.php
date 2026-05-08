@@ -6,6 +6,7 @@ imagekpr_require_admin_html(1, 1);
 
 $pdo = imagekpr_pdo();
 $actorId = imagekpr_user_id();
+$ikServerTheme = imagekpr_user_theme_preference($pdo, (int) $actorId);
 
 function imagekpr_admin_plans_redirect(): void
 {
@@ -160,9 +161,19 @@ $pageTitle = 'Admin - Plans';
 $adminNavCurrent = 'plans';
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?php echo htmlspecialchars($ikServerTheme, ENT_QUOTES, 'UTF-8'); ?>">
 <head>
   <meta charset="UTF-8">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('ikpr-theme-override');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></title>
   <link rel="stylesheet" href="../styles.css">

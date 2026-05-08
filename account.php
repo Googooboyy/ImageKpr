@@ -47,14 +47,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action']) && (st
     $trimDn = trim($rawDn);
     $rawTopSectionsMode = isset($_POST['top_sections_mode']) ? (string) $_POST['top_sections_mode'] : 'collapsible';
     $topSectionsMode = $rawTopSectionsMode === 'classic' ? 'classic' : 'collapsible';
+    $rawThemePref = isset($_POST['theme_preference']) ? (string) $_POST['theme_preference'] : 'light';
+    $themePref = $rawThemePref === 'dark' ? 'dark' : 'light';
     if (strlen($trimDn) > 255) {
       $formError = 'Display name must be 255 characters or fewer.';
     } else {
       $storeDn = $trimDn === '' ? null : $trimDn;
       try {
-        $up = $pdo->prepare('UPDATE users SET display_name = ?, top_sections_mode = ? WHERE id = ?');
-        $up->execute([$storeDn, $topSectionsMode, $uid]);
-        $st = $pdo->prepare('SELECT display_name, name, email, top_sections_mode FROM users WHERE id = ? LIMIT 1');
+        $up = $pdo->prepare('UPDATE users SET display_name = ?, top_sections_mode = ?, theme_preference = ? WHERE id = ?');
+        $up->execute([$storeDn, $topSectionsMode, $themePref, $uid]);
+        $st = $pdo->prepare('SELECT display_name, name, email, top_sections_mode, theme_preference FROM users WHERE id = ? LIMIT 1');
         $st->execute([$uid]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
         if ($row !== false) {
@@ -72,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['form_action']) && (st
         header('Location: ' . imagekpr_public_path('account.php', 0), true, 302);
         exit;
       } catch (Throwable $e) {
-        $schemaError = 'Could not save your profile. If this is a new install, run database migrations phase18_user_display_name.sql and phase21_top_sections_mode.sql.';
+        $schemaError = 'Could not save your profile. If this is a new install, run database migrations phase18_user_display_name.sql, phase21_top_sections_mode.sql, and phase22_user_theme_preference.sql.';
       }
     }
   }
@@ -99,7 +101,7 @@ $topSectionsModeInput = 'collapsible';
 
 try {
   $st = $pdo->prepare(
-    'SELECT email, name, display_name, top_sections_mode, storage_quota_bytes, upload_size_mb, upload_tier_downgraded_at, created_at
+    'SELECT email, name, display_name, top_sections_mode, theme_preference, storage_quota_bytes, upload_size_mb, upload_tier_downgraded_at, created_at
      FROM users WHERE id = ? LIMIT 1'
   );
   $st->execute([$uid]);
@@ -178,7 +180,7 @@ try {
   $gName = trim((string) ($userRow['name'] ?? ''));
   $googleNameLine = $gName !== '' ? $gName : '—';
 } catch (Throwable $e) {
-  $schemaError = $schemaError !== '' ? $schemaError : 'Could not load account data. Run migrations/phase18_user_display_name.sql and phase21_top_sections_mode.sql if needed.';
+  $schemaError = $schemaError !== '' ? $schemaError : 'Could not load account data. Run migrations/phase18_user_display_name.sql, phase21_top_sections_mode.sql, and phase22_user_theme_preference.sql if needed.';
 }
 
 $emailShown = $userRow ? (string) ($userRow['email'] ?? '') : (string) ($_SESSION['email'] ?? '');
@@ -200,6 +202,14 @@ if ($formError !== '' && isset($_POST['top_sections_mode'])) {
   $topSectionsModeInput = (string) $_POST['top_sections_mode'] === 'classic' ? 'classic' : 'collapsible';
 }
 
+$themePreferenceInput = 'light';
+if ($userRow !== null && isset($userRow['theme_preference']) && (string) $userRow['theme_preference'] === 'dark') {
+  $themePreferenceInput = 'dark';
+}
+if ($formError !== '' && isset($_POST['theme_preference'])) {
+  $themePreferenceInput = (string) $_POST['theme_preference'] === 'dark' ? 'dark' : 'light';
+}
+
 $storageHint = $userRow !== null ? imagekpr_stats_storage_hint_line($totalStorageBytes, $quotaStatus) : '';
 $graceNote = '';
 if ($downgradedAt !== null && !imagekpr_upload_tier_grace_expired($downgradedAt)) {
@@ -214,12 +224,24 @@ $headerLabel = imagekpr_user_header_display_label(
   $userRow && isset($userRow['name']) ? (string) $userRow['name'] : null,
   $emailShown
 );
+$ikServerTheme = $themePreferenceInput;
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?php echo htmlspecialchars($ikServerTheme, ENT_QUOTES, 'UTF-8'); ?>">
 <head>
   <meta charset="UTF-8">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('ikpr-theme-override');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="ikpr-app-csrf" content="<?php echo htmlspecialchars(imagekpr_app_csrf_token(), ENT_QUOTES, 'UTF-8'); ?>">
   <title>Account — ImageKpr</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -341,6 +363,12 @@ $headerLabel = imagekpr_user_header_display_label(
           <option value="classic"<?php echo $topSectionsModeInput === 'classic' ? ' selected' : ''; ?>>Original always-expanded style</option>
         </select>
         <p class="ikpr-account-hint">Controls how Folders and Shared dashboard tiles appear on your main library page.</p>
+        <label class="ikpr-account-label" for="theme_preference">Appearance</label>
+        <select id="theme_preference" name="theme_preference" class="ikpr-account-input">
+          <option value="light"<?php echo $themePreferenceInput === 'light' ? ' selected' : ''; ?>>Light</option>
+          <option value="dark"<?php echo $themePreferenceInput === 'dark' ? ' selected' : ''; ?>>Dark</option>
+        </select>
+        <p class="ikpr-account-hint">Switches instantly. Saved to your account so other devices match — though each device can override locally.</p>
         <button type="submit" class="ikpr-account-submit">Save profile settings</button>
       </form>
     </section>
@@ -353,5 +381,6 @@ $headerLabel = imagekpr_user_header_display_label(
       <a href="auth/logout.php">Log out</a>
     </nav>
   </main>
+  <script src="theme.js"></script>
 </body>
 </html>

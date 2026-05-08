@@ -146,11 +146,22 @@ if (!empty($dashboard['hero_image_id'])) {
     }
   }
 }
+$sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['default_theme'] === 'dark') ? 'dark' : 'light';
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?php echo htmlspecialchars($sharedTheme, ENT_QUOTES, 'UTF-8'); ?>">
 <head>
   <meta charset="UTF-8">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('ikpr-shared-theme-override');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?php echo htmlspecialchars((string) ($dashboard['title'] ?: 'Shared Dashboard'), ENT_QUOTES, 'UTF-8'); ?> - ImageKpr</title>
   <link rel="stylesheet" href="styles.css">
@@ -158,6 +169,10 @@ if (!empty($dashboard['hero_image_id'])) {
 <body class="shared-dash-body">
   <header class="shared-dash-top">
     <div class="shared-dash-top-inner">
+      <button type="button" id="ikpr-shared-theme-toggle" class="ikpr-theme-toggle ikpr-shared-theme-toggle" aria-pressed="<?php echo $sharedTheme === 'dark' ? 'true' : 'false'; ?>" aria-label="<?php echo $sharedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'; ?>" title="Switch theme">
+        <svg class="ikpr-theme-toggle-icon ikpr-theme-toggle-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="ikpr-theme-toggle-icon ikpr-theme-toggle-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      </button>
       <div class="shared-dash-top-media" aria-hidden="true">
         <?php if ($heroImageUrl !== '') { ?>
           <img src="<?php echo htmlspecialchars($heroImageUrl, ENT_QUOTES, 'UTF-8'); ?>" alt="">
@@ -189,19 +204,26 @@ if (!empty($dashboard['hero_image_id'])) {
     <?php elseif (empty($images)): ?>
       <section class="shared-dash-empty">No images have been added to this dashboard yet.</section>
     <?php else: ?>
+      <section class="grid-size-row shared-grid-size-row" aria-label="Shared grid image size">
+        <span class="grid-size-label">Grid size</span>
+        <div class="grid-size-controls" role="radiogroup" aria-label="Shared grid size scale">
+          <input type="radio" id="shared-grid-scale-05" name="shared-grid-scale" value="0.5">
+          <label for="shared-grid-scale-05">0.5x</label>
+          <input type="radio" id="shared-grid-scale-075" name="shared-grid-scale" value="0.75">
+          <label for="shared-grid-scale-075">0.75x</label>
+          <input type="radio" id="shared-grid-scale-10" name="shared-grid-scale" value="1">
+          <label for="shared-grid-scale-10">1x</label>
+          <input type="radio" id="shared-grid-scale-15" name="shared-grid-scale" value="1.5">
+          <label for="shared-grid-scale-15">1.5x</label>
+          <input type="radio" id="shared-grid-scale-20" name="shared-grid-scale" value="2">
+          <label for="shared-grid-scale-20">2x</label>
+        </div>
+      </section>
       <div class="shared-dash-actions">
         <button type="button" id="shared-start-slideshow">Start Slideshow</button>
         <a href="<?php echo htmlspecialchars('index.php?share=' . rawurlencode($token) . '&download=all', ENT_QUOTES, 'UTF-8'); ?>">Download all ZIP</a>
       </div>
-      <section class="collapsible-panel is-collapsed shared-dash-collapsible" data-collapsible-id="public-shared-tiles">
-        <button type="button" class="collapsible-panel-toggle" id="shared-tiles-toggle" aria-expanded="false" aria-controls="shared-tiles-body" title="Expand shared tiles for more details">
-          <span class="collapsible-panel-title">Shared dashboard tiles</span>
-          <span class="collapsible-panel-hint">Collapsed. Click to expand for more details.</span>
-          <span class="collapsible-panel-chevron" aria-hidden="true">▾</span>
-        </button>
-        <div id="shared-tiles-body" class="collapsible-panel-body" hidden>
-          <input type="search" id="shared-tiles-search" class="section-search-input" placeholder="Search shared tiles..." aria-label="Search shared tiles" autocomplete="off">
-          <section class="shared-dash-grid" id="shared-dash-grid">
+      <section class="shared-dash-grid" id="shared-dash-grid">
         <?php foreach ($images as $idx => $img): ?>
           <?php $isVideo = isset($img['media_type']) && (string) $img['media_type'] === 'video'; ?>
           <figure class="shared-dash-item" data-index="<?php echo (int) $idx; ?>" data-image-id="<?php echo (int) $img['id']; ?>" data-url="<?php echo htmlspecialchars((string) $img['url'], ENT_QUOTES, 'UTF-8'); ?>" data-filename="<?php echo htmlspecialchars((string) $img['filename'], ENT_QUOTES, 'UTF-8'); ?>" data-media-type="<?php echo $isVideo ? 'video' : 'image'; ?>">
@@ -212,9 +234,6 @@ if (!empty($dashboard['hero_image_id'])) {
             <?php endif; ?>
           </figure>
         <?php endforeach; ?>
-          </section>
-          <div id="shared-tiles-empty" class="shared-dash-empty" hidden>No shared tiles match your search.</div>
-        </div>
       </section>
     <?php endif; ?>
   </main>
@@ -357,39 +376,63 @@ if (!empty($dashboard['hero_image_id'])) {
   </div>
   <script>
     (function () {
+      (function initSharedThemeToggle() {
+        var btn = document.getElementById('ikpr-shared-theme-toggle');
+        if (!btn) return;
+        function sync() {
+          var t = document.documentElement.getAttribute('data-theme') || 'light';
+          btn.setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
+          btn.setAttribute('aria-label', t === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
+        }
+        btn.addEventListener('click', function () {
+          var cur = document.documentElement.getAttribute('data-theme') || 'light';
+          var next = cur === 'dark' ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', next);
+          try {
+            localStorage.setItem('ikpr-shared-theme-override', next);
+          } catch (e) {}
+          sync();
+        });
+        sync();
+      })();
+
+      (function initSharedGridScaleToggle() {
+        const KEY = 'imagekprSharedGridScale';
+        const root = document.documentElement;
+        const options = ['0.5', '0.75', '1', '1.5', '2'];
+        const columnsByScale = {
+          '0.5': '6',
+          '0.75': '5',
+          '1': '4',
+          '1.5': '3',
+          '2': '2',
+        };
+        const radios = Array.from(document.querySelectorAll('input[name="shared-grid-scale"]'));
+        if (radios.length === 0 || !root) return;
+        function applyScale(scale, persist) {
+          const value = options.includes(scale) ? scale : '1';
+          root.style.setProperty('--shared-grid-columns', columnsByScale[value] || '4');
+          radios.forEach((r) => { r.checked = r.value === value; });
+          if (!persist) return;
+          try {
+            localStorage.setItem(KEY, value);
+          } catch (_) {}
+        }
+        let initial = '1';
+        try {
+          const saved = localStorage.getItem(KEY);
+          if (saved && options.includes(saved)) initial = saved;
+        } catch (_) {}
+        applyScale(initial, false);
+        radios.forEach((r) => {
+          r.addEventListener('change', () => {
+            if (!r.checked) return;
+            applyScale(r.value, true);
+          });
+        });
+      })();
+
       const items = Array.from(document.querySelectorAll('.shared-dash-item'));
-      const tilesRoot = document.querySelector('[data-collapsible-id="public-shared-tiles"]');
-      const tilesToggle = document.getElementById('shared-tiles-toggle');
-      const tilesBody = document.getElementById('shared-tiles-body');
-      const tilesSearch = document.getElementById('shared-tiles-search');
-      const tilesEmpty = document.getElementById('shared-tiles-empty');
-      function setTilesCollapsed(collapsed) {
-        if (!tilesRoot || !tilesToggle || !tilesBody) return;
-        tilesRoot.classList.toggle('is-collapsed', !!collapsed);
-        tilesToggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-        tilesToggle.title = collapsed ? 'Expand shared tiles for more details' : 'Collapse shared tiles';
-        tilesBody.hidden = !!collapsed;
-      }
-      if (tilesToggle) {
-        setTilesCollapsed(true);
-        tilesToggle.addEventListener('click', () => {
-          setTilesCollapsed(tilesToggle.getAttribute('aria-expanded') === 'true');
-        });
-      }
-      function applySharedTilesFilter() {
-        if (!tilesSearch || !tilesEmpty) return;
-        const q = tilesSearch.value.trim().toLowerCase();
-        let visibleCount = 0;
-        items.forEach((el) => {
-          const filename = String(el.dataset.filename || '').toLowerCase();
-          const mediaType = String(el.dataset.mediaType || '').toLowerCase();
-          const match = !q || filename.indexOf(q) !== -1 || mediaType.indexOf(q) !== -1;
-          el.hidden = !match;
-          if (match) visibleCount++;
-        });
-        tilesEmpty.hidden = visibleCount > 0;
-      }
-      if (tilesSearch) tilesSearch.addEventListener('input', applySharedTilesFilter);
       const lb = document.getElementById('shared-lightbox');
       if (!lb || items.length === 0) return;
       const imgEl = document.getElementById('shared-lightbox-img');

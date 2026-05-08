@@ -6,6 +6,7 @@ imagekpr_require_admin_html(1, 1);
 
 $pdo = imagekpr_pdo();
 $actorId = imagekpr_user_id();
+$ikServerTheme = imagekpr_user_theme_preference($pdo, (int) $actorId);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'set_quota') {
   if (!imagekpr_csrf_verify()) {
@@ -788,9 +789,19 @@ function admin_th_hint(string $tip): string
 
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="<?php echo htmlspecialchars($ikServerTheme, ENT_QUOTES, 'UTF-8'); ?>">
 <head>
   <meta charset="UTF-8">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('ikpr-theme-override');
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.setAttribute('data-theme', t);
+        }
+      } catch (e) {}
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?php echo htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8'); ?></title>
   <link rel="apple-touch-icon" sizes="180x180" href="../favicons/apple-touch-icon.png">

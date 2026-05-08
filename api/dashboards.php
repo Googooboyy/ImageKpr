@@ -94,6 +94,7 @@ function imagekpr_dash_payload(PDO $pdo, array $dash, bool $forPublic = false): 
     'hero_image_id' => $dash['hero_image_id'] ? (int) $dash['hero_image_id'] : null,
     'allow_slideshow' => (bool) ((int) ($dash['allow_slideshow'] ?? 1)),
     'allow_download' => (bool) ((int) ($dash['allow_download'] ?? 1)),
+    'default_theme' => (isset($dash['default_theme']) && (string) $dash['default_theme'] === 'dark') ? 'dark' : 'light',
     'expires_at' => $expiresAt,
     'never_expires' => $expiresAt === null,
     'view_count' => (int) ($dash['view_count'] ?? 0),
@@ -248,6 +249,7 @@ $title = trim((string) ($input['title'] ?? ''));
 $subtitle = trim((string) ($input['subtitle'] ?? ''));
 $allowSlideshow = !isset($input['allow_slideshow']) || (bool) $input['allow_slideshow'];
 $allowDownload = !isset($input['allow_download']) || (bool) $input['allow_download'];
+$defaultTheme = (string) ($input['default_theme'] ?? 'light') === 'dark' ? 'dark' : 'light';
 $imageIds = isset($input['image_ids']) && is_array($input['image_ids']) ? array_values(array_unique(array_map('intval', $input['image_ids']))) : [];
 $heroImageId = isset($input['hero_image_id']) ? (int) $input['hero_image_id'] : null;
 $expiresAt = imagekpr_dash_parse_expiry((string) ($input['expiry_preset'] ?? 'never'), (string) ($input['expires_custom'] ?? ''));
@@ -285,7 +287,7 @@ if ($heroImageId && !in_array($heroImageId, $imageIds, true)) {
 
 if ($action === 'create') {
   $token = imagekpr_dash_token();
-  $st = $pdo->prepare('INSERT INTO shared_dashboards (user_id, token, title, subtitle, hero_image_id, allow_slideshow, allow_download, password_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+  $st = $pdo->prepare('INSERT INTO shared_dashboards (user_id, token, title, subtitle, hero_image_id, allow_slideshow, allow_download, default_theme, password_hash, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
   $st->execute([
     $uidInt,
     $token,
@@ -294,6 +296,7 @@ if ($action === 'create') {
     $heroImageId ?: null,
     $allowSlideshow ? 1 : 0,
     $allowDownload ? 1 : 0,
+    $defaultTheme,
     $passwordHash,
     $expiresAt,
   ]);
@@ -329,13 +332,14 @@ if (array_key_exists('password', $input)) {
     $nextHash = $passwordHash;
   }
 }
-$upd = $pdo->prepare('UPDATE shared_dashboards SET title = ?, subtitle = ?, hero_image_id = ?, allow_slideshow = ?, allow_download = ?, password_hash = ?, expires_at = ? WHERE id = ? AND user_id = ?');
+$upd = $pdo->prepare('UPDATE shared_dashboards SET title = ?, subtitle = ?, hero_image_id = ?, allow_slideshow = ?, allow_download = ?, default_theme = ?, password_hash = ?, expires_at = ? WHERE id = ? AND user_id = ?');
 $upd->execute([
   $title !== '' ? $title : null,
   $subtitle !== '' ? $subtitle : null,
   $heroImageId ?: null,
   $allowSlideshow ? 1 : 0,
   $allowDownload ? 1 : 0,
+  $defaultTheme,
   $nextHash,
   $expiresAt,
   $id,

@@ -285,6 +285,27 @@ function imagekpr_app_csrf_verify(): bool
 }
 
 /**
+ * Signed-in UI theme: 'light' (default) or 'dark'. NULL in DB means light.
+ */
+function imagekpr_user_theme_preference(PDO $pdo, int $userId): string
+{
+  if ($userId < 1) {
+    return 'light';
+  }
+  try {
+    $st = $pdo->prepare('SELECT theme_preference FROM users WHERE id = ? LIMIT 1');
+    $st->execute([$userId]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if ($row !== false && isset($row['theme_preference']) && (string) $row['theme_preference'] === 'dark') {
+      return 'dark';
+    }
+  } catch (Throwable $e) {
+    // Column may be missing before migration phase22_user_theme_preference.sql
+  }
+  return 'light';
+}
+
+/**
  * Label shown in the header: custom display_name, else account name (e.g. Google), else email.
  */
 function imagekpr_user_header_display_label(?string $displayName, ?string $accountName, string $email): string

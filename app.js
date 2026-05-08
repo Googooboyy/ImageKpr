@@ -4200,6 +4200,7 @@
       allow_slideshow: true,
       allow_download: true,
       password: document.getElementById('dashboard-password').value,
+      default_theme: document.getElementById('dashboard-default-theme').value === 'dark' ? 'dark' : 'light',
       expiry_preset: customExpiry ? 'custom' : 'never',
       expires_custom: customExpiry || '',
       image_ids: dashboardSelectedImageIds(),
@@ -4397,6 +4398,8 @@
     document.getElementById('dashboard-subtitle').value = dash.subtitle || '';
     document.getElementById('dashboard-password').value = '';
     document.getElementById('dashboard-expiry-custom').value = dash.expires_at ? String(dash.expires_at).slice(0, 16).replace(' ', 'T') : '';
+    const dtEl = document.getElementById('dashboard-default-theme');
+    if (dtEl) dtEl.value = dash.default_theme === 'dark' ? 'dark' : 'light';
     selectedIds = new Set();
     selectedImages = new Map();
     selectedOrder = [];
@@ -4748,6 +4751,8 @@
       document.getElementById('dashboard-subtitle').value = '';
       document.getElementById('dashboard-expiry-custom').value = '';
       document.getElementById('dashboard-password').value = '';
+      const dtNew = document.getElementById('dashboard-default-theme');
+      if (dtNew) dtNew.value = 'light';
       document.getElementById('dashboard-password-wrap').hidden = !dashboardState.isPaid;
       document.getElementById('dashboard-editor-copy-link').hidden = true;
       document.getElementById('dashboard-editor-view-link').hidden = true;
@@ -5011,6 +5016,10 @@
       const el = document.getElementById(id);
       el.addEventListener('input', dashboardQueueAutosave);
     });
+    const dashDefaultTheme = document.getElementById('dashboard-default-theme');
+    if (dashDefaultTheme) {
+      dashDefaultTheme.addEventListener('change', dashboardQueueAutosave);
+    }
     document.getElementById('selection-row').addEventListener('mouseup', () => {
       dashboardRenderHeroStrip();
       dashboardQueueAutosave();
