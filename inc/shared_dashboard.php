@@ -315,6 +315,8 @@ $sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['defau
         </div>
         <div class="ss-hint-group ss-hint-display">
           <span class="ss-hint-label">Display</span>
+          <span class="ss-hint-item"><kbd>=</kbd> <kbd>+</kbd> zoom in &middot; <kbd>&minus;</kbd> <kbd>_</kbd> zoom out (images, not Fill mode; numpad + / &minus; too)</span>
+          <span class="ss-hint-item">Mouse wheel pans up/down when zoomed in (Fill off)</span>
           <span class="ss-hint-item"><kbd>F</kbd> toggle Fill image</span>
           <span class="ss-hint-item"><kbd>C</kbd> show / hide the mini controller tray</span>
         </div>
@@ -368,10 +370,12 @@ $sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['defau
         <circle cx="14.3" cy="14.5" r="1"></circle>
       </svg>
     </button>
-    <div class="slideshow-stage">
+        <div class="slideshow-stage">
       <div class="slideshow-player-bg" id="slideshow-player-bg" aria-hidden="true"></div>
-      <img id="slideshow-img" class="slideshow-img" src="" alt="">
-      <video id="slideshow-video" class="slideshow-video" controls preload="metadata" hidden></video>
+      <div id="slideshow-zoom-shell" class="slideshow-zoom-shell">
+        <img id="slideshow-img" class="slideshow-img" src="" alt="">
+        <video id="slideshow-video" class="slideshow-video" controls preload="metadata" hidden></video>
+      </div>
     </div>
   </div>
   <script>
@@ -583,6 +587,120 @@ $sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['defau
           a[j] = t;
         }
       }
+      const SS_ZOOM_MIN = 1;
+      const SS_ZOOM_MAX = 6;
+      const SS_ZOOM_FACTOR = 1.18;
+      function ssClampZoom(z) {
+        if (!isFinite(z) || z < SS_ZOOM_MIN) return SS_ZOOM_MIN;
+        return Math.min(SS_ZOOM_MAX, z);
+      }
+      function ssTypingTarget(e) {
+        const t = e.target;
+        if (!t || t.nodeType !== 1) return false;
+        if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return true;
+        if (t.closest && t.closest('[contenteditable="true"]')) return true;
+        return false;
+      }
+      function ssZoomYieldToField(e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return true;
+        const t = e.target;
+        if (!t || t.nodeType !== 1) return false;
+        if (t.tagName === 'TEXTAREA' || t.isContentEditable) return true;
+        if (t.closest && t.closest('[contenteditable="true"]')) return true;
+        if (t.tagName === 'SELECT') return true;
+        const hostDlg = t.closest('.dialog, [role="dialog"]');
+        if (hostDlg && !hostDlg.closest('#slideshow-player')) return true;
+        const pl = document.getElementById('slideshow-player');
+        if (pl && !pl.hidden) return false;
+        return true;
+      }
+      function ssZoomInKey(e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return false;
+        if (e.key === '+' || e.key === '=') return true;
+        if (e.code === 'NumpadAdd' || e.code === 'NumpadEqual') return true;
+        if (e.code === 'Equal') return true;
+        return false;
+      }
+      function ssZoomOutKey(e) {
+        if (e.ctrlKey || e.metaKey || e.altKey) return false;
+        if (e.key === '-' || e.key === '_') return true;
+        if (e.code === 'NumpadSubtract' || e.code === 'Minus') return true;
+        return false;
+      }
+      function ssWheelDeltaY(e) {
+        if (e.deltaMode === 1) return e.deltaY * 16;
+        if (e.deltaMode === 2) return e.deltaY * (document.documentElement.clientHeight || 600);
+        return e.deltaY;
+      }
+      function ssContainedImageRect(imgEl, stageEl) {
+        if (!imgEl || !stageEl) return null;
+        const cr = stageEl.getBoundingClientRect();
+        const nw = imgEl.naturalWidth;
+        const nh = imgEl.naturalHeight;
+        if (!nw || !nh) return null;
+        const cw = cr.width;
+        const ch = cr.height;
+        const scale = Math.min(cw / nw, ch / nh);
+        const dw = nw * scale;
+        const dh = nh * scale;
+        const left = cr.left + (cw - dw) / 2;
+        const top = cr.top + (ch - dh) / 2;
+        return { left, top, right: left + dw, bottom: top + dh };
+      }
+      function ssZoomPanLimitY() {
+        if (!ss) return 0;
+        const z = ssClampZoom(ss.imageZoom || 1);
+        if (z <= SS_ZOOM_MIN) return 0;
+        const img = document.getElementById('slideshow-img');
+        const stage = document.querySelector('#slideshow-player .slideshow-stage');
+        if (!img || !stage) return 0;
+        const r = ssContainedImageRect(img, stage);
+        if (!r) return 0;
+        const drawnH = r.bottom - r.top;
+        const ch = stage.clientHeight;
+        if (!ch) return 0;
+        return Math.max(0, (drawnH * z - ch) / 2);
+      }
+      function ssApplyImageZoom() {
+        if (!ss) return;
+        const shell = document.getElementById('slideshow-zoom-shell');
+        const img = document.getElementById('slideshow-img');
+        const zoomEl = shell || img;
+        if (!img || img.hidden) {
+          if (shell) {
+            shell.style.transform = '';
+            shell.style.transformOrigin = '';
+          }
+          ss.zoomPanY = 0;
+          return;
+        }
+        const slide = ss.slides[ss.index];
+        if (slide && slide.media_type === 'video') {
+          zoomEl.style.transform = '';
+          zoomEl.style.transformOrigin = '';
+          ss.zoomPanY = 0;
+          return;
+        }
+        if (ss.fillImage) {
+          zoomEl.style.transform = '';
+          zoomEl.style.transformOrigin = '';
+          ss.zoomPanY = 0;
+          return;
+        }
+        const z = ssClampZoom(ss.imageZoom || 1);
+        ss.imageZoom = z;
+        if (z <= SS_ZOOM_MIN) {
+          ss.zoomPanY = 0;
+          zoomEl.style.transform = '';
+          zoomEl.style.transformOrigin = '';
+        } else {
+          const maxY = ssZoomPanLimitY();
+          const py = Math.max(-maxY, Math.min(maxY, ss.zoomPanY || 0));
+          ss.zoomPanY = py;
+          zoomEl.style.transform = 'translate(0,' + py + 'px) scale(' + z + ')';
+          zoomEl.style.transformOrigin = 'center center';
+        }
+      }
       function ssToggleRandomizeOrder() {
         if (!ss) return;
         const curKey = ss.slides[ss.index] ? ss.slides[ss.index].url : '';
@@ -637,6 +755,16 @@ $sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['defau
         if (!player || !img || !counter || !bg || !cap || !video) return;
         const slide = ss.slides[ss.index];
         const isVideo = slide && slide.media_type === 'video';
+        const zoomKey = ss.index + '|' + (isVideo ? 'v' : 'i') + String((slide && slide.url) || '');
+        if (ss._ssZoomKey !== zoomKey) {
+          ss.imageZoom = 1;
+          ss.zoomPanY = 0;
+          ss._ssZoomKey = zoomKey;
+        }
+        if (ss.fillImage) {
+          ss.imageZoom = 1;
+          ss.zoomPanY = 0;
+        }
         if (isVideo) {
           img.hidden = true;
           img.removeAttribute('src');
@@ -667,6 +795,7 @@ $sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['defau
           cap.textContent = '';
         }
         if (ss.auto && !ss.paused) ssArmTimer();
+        ssApplyImageZoom();
       }
       function ssMove(delta) {
         if (!ss || !ss.slides.length) return;
@@ -686,6 +815,16 @@ $sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['defau
       }
       function ssClosePlayer() {
         ssClearTimer();
+        const zsh = document.getElementById('slideshow-zoom-shell');
+        if (zsh) {
+          zsh.style.transform = '';
+          zsh.style.transformOrigin = '';
+        }
+        const simg = document.getElementById('slideshow-img');
+        if (simg) {
+          simg.style.transform = '';
+          simg.style.transformOrigin = '';
+        }
         const sv = document.getElementById('slideshow-video');
         if (sv) {
           sv.pause();
@@ -723,6 +862,8 @@ $sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['defau
           timerId: null,
           videoEndedHandler: null,
           controllerVisible: !!document.getElementById('slideshow-show-controller')?.checked,
+          imageZoom: 1,
+          zoomPanY: 0,
         };
         const wrap = document.getElementById('slideshow-settings-wrap');
         const player = document.getElementById('slideshow-player');
@@ -768,7 +909,7 @@ $sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['defau
       document.getElementById('ss-ctrl-loop')?.addEventListener('click', () => { if (!ss) return; ss.autoloop = !ss.autoloop; ssSyncController(); });
       document.getElementById('ss-ctrl-rand')?.addEventListener('click', () => ssToggleRandomizeOrder());
       document.getElementById('ss-ctrl-pause')?.addEventListener('click', () => { if (!ss || !ss.auto) return; ss.paused = !ss.paused; ssSyncController(); ssArmTimer(); });
-      document.getElementById('ss-ctrl-fill')?.addEventListener('click', () => { if (!ss) return; ss.fillImage = !ss.fillImage; ssApplyUi(); ssSyncController(); });
+      document.getElementById('ss-ctrl-fill')?.addEventListener('click', () => { if (!ss) return; ss.fillImage = !ss.fillImage; ss.imageZoom = 1; ss.zoomPanY = 0; ssApplyUi(); ssSyncController(); });
       document.getElementById('ss-ctrl-transition')?.addEventListener('click', () => { if (!ss) return; ss.transition = ss.transition === 'fly' ? 'diffuse' : 'fly'; ssSyncController(); });
       document.getElementById('ss-ctrl-interval-dec')?.addEventListener('click', () => { if (!ss) return; ss.intervalMs = Math.max(1000, ss.intervalMs - 1000); ssSyncController(); ssArmTimer(); });
       document.getElementById('ss-ctrl-interval-inc')?.addEventListener('click', () => { if (!ss) return; ss.intervalMs = Math.min(600000, ss.intervalMs + 1000); ssSyncController(); ssArmTimer(); });
@@ -790,12 +931,30 @@ $sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['defau
         }
         if (!player || player.hidden || !ss) return;
         if (e.key === 'Escape') { e.preventDefault(); ssClosePlayer(); return; }
+        if (!ssZoomYieldToField(e)) {
+          const sl = ss.slides[ss.index];
+          const isVid = sl && sl.media_type === 'video';
+          if (!isVid && !ss.fillImage) {
+            if (ssZoomInKey(e)) {
+              e.preventDefault();
+              ss.imageZoom = ssClampZoom((ss.imageZoom || 1) * SS_ZOOM_FACTOR);
+              ssApplyImageZoom();
+              return;
+            }
+            if (ssZoomOutKey(e)) {
+              e.preventDefault();
+              ss.imageZoom = ssClampZoom((ss.imageZoom || 1) / SS_ZOOM_FACTOR);
+              ssApplyImageZoom();
+              return;
+            }
+          }
+        }
         if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); ssMove(1); }
         if (e.key === 'ArrowLeft') { e.preventDefault(); ssMove(-1); }
         if (e.key.toLowerCase() === 'm') { ss.auto = false; ss.paused = false; ssClearTimer(); ssSyncController(); }
         if (e.key.toLowerCase() === 'a') { ss.auto = true; ss.paused = false; ssSyncController(); ssArmTimer(); }
         if (e.key.toLowerCase() === 'p' && ss.auto) { ss.paused = !ss.paused; ssSyncController(); ssArmTimer(); }
-        if (e.key.toLowerCase() === 'f') { ss.fillImage = !ss.fillImage; ssApplyUi(); ssSyncController(); }
+        if (e.key.toLowerCase() === 'f') { ss.fillImage = !ss.fillImage; ss.imageZoom = 1; ss.zoomPanY = 0; ssApplyUi(); ssSyncController(); }
         if (e.key.toLowerCase() === 'l') { ss.autoloop = !ss.autoloop; ssSyncController(); }
         if (e.key.toLowerCase() === 'r') { e.preventDefault(); ssToggleRandomizeOrder(); }
         if (e.key.toLowerCase() === 'c') { ssSetControllerVisible(!ss.controllerVisible); }
@@ -840,6 +999,8 @@ $sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['defau
               clearTimeout(ssSingleTapTimer);
               ssDoubleTapTime = 0;
               ss.fillImage = !ss.fillImage;
+              ss.imageZoom = 1;
+              ss.zoomPanY = 0;
               ssApplyUi();
               ssSyncController();
             } else {
@@ -857,6 +1018,20 @@ $sharedTheme = (isset($dashboard['default_theme']) && (string) $dashboard['defau
             }
           }
         }, { passive: true });
+        ssStage.addEventListener('wheel', (e) => {
+          if (!ss) return;
+          const sl = ss.slides[ss.index];
+          if (sl && sl.media_type === 'video') return;
+          if (ss.fillImage) return;
+          const z = ss.imageZoom || 1;
+          if (z <= SS_ZOOM_MIN) return;
+          const maxY = ssZoomPanLimitY();
+          if (maxY <= 0) return;
+          e.preventDefault();
+          const dy = ssWheelDeltaY(e);
+          ss.zoomPanY = Math.max(-maxY, Math.min(maxY, (ss.zoomPanY || 0) - dy));
+          ssApplyImageZoom();
+        }, { passive: false });
       }
 
       const footerModal = document.getElementById('shared-footer-modal');

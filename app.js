@@ -817,6 +817,7 @@
         const h = imgEl.naturalHeight || imgEl.height;
         content.classList.toggle('modal-content-wide', w > h);
         content.classList.toggle('modal-content-tall', h >= w);
+        applyModalImageZoom();
       };
       if (imgEl.complete) imgEl.onload();
     } else {
@@ -824,6 +825,16 @@
     }
     modal.hidden = false;
     document.body.style.overflow = 'hidden';
+    modalImageZoom = 1;
+    modalImagePanY = 0;
+    if (!isVideo) applyModalImageZoom();
+    else {
+      const mi = document.getElementById('modal-img');
+      if (mi) {
+        mi.style.transform = '';
+        mi.style.transformOrigin = '';
+      }
+    }
     updateModalNavUi();
   }
 
@@ -872,6 +883,159 @@
     nextBtn.disabled = i === list.length - 1;
   }
 
+  const VIEW_IMAGE_ZOOM_MIN = 1;
+  const VIEW_IMAGE_ZOOM_MAX = 6;
+  const VIEW_IMAGE_ZOOM_FACTOR = 1.18;
+
+  function clampViewImageZoom(z) {
+    if (!isFinite(z) || z < VIEW_IMAGE_ZOOM_MIN) return VIEW_IMAGE_ZOOM_MIN;
+    return Math.min(VIEW_IMAGE_ZOOM_MAX, z);
+  }
+
+  function wheelDeltaYPixels(e) {
+    if (e.deltaMode === 1) return e.deltaY * 16;
+    if (e.deltaMode === 2) return e.deltaY * (document.documentElement.clientHeight || 600);
+    return e.deltaY;
+  }
+
+  /** Half of extra height after scaling image in container (vertical pan range, px). */
+  function getViewZoomPanLimitY(imgEl, containerEl, z) {
+    if (!imgEl || !containerEl || z <= VIEW_IMAGE_ZOOM_MIN) return 0;
+    const ih = imgEl.offsetHeight;
+    const ch = containerEl.clientHeight;
+    if (!ih || !ch) return 0;
+    const scaledH = ih * z;
+    return Math.max(0, (scaledH - ch) / 2);
+  }
+
+  function getSlideshowZoomPanLimitY() {
+    if (!slideshowState || !slideshowState.stageEl) return 0;
+    const z = clampViewImageZoom(slideshowState.imageZoom || 1);
+    if (z <= VIEW_IMAGE_ZOOM_MIN) return 0;
+    const img = document.getElementById('slideshow-img');
+    const stage = slideshowState.stageEl;
+    const r = slideshowContainedImageRect(img, stage);
+    if (!r) return 0;
+    const drawnH = r.bottom - r.top;
+    const ch = stage.clientHeight;
+    if (!ch) return 0;
+    return Math.max(0, (drawnH * z - ch) / 2);
+  }
+
+  function isViewZoomInKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (e.key === '+' || e.key === '=') return true;
+    if (e.code === 'NumpadAdd' || e.code === 'NumpadEqual') return true;
+    if (e.code === 'Equal') return true;
+    return false;
+  }
+
+  function isViewZoomOutKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (e.key === '-' || e.key === '_') return true;
+    if (e.code === 'NumpadSubtract' || e.code === 'Minus') return true;
+    return false;
+  }
+
+  /** When false, image zoom shortcuts may run; when true, let the focused control handle the key. */
+  function zoomKeyEventShouldYieldToField(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return true;
+    const t = e.target;
+    if (!t || t.nodeType !== 1) return false;
+    if (t.tagName === 'TEXTAREA' || t.isContentEditable) return true;
+    if (t.closest && t.closest('[contenteditable="true"]')) return true;
+    if (t.tagName === 'SELECT') return true;
+    const hostDialog = t.closest('.dialog, [role="dialog"]');
+    if (hostDialog && !hostDialog.closest('#modal')) return true;
+    if (t.tagName !== 'INPUT') return false;
+    const type = (t.getAttribute('type') || 'text').toLowerCase();
+    if (type === 'button' || type === 'submit' || type === 'checkbox' || type === 'radio' || type === 'range' || type === 'file' || type === 'hidden') return false;
+    const modal = document.getElementById('modal');
+    if (t.id === 'modal-filename' && modal && !modal.hidden && modal.contains(t) && (isViewZoomInKey(e) || isViewZoomOutKey(e))) {
+      return true;
+    }
+    const ssPl = document.getElementById('slideshow-player');
+    const mfs = document.getElementById('modal-fullscreen');
+    if ((modal && !modal.hidden) || (ssPl && !ssPl.hidden) || (mfs && !mfs.hidden)) return false;
+    return true;
+  }
+
+  function keydownTargetIsTyping(e) {
+    const t = e.target;
+    if (!t || t.nodeType !== 1) return false;
+    if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return true;
+    if (t.closest && t.closest('[contenteditable="true"]')) return true;
+    return false;
+  }
+
+  let modalImageZoom = 1;
+  let modalImagePanY = 0;
+
+  function applyModalImageZoom() {
+    const modal = document.getElementById('modal');
+    const imgEl = document.getElementById('modal-img');
+    const wrap = document.querySelector('#modal .modal-img-wrap');
+    if (!modal || modal.hidden || !imgEl || imgEl.hidden) return;
+    const z = clampViewImageZoom(modalImageZoom);
+    modalImageZoom = z;
+    if (z <= VIEW_IMAGE_ZOOM_MIN) {
+      modalImagePanY = 0;
+      imgEl.style.transform = '';
+      imgEl.style.transformOrigin = '';
+    } else {
+      const maxY = wrap ? getViewZoomPanLimitY(imgEl, wrap, z) : 0;
+      modalImagePanY = Math.max(-maxY, Math.min(maxY, modalImagePanY || 0));
+      imgEl.style.transform = 'translate(0,' + modalImagePanY + 'px) scale(' + z + ')';
+      imgEl.style.transformOrigin = 'center center';
+    }
+  }
+
+  function applyModalFullscreenZoom() {
+    if (!modalFullscreenState) return;
+    const fsImg = document.getElementById('modal-fullscreen-img');
+    const stage = modalFullscreenState.stage;
+    if (!fsImg || !stage) return;
+    const z = clampViewImageZoom(modalFullscreenState.imageZoom || 1);
+    modalFullscreenState.imageZoom = z;
+    if (z <= VIEW_IMAGE_ZOOM_MIN) {
+      modalFullscreenState.zoomPanY = 0;
+      fsImg.style.transform = '';
+      fsImg.style.transformOrigin = '';
+    } else {
+      const maxY = getViewZoomPanLimitY(fsImg, stage, z);
+      const py = Math.max(-maxY, Math.min(maxY, modalFullscreenState.zoomPanY || 0));
+      modalFullscreenState.zoomPanY = py;
+      fsImg.style.transform = 'translate(0,' + py + 'px) scale(' + z + ')';
+      fsImg.style.transformOrigin = 'center center';
+    }
+  }
+
+  function applySlideshowImageZoom() {
+    if (!slideshowState) return;
+    const shell = document.getElementById('slideshow-zoom-shell');
+    if (!shell) return;
+    const slide = slideshowState.slides[slideshowState.index];
+    if (isVideoSlide(slide) || slideshowState.fillImage) {
+      shell.style.transform = '';
+      shell.style.transformOrigin = '';
+      slideshowState.zoomPanY = 0;
+      return;
+    }
+    const z = clampViewImageZoom(slideshowState.imageZoom || 1);
+    slideshowState.imageZoom = z;
+    if (z <= VIEW_IMAGE_ZOOM_MIN) {
+      shell.style.transform = '';
+      shell.style.transformOrigin = '';
+      slideshowState.zoomPanY = 0;
+    } else {
+      const maxY = getSlideshowZoomPanLimitY();
+      const py = Math.max(-maxY, Math.min(maxY, slideshowState.zoomPanY || 0));
+      slideshowState.zoomPanY = py;
+      shell.style.transform = 'translate(0,' + py + 'px) scale(' + z + ')';
+      shell.style.transformOrigin = 'center center';
+    }
+  }
+
   let modalFullscreenState = null;
 
   function closeModalFullscreen() {
@@ -882,6 +1046,9 @@
       if (modalFullscreenState.onFsChange) document.removeEventListener('fullscreenchange', modalFullscreenState.onFsChange);
       if (modalFullscreenState.stageClickHandler && modalFullscreenState.stage) {
         modalFullscreenState.stage.removeEventListener('click', modalFullscreenState.stageClickHandler);
+      }
+      if (modalFullscreenState.stageWheelHandler && modalFullscreenState.stage) {
+        modalFullscreenState.stage.removeEventListener('wheel', modalFullscreenState.stageWheelHandler);
       }
       modalFullscreenState = null;
     }
@@ -894,6 +1061,8 @@
     if (fsImg) {
       fsImg.removeAttribute('src');
       fsImg.removeAttribute('alt');
+      fsImg.style.transform = '';
+      fsImg.style.transformOrigin = '';
     }
     shell.hidden = true;
     shell.setAttribute('aria-hidden', 'true');
@@ -913,6 +1082,10 @@
       fsImg.src = currentModalImg.url;
       fsImg.alt = currentModalImg.filename || '';
     }
+    if (modalFullscreenState) {
+      modalFullscreenState.imageZoom = 1;
+      applyModalFullscreenZoom();
+    }
     return true;
   }
 
@@ -928,14 +1101,20 @@
 
     fsImg.src = currentModalImg.url;
     fsImg.alt = currentModalImg.filename || '';
+    fsImg.style.transform = '';
+    fsImg.style.transformOrigin = '';
 
     modalFullscreenState = {
       stage,
       expectFullscreen: false,
       stageClickHandler: null,
+      stageWheelHandler: null,
       onKeyDown: null,
       onFsChange: null,
+      imageZoom: 1,
+      zoomPanY: 0,
     };
+    applyModalFullscreenZoom();
 
     modalFullscreenState.stageClickHandler = (e) => {
       if (e.target === exitBtn || (exitBtn.contains && exitBtn.contains(e.target))) return;
@@ -947,8 +1126,35 @@
     };
     stage.addEventListener('click', modalFullscreenState.stageClickHandler);
 
+    modalFullscreenState.stageWheelHandler = (e) => {
+      if (!modalFullscreenState || shell.hidden) return;
+      const z = modalFullscreenState.imageZoom || 1;
+      if (z <= VIEW_IMAGE_ZOOM_MIN) return;
+      const maxY = getViewZoomPanLimitY(fsImg, stage, z);
+      if (maxY <= 0) return;
+      e.preventDefault();
+      const dy = wheelDeltaYPixels(e);
+      modalFullscreenState.zoomPanY = Math.max(-maxY, Math.min(maxY, (modalFullscreenState.zoomPanY || 0) - dy));
+      applyModalFullscreenZoom();
+    };
+    stage.addEventListener('wheel', modalFullscreenState.stageWheelHandler, { passive: false });
+
     modalFullscreenState.onKeyDown = (e) => {
       if (shell.hidden) return;
+      if ((isViewZoomInKey(e) || isViewZoomOutKey(e)) && !zoomKeyEventShouldYieldToField(e)) {
+        if (isViewZoomInKey(e)) {
+          e.preventDefault();
+          modalFullscreenState.imageZoom = clampViewImageZoom((modalFullscreenState.imageZoom || 1) * VIEW_IMAGE_ZOOM_FACTOR);
+          applyModalFullscreenZoom();
+          return;
+        }
+        if (isViewZoomOutKey(e)) {
+          e.preventDefault();
+          modalFullscreenState.imageZoom = clampViewImageZoom((modalFullscreenState.imageZoom || 1) / VIEW_IMAGE_ZOOM_FACTOR);
+          applyModalFullscreenZoom();
+          return;
+        }
+      }
       const t = e.target;
       if (t && t.nodeType === 1) {
         if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return;
@@ -1263,7 +1469,9 @@
     bind('ss-ctrl-fill', () => {
       slideshowState.fillImage = !slideshowState.fillImage;
       if (!slideshowState.fillImage) resetSlideshowImagePan();
+      slideshowState.imageZoom = 1;
       applySlideshowImageFit();
+      applySlideshowImageZoom();
       syncSlideshowMiniControllerUi();
       showToast(slideshowState.fillImage ? 'Fill image: ON' : 'Fill image: OFF', false);
     });
@@ -1425,9 +1633,20 @@
   }
 
   function panSlideshowImageFromWheel(e) {
-    if (!slideshowState || !slideshowState.fillImage) return;
+    if (!slideshowState) return;
     const slide = slideshowState.slides[slideshowState.index];
     if (isVideoSlide(slide)) return;
+    const z = slideshowState.imageZoom || 1;
+    if (!slideshowState.fillImage && z > VIEW_IMAGE_ZOOM_MIN) {
+      const maxY = getSlideshowZoomPanLimitY();
+      if (maxY <= 0) return;
+      e.preventDefault();
+      const dy = wheelDeltaYPixels(e);
+      slideshowState.zoomPanY = Math.max(-maxY, Math.min(maxY, (slideshowState.zoomPanY || 0) - dy));
+      applySlideshowImageZoom();
+      return;
+    }
+    if (!slideshowState.fillImage) return;
     const limits = getSlideshowCoverPanLimits();
     if (limits.maxX <= 0 && limits.maxY <= 0) return;
     let panDeltaX = 0;
@@ -1640,6 +1859,8 @@
       slideshowState.index = newIndex;
       slideshowState.panX = 0;
       slideshowState.panY = 0;
+      slideshowState.imageZoom = 1;
+      slideshowState.zoomPanY = 0;
       if (isVideoSlide(slide)) {
         pauseAndResetSlideshowVideo();
         img.hidden = true;
@@ -1672,6 +1893,7 @@
       updateSlideshowCounter();
       updateSlideshowFilenameCaption();
       applySlideshowImageFit();
+      applySlideshowImageZoom();
       resyncSlideshowPlaybackTimers();
       syncSlideshowMiniControllerUi();
     };
@@ -1773,6 +1995,11 @@
       player.classList.remove('slideshow-player-locked');
       player.setAttribute('aria-hidden', 'true');
     }
+    const zoomShell = document.getElementById('slideshow-zoom-shell');
+    if (zoomShell) {
+      zoomShell.style.transform = '';
+      zoomShell.style.transformOrigin = '';
+    }
     slideshowState = null;
     document.body.style.overflow = '';
   }
@@ -1808,6 +2035,8 @@
       transitioning: false,
       videoEndedHandler: null,
       videoReplayLoop: false,
+      imageZoom: 1,
+      zoomPanY: 0,
     };
 
     const player = document.getElementById('slideshow-player');
@@ -1878,6 +2107,23 @@
         e.preventDefault();
         closeSlideshowPlayer();
         return;
+      }
+      if (!zoomKeyEventShouldYieldToField(e)) {
+        const curSlide = slideshowState.slides[slideshowState.index];
+        if (!isVideoSlide(curSlide) && !slideshowState.fillImage) {
+          if (isViewZoomInKey(e)) {
+            e.preventDefault();
+            slideshowState.imageZoom = clampViewImageZoom((slideshowState.imageZoom || 1) * VIEW_IMAGE_ZOOM_FACTOR);
+            applySlideshowImageZoom();
+            return;
+          }
+          if (isViewZoomOutKey(e)) {
+            e.preventDefault();
+            slideshowState.imageZoom = clampViewImageZoom((slideshowState.imageZoom || 1) / VIEW_IMAGE_ZOOM_FACTOR);
+            applySlideshowImageZoom();
+            return;
+          }
+        }
       }
       if (slideshowState.auto) {
         if (e.key === 'p' || e.key === 'P') {
@@ -1968,7 +2214,9 @@
         if (!slideshowState.fillImage) {
           resetSlideshowImagePan();
         }
+        slideshowState.imageZoom = 1;
         applySlideshowImageFit();
+        applySlideshowImageZoom();
         syncSlideshowMiniControllerUi();
         showToast(slideshowState.fillImage ? 'Fill image: ON' : 'Fill image: OFF', false);
         return;
@@ -2405,6 +2653,13 @@
 
   function closeModal() {
     closeModalFullscreen();
+    const modalImg = document.getElementById('modal-img');
+    if (modalImg) {
+      modalImg.style.transform = '';
+      modalImg.style.transformOrigin = '';
+    }
+    modalImageZoom = 1;
+    modalImagePanY = 0;
     const videoEl = document.getElementById('modal-video');
     if (videoEl) {
       videoEl.pause();
@@ -4640,6 +4895,22 @@
         navigateModal(1);
       });
     }
+    const modalImgWrap = document.querySelector('#modal .modal-img-wrap');
+    if (modalImgWrap) {
+      modalImgWrap.addEventListener('wheel', (e) => {
+        const modal = document.getElementById('modal');
+        if (!modal || modal.hidden) return;
+        const imgEl = document.getElementById('modal-img');
+        if (!imgEl || imgEl.hidden) return;
+        if (modalImageZoom <= VIEW_IMAGE_ZOOM_MIN) return;
+        const maxY = getViewZoomPanLimitY(imgEl, modalImgWrap, modalImageZoom);
+        if (maxY <= 0) return;
+        e.preventDefault();
+        const dy = wheelDeltaYPixels(e);
+        modalImagePanY = Math.max(-maxY, Math.min(maxY, (modalImagePanY || 0) - dy));
+        applyModalImageZoom();
+      }, { passive: false });
+    }
     document.addEventListener('keydown', (e) => {
       const ssPlayer = document.getElementById('slideshow-player');
       if (ssPlayer && !ssPlayer.hidden) return;
@@ -4647,12 +4918,25 @@
       if (modalFs && !modalFs.hidden) return;
       const modal = document.getElementById('modal');
       if (!modal || modal.hidden) return;
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      const isVideo = currentModalImg && String(currentModalImg.media_type || 'image') === 'video';
+      if (!isVideo && (isViewZoomInKey(e) || isViewZoomOutKey(e)) && !zoomKeyEventShouldYieldToField(e)) {
+        if (isViewZoomInKey(e)) {
+          e.preventDefault();
+          modalImageZoom = clampViewImageZoom(modalImageZoom * VIEW_IMAGE_ZOOM_FACTOR);
+          applyModalImageZoom();
+          return;
+        }
+        e.preventDefault();
+        modalImageZoom = clampViewImageZoom(modalImageZoom / VIEW_IMAGE_ZOOM_FACTOR);
+        applyModalImageZoom();
+        return;
+      }
       const t = e.target;
       if (t && t.nodeType === 1) {
         if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable) return;
         if (t.closest && t.closest('[contenteditable="true"]')) return;
       }
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
       if (e.key === 'ArrowLeft' && navigateModal(-1)) e.preventDefault();
       else if (e.key === 'ArrowRight' && navigateModal(1)) e.preventDefault();
     });

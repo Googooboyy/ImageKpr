@@ -418,6 +418,7 @@ $ikServerTheme = imagekpr_user_theme_preference($pdo, (int) imagekpr_user_id());
         </div>
         <div class="ss-hint-group ss-hint-display">
           <span class="ss-hint-label">Display</span>
+          <span class="ss-hint-item"><kbd>=</kbd> <kbd>+</kbd> zoom in &middot; <kbd>&minus;</kbd> <kbd>_</kbd> zoom out (images, not Fill mode; numpad + / &minus; too)</span>
           <span class="ss-hint-item"><kbd>F</kbd> toggle Fill image &middot; mouse wheel pans when on</span>
           <span class="ss-hint-item"><kbd>C</kbd> show / hide the mini controller tray</span>
         </div>
@@ -475,8 +476,10 @@ $ikServerTheme = imagekpr_user_theme_preference($pdo, (int) imagekpr_user_id());
     </button>
     <div class="slideshow-stage">
       <div class="slideshow-player-bg" id="slideshow-player-bg" aria-hidden="true"></div>
-      <img id="slideshow-img" class="slideshow-img" src="" alt="">
-      <video id="slideshow-video" class="slideshow-video" controls preload="metadata" hidden></video>
+      <div id="slideshow-zoom-shell" class="slideshow-zoom-shell">
+        <img id="slideshow-img" class="slideshow-img" src="" alt="">
+        <video id="slideshow-video" class="slideshow-video" controls preload="metadata" hidden></video>
+      </div>
     </div>
   </div>
 
