@@ -728,33 +728,111 @@ $allRows = $pdo->query($sqlAll)->fetchAll(PDO::FETCH_ASSOC);
 
 $overQuota = 0;
 $expiredGraceUsers = 0;
+$expiredGraceList = [];
+$overQuotaList = [];
+$usersByTier = ['free' => [], 'silver' => [], 'gold' => [], 'platinum' => []];
 foreach ($allRows as $r) {
   $used = (int) $r['used_bytes'];
   $dbq = $r['storage_quota_bytes'];
   $dbq = $dbq === null ? null : (int) $dbq;
-  $tierEnt = imagekpr_plan_admin_tier_entitlements($dbq, (int) ($r['upload_size_mb'] ?? 3));
-  if ($tierEnt['matrix_key'] === 'free') {
+  $uploadMb = imagekpr_normalize_upload_size_mb($r['upload_size_mb'] ?? 3);
+  $tierEnt = imagekpr_plan_admin_tier_entitlements($dbq, $uploadMb);
+  $tierLabel = imagekpr_admin_resolved_tier_label($tierEnt);
+  $userId = (int) $r['id'];
+  $tierRow = [
+    'id' => $userId,
+    'email' => (string) $r['email'],
+    'name' => (string) ($r['name'] ?? ''),
+    'tier_label' => $tierLabel,
+    'upload_mb' => $uploadMb,
+    'used_bytes' => $used,
+    'image_count' => (int) ($r['image_count'] ?? 0),
+  ];
+  $mk = $tierEnt['matrix_key'];
+  if ($mk === 'free') {
     $freeUsers++;
-  } elseif ($tierEnt['matrix_key'] === 'silver') {
+    $usersByTier['free'][] = $tierRow;
+  } elseif ($mk === 'silver') {
     $silverUsers++;
-  } elseif ($tierEnt['matrix_key'] === 'gold') {
+    $usersByTier['silver'][] = $tierRow;
+  } elseif ($mk === 'gold') {
     $goldUsers++;
-  } elseif ($tierEnt['matrix_key'] === 'platinum') {
+    $usersByTier['gold'][] = $tierRow;
+  } elseif ($mk === 'platinum') {
     $platinumUsers++;
+    $usersByTier['platinum'][] = $tierRow;
   }
-  $eff = imagekpr_effective_quota_bytes_for_user_row($dbq, (int) ($r['upload_size_mb'] ?? 3));
+  $eff = imagekpr_effective_quota_bytes_for_user_row($dbq, $uploadMb);
   if ($eff !== null && $used > $eff) {
     $overQuota++;
+    $overQuotaList[] = $tierRow + [
+      'eff_bytes' => $eff,
+      'over_by_bytes' => $used - $eff,
+    ];
   }
-  if (imagekpr_upload_tier_grace_expired(isset($r['upload_tier_downgraded_at']) ? (string) $r['upload_tier_downgraded_at'] : null)) {
+  $downAt = isset($r['upload_tier_downgraded_at']) ? (string) $r['upload_tier_downgraded_at'] : null;
+  if ($downAt !== null && trim($downAt) === '') {
+    $downAt = null;
+  }
+  if (imagekpr_upload_tier_grace_expired($downAt)) {
     $expiredGraceUsers++;
+    $graceEndsAt = imagekpr_upload_tier_grace_ends_at($downAt);
+    $expiredGraceList[] = [
+      'id' => $userId,
+      'email' => (string) $r['email'],
+      'name' => (string) ($r['name'] ?? ''),
+      'upload_mb' => $uploadMb,
+      'tier_label' => $tierLabel,
+      'downgraded_at' => $downAt,
+      'grace_ends_at' => $graceEndsAt,
+      'days_since_grace_ended' => $graceEndsAt !== null ? (int) floor((time() - $graceEndsAt) / 86400) : null,
+      'image_count' => (int) ($r['image_count'] ?? 0),
+    ];
   }
 }
+usort($overQuotaList, static function (array $a, array $b): int {
+  return (int) $b['over_by_bytes'] <=> (int) $a['over_by_bytes'];
+});
+foreach (['free', 'silver', 'gold', 'platinum'] as $tierKey) {
+  usort($usersByTier[$tierKey], static function (array $a, array $b): int {
+    return (int) $b['used_bytes'] <=> (int) $a['used_bytes'];
+  });
+}
+$expiredGraceOversized = imagekpr_admin_oversized_image_stats_for_users(
+  $pdo,
+  array_column($expiredGraceList, 'id')
+);
+usort($expiredGraceList, static function (array $a, array $b) use ($expiredGraceOversized): int {
+  $aCnt = $expiredGraceOversized[$a['id']]['count'] ?? 0;
+  $bCnt = $expiredGraceOversized[$b['id']]['count'] ?? 0;
+  if ($aCnt !== $bCnt) {
+    return $bCnt <=> $aCnt;
+  }
+  return ($b['days_since_grace_ended'] ?? 0) <=> ($a['days_since_grace_ended'] ?? 0);
+});
 $byUsed = $allRows;
 usort($byUsed, static function ($a, $b) {
   return (int) $b['used_bytes'] <=> (int) $a['used_bytes'];
 });
 $topUsers = array_slice($byUsed, 0, 5);
+$largestUsersList = [];
+$rank = 0;
+foreach (array_slice($byUsed, 0, 50) as $lu) {
+  $rank++;
+  $luDbq = $lu['storage_quota_bytes'];
+  $luDbq = $luDbq === null ? null : (int) $luDbq;
+  $luUploadMb = imagekpr_normalize_upload_size_mb($lu['upload_size_mb'] ?? 3);
+  $luTierEnt = imagekpr_plan_admin_tier_entitlements($luDbq, $luUploadMb);
+  $largestUsersList[] = [
+    'rank' => $rank,
+    'id' => (int) $lu['id'],
+    'email' => (string) $lu['email'],
+    'name' => (string) ($lu['name'] ?? ''),
+    'tier_label' => imagekpr_admin_resolved_tier_label($luTierEnt),
+    'used_bytes' => (int) $lu['used_bytes'],
+    'image_count' => (int) ($lu['image_count'] ?? 0),
+  ];
+}
 
 $pageTitle = 'Admin — Dashboard';
 $adminNavCurrent = 'dashboard';
@@ -826,6 +904,44 @@ function admin_th_hint(string $tip): string
     .admin-stat--wide { grid-column: span 2; }
     .admin-stat dt { font-size: 0.75rem; color: #666; margin: 0; text-transform: uppercase; letter-spacing: 0.03em; }
     .admin-stat dd { margin: 0.35rem 0 0; font-size: 1.15rem; font-weight: 600; color: #333; }
+    button.admin-stat--clickable {
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    button.admin-stat--clickable:hover,
+    button.admin-stat--clickable:focus-visible {
+      border-color: #90caf9;
+      box-shadow: 0 0 0 2px rgba(21, 101, 192, 0.15);
+      outline: none;
+    }
+    .admin-stat-hint {
+      display: block;
+      margin-top: 0.35rem;
+      font-size: 0.68rem;
+      font-weight: 500;
+      color: #1565c0;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .admin-drilldown-modal-card { width: min(52rem, calc(100vw - 2rem)); max-height: min(85vh, 40rem); }
+    .admin-drilldown-modal-body { color: #334155; font-size: 0.9rem; line-height: 1.5; overflow-y: auto; flex: 1; min-height: 0; }
+    .admin-drilldown-panel[hidden] { display: none; }
+    .admin-drilldown-lead { margin: 0 0 0.85rem; }
+    .admin-drilldown-foot { margin: 0.85rem 0 0; font-size: 0.82rem; }
+    .admin-drilldown-table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .admin-drilldown-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .admin-drilldown-table th, .admin-drilldown-table td { padding: 0.45rem 0.55rem; text-align: left; border-bottom: 1px solid #eef2f6; vertical-align: top; }
+    .admin-drilldown-table thead th { background: #f1f5f9; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; white-space: nowrap; }
+    .admin-drilldown-table tbody tr:last-child td { border-bottom: none; }
+    .admin-drilldown-email { display: block; font-weight: 600; word-break: break-all; }
+    .admin-drilldown-name { display: block; font-size: 0.75rem; color: #64748b; margin-top: 0.1rem; }
+    .admin-drilldown-sub { display: block; font-size: 0.72rem; color: #64748b; margin-top: 0.1rem; }
+    .admin-drilldown-find { font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+    table.admin-users tr:target { background: #fff8e1; outline: 2px solid #ffc107; outline-offset: -2px; }
     .admin-top-list { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; color: #444; }
     .admin-top-list li { word-break: break-all; line-height: 1.4; }
     .admin-stats-wrap.is-hidden .admin-stats { display: none; }
@@ -901,6 +1017,8 @@ function admin_th_hint(string $tip): string
       position: relative;
       width: min(32rem, calc(100vw - 2rem));
       max-height: min(80vh, 36rem);
+      display: flex;
+      flex-direction: column;
       overflow: auto;
       background: #fff;
       border: 1px solid #d8e1e8;
@@ -1034,31 +1152,37 @@ function admin_th_hint(string $tip): string
           <dt>Users</dt>
           <dd><?php echo (int) $userCount; ?></dd>
         </div>
-        <div class="admin-stat">
+        <button type="button" class="admin-stat admin-stat--clickable" data-drilldown="tierFree" aria-haspopup="dialog" aria-controls="admin-stat-drilldown-modal">
           <dt>Free users</dt>
-          <dd><?php echo $freeUsers; ?></dd>
-        </div>
-        <div class="admin-stat">
+          <dd><?php echo (int) $freeUsers; ?></dd>
+          <span class="admin-stat-hint">View details</span>
+        </button>
+        <button type="button" class="admin-stat admin-stat--clickable" data-drilldown="tierSilver" aria-haspopup="dialog" aria-controls="admin-stat-drilldown-modal">
           <dt>Silver users</dt>
-          <dd><?php echo $silverUsers; ?></dd>
-        </div>
-        <div class="admin-stat">
+          <dd><?php echo (int) $silverUsers; ?></dd>
+          <span class="admin-stat-hint">View details</span>
+        </button>
+        <button type="button" class="admin-stat admin-stat--clickable" data-drilldown="tierGold" aria-haspopup="dialog" aria-controls="admin-stat-drilldown-modal">
           <dt>Gold users</dt>
-          <dd><?php echo $goldUsers; ?></dd>
-        </div>
-        <div class="admin-stat">
+          <dd><?php echo (int) $goldUsers; ?></dd>
+          <span class="admin-stat-hint">View details</span>
+        </button>
+        <button type="button" class="admin-stat admin-stat--clickable" data-drilldown="tierPlatinum" aria-haspopup="dialog" aria-controls="admin-stat-drilldown-modal">
           <dt>Platinum users</dt>
-          <dd><?php echo $platinumUsers; ?></dd>
-        </div>
-        <div class="admin-stat">
+          <dd><?php echo (int) $platinumUsers; ?></dd>
+          <span class="admin-stat-hint">View details</span>
+        </button>
+        <button type="button" class="admin-stat admin-stat--clickable" data-drilldown="overQuota" aria-haspopup="dialog" aria-controls="admin-stat-drilldown-modal">
           <dt>Over quota</dt>
           <dd><?php echo $overQuota > 0 ? '<span class="admin-over">' . (int) $overQuota . '</span>' : (int) $overQuota; ?></dd>
-        </div>
-        <div class="admin-stat">
+          <span class="admin-stat-hint">View details</span>
+        </button>
+        <button type="button" class="admin-stat admin-stat--clickable" data-drilldown="graceExpired" aria-haspopup="dialog" aria-controls="admin-stat-drilldown-modal">
           <dt>Upload grace expired</dt>
           <dd><?php echo $expiredGraceUsers > 0 ? '<span class="admin-over">' . (int) $expiredGraceUsers . '</span>' : (int) $expiredGraceUsers; ?></dd>
-        </div>
-        <div class="admin-stat admin-stat--wide">
+          <span class="admin-stat-hint">View details</span>
+        </button>
+        <button type="button" class="admin-stat admin-stat--clickable admin-stat--wide" data-drilldown="largestUsers" aria-haspopup="dialog" aria-controls="admin-stat-drilldown-modal">
           <dt>Largest users</dt>
           <dd>
             <?php if (empty($topUsers)) { ?>
@@ -1071,7 +1195,8 @@ function admin_th_hint(string $tip): string
               </ul>
             <?php } ?>
           </dd>
-        </div>
+          <span class="admin-stat-hint">View all (top 50)</span>
+        </button>
       </dl>
     </div>
 
@@ -1088,8 +1213,7 @@ function admin_th_hint(string $tip): string
         <p class="admin-muted">Default quota for users with no per-user cap: <?php
           echo $d === null ? 'none (unlimited)' : htmlspecialchars(imagekpr_format_bytes($d), ENT_QUOTES, 'UTF-8');
         ?> — set <span class="admin-mono">DEFAULT_STORAGE_QUOTA_BYTES</span> in <span class="admin-mono">config.php</span> if needed.</p>
-        <p class="admin-muted"><strong>SaaS tier matrix</strong> (reference — upload MB, total storage, image caps, shared-dashboard caps). Use <strong>Plan preset</strong> below to apply Free/Silver/Gold/Platinum storage + upload limits together: <?php echo imagekpr_admin_html_plan_matrix_saas_blurb(); ?></p>
-        <p class="admin-muted"><?php echo imagekpr_admin_html_plan_matrix_pro_blurb(); ?></p>
+        <?php echo imagekpr_admin_html_plan_matrix_panel(); ?>
       </div>
     </div>
 
@@ -1261,7 +1385,7 @@ function admin_th_hint(string $tip): string
               }
             }
             ?>
-            <tr>
+            <tr id="admin-user-<?php echo (int) $r['id']; ?>">
               <td class="admin-col-cb"><input type="checkbox" class="admin-user-cb" form="bulkUserForm" name="bulk_user_ids[]" value="<?php echo (int) $r['id']; ?>" aria-label="Select <?php echo htmlspecialchars((string) $r['email'], ENT_QUOTES, 'UTF-8'); ?>"></td>
               <?php
               $emailDisp = (string) $r['email'];
@@ -1316,6 +1440,7 @@ function admin_th_hint(string $tip): string
       </table>
     </div>
   </div>
+  <?php require __DIR__ . '/_stat_drilldown_modals.php'; ?>
   <div class="admin-info-modal" id="admin-info-modal" hidden aria-hidden="true">
     <div class="admin-info-modal-backdrop" id="admin-info-modal-backdrop"></div>
     <div class="admin-info-modal-card" role="dialog" aria-modal="true" aria-labelledby="admin-info-modal-title">
@@ -1463,6 +1588,78 @@ function admin_th_hint(string $tip): string
           closeModal();
         }
       });
+    })();
+
+    (function () {
+      var modal = document.getElementById('admin-stat-drilldown-modal');
+      var titleEl = document.getElementById('admin-stat-drilldown-title');
+      var closeBtn = document.getElementById('admin-stat-drilldown-close');
+      var backdrop = document.getElementById('admin-stat-drilldown-backdrop');
+      var titlesNode = document.getElementById('admin-stat-drilldown-titles');
+      if (!modal || !titleEl || !closeBtn || !backdrop || !titlesNode) return;
+
+      var titles = {};
+      try {
+        titles = JSON.parse(titlesNode.textContent || '{}');
+      } catch (e) {
+        titles = {};
+      }
+
+      var panels = modal.querySelectorAll('.admin-drilldown-panel[data-drilldown-panel]');
+      var triggers = document.querySelectorAll('.admin-stat--clickable[data-drilldown]');
+      var lastTrigger = null;
+
+      var closeModal = function () {
+        modal.hidden = true;
+        modal.setAttribute('aria-hidden', 'true');
+        panels.forEach(function (p) { p.hidden = true; });
+        if (lastTrigger && typeof lastTrigger.focus === 'function') {
+          lastTrigger.focus();
+        }
+        lastTrigger = null;
+      };
+
+      var openModal = function (panelId, trigger) {
+        var active = null;
+        panels.forEach(function (p) {
+          var on = p.getAttribute('data-drilldown-panel') === panelId;
+          p.hidden = !on;
+          if (on) {
+            active = p;
+          }
+        });
+        titleEl.textContent = titles[panelId] || 'Details';
+        lastTrigger = trigger || null;
+        modal.hidden = false;
+        modal.setAttribute('aria-hidden', 'false');
+        closeBtn.focus();
+      };
+
+      triggers.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openModal(btn.getAttribute('data-drilldown') || '', btn);
+        });
+      });
+
+      closeBtn.addEventListener('click', closeModal);
+      backdrop.addEventListener('click', closeModal);
+      modal.querySelectorAll('.admin-drilldown-find').forEach(function (link) {
+        link.addEventListener('click', function () {
+          closeModal();
+        });
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !modal.hidden) {
+          closeModal();
+        }
+      });
+
+      if (window.location.hash && window.location.hash.indexOf('#admin-user-') === 0) {
+        var row = document.getElementById(window.location.hash.slice(1));
+        if (row) {
+          row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      }
     })();
   </script>
   <?php

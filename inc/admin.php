@@ -530,6 +530,80 @@ function imagekpr_admin_html_plan_matrix_pro_blurb(): string
     . $note . ' (Stripe: one-time or invoice per contract).';
 }
 
+/**
+ * Structured SaaS tier matrix + Ultra card for admin pages (Users dashboard, Config).
+ *
+ * @param bool $stripeHeading When true, heading mentions Stripe (Config storage section).
+ */
+function imagekpr_admin_html_plan_matrix_panel(bool $stripeHeading = false): string
+{
+  $m = imagekpr_plan_tier_matrix_reference();
+  $graceDays = (int) imagekpr_upload_tier_grace_days();
+  $heading = $stripeHeading ? 'Stripe / SaaS tier matrix' : 'SaaS tier matrix';
+  $h = htmlspecialchars($heading, ENT_QUOTES, 'UTF-8');
+
+  $rows = '';
+  foreach (['free', 'silver', 'gold', 'platinum'] as $key) {
+    $r = $m[$key];
+    $label = htmlspecialchars((string) $r['label'], ENT_QUOTES, 'UTF-8');
+    $uploadMb = (int) $r['upload_mb'];
+    $storageBytes = (int) $r['storage_bytes'];
+    $maxImages = (int) $r['max_images'];
+    $dashCap = (int) $r['shared_dashboard_cap'];
+    $storageFmt = htmlspecialchars(imagekpr_format_bytes($storageBytes), ENT_QUOTES, 'UTF-8');
+    $keyEsc = htmlspecialchars($key, ENT_QUOTES, 'UTF-8');
+    $rows .= '<tr class="admin-tier-matrix-row admin-tier-matrix-row--' . $keyEsc . '">'
+      . '<th scope="row"><span class="admin-tier-matrix-tier">' . $label . '</span>'
+      . '<span class="admin-tier-matrix-key admin-mono">' . $keyEsc . '</span></th>'
+      . '<td data-label="Upload / file">' . $uploadMb . ' MB</td>'
+      . '<td data-label="Storage"><span class="admin-tier-matrix-primary">' . $storageFmt . '</span>'
+      . '<span class="admin-tier-matrix-bytes admin-mono">' . $storageBytes . ' B</span></td>'
+      . '<td data-label="Max images">' . number_format($maxImages) . '</td>'
+      . '<td data-label="Shared dashboard">' . number_format($dashCap) . ' / board</td>'
+      . '</tr>';
+  }
+
+  $p = $m['pro'];
+  $ultraLabel = htmlspecialchars(imagekpr_plan_tier_display_label($p), ENT_QUOTES, 'UTF-8');
+  $ultraBytes = (int) $p['storage_bytes'];
+  $ultraNote = htmlspecialchars((string) ($p['commercial_note'] ?? ''), ENT_QUOTES, 'UTF-8');
+  $ultraStorage = htmlspecialchars(imagekpr_format_bytes($ultraBytes), ENT_QUOTES, 'UTF-8');
+
+  return '<section class="admin-tier-matrix" aria-labelledby="admin-tier-matrix-heading">'
+    . '<h3 class="admin-tier-matrix-heading" id="admin-tier-matrix-heading">' . $h . '</h3>'
+    . '<p class="admin-tier-matrix-lead admin-muted">Reference limits for Free, Silver, Gold, and Platinum on this shared app. '
+    . 'Use <strong>Plan preset</strong> on the user table to apply storage + upload together.</p>'
+    . '<div class="admin-tier-matrix-table-wrap">'
+    . '<table class="admin-tier-matrix-table">'
+    . '<caption class="admin-tier-matrix-sr">SaaS plan limits by tier</caption>'
+    . '<thead><tr>'
+    . '<th scope="col">Tier</th>'
+    . '<th scope="col">Upload / file</th>'
+    . '<th scope="col">Total storage</th>'
+    . '<th scope="col">Max images</th>'
+    . '<th scope="col">Shared dashboard</th>'
+    . '</tr></thead>'
+    . '<tbody>' . $rows . '</tbody>'
+    . '</table>'
+    . '</div>'
+    . '<aside class="admin-tier-matrix-ultra">'
+    . '<div class="admin-tier-matrix-ultra-head">'
+    . '<h4 class="admin-tier-matrix-ultra-title">' . $ultraLabel . '</h4>'
+    . '<span class="admin-tier-matrix-ultra-badge">Dedicated</span>'
+    . '</div>'
+    . '<p class="admin-tier-matrix-ultra-lead">White-label deployment on a <strong>separate instance</strong> — not a seat on this multi-tenant app. Preset key <span class="admin-mono">pro</span>.</p>'
+    . '<dl class="admin-tier-matrix-ultra-facts">'
+    . '<div><dt>Reference storage</dt><dd>' . $ultraStorage . ' <span class="admin-mono">(' . $ultraBytes . ' B)</span></dd></div>'
+    . '<div><dt>Library &amp; dashboards</dt><dd>Unlimited on the dedicated instance</dd></div>'
+    . '<div><dt>Commercial</dt><dd>' . $ultraNote . ' <span class="admin-tier-matrix-ultra-pay">(Stripe: one-time or invoice per contract)</span></dd></div>'
+    . '</dl></aside>'
+    . '<p class="admin-tier-matrix-grace admin-muted"><strong>Upload downgrade grace (' . $graceDays . ' days):</strong> '
+    . 'when a user\'s per-file upload limit is lowered, they keep uploading larger files until grace ends; '
+    . 'after that, only files within the new limit count in the gallery and shared-dashboard caps tighten for paid tiers. '
+    . 'The dashboard stat <strong>Upload grace expired</strong> counts users past that window.</p>'
+    . '</section>';
+}
+
 /** Normalize requested tier to a safe supported value (defaults to 3MB). */
 function imagekpr_normalize_upload_size_mb($raw): int
 {
@@ -543,6 +617,22 @@ function imagekpr_normalize_upload_size_mb($raw): int
 function imagekpr_upload_limit_bytes_from_mb(int $mb): int
 {
   return $mb * 1024 * 1024;
+}
+
+/** Display label for a user row resolved via imagekpr_plan_admin_tier_entitlements(). */
+function imagekpr_admin_resolved_tier_label(array $tierEnt): string
+{
+  if ($tierEnt['matrix_key'] !== null) {
+    $mk = (string) $tierEnt['matrix_key'];
+    return imagekpr_plan_tier_display_label(imagekpr_plan_tier_matrix_reference()[$mk]);
+  }
+  return 'Custom';
+}
+
+/** Admin dashboard drill-down: link to user row in the Users table. */
+function imagekpr_admin_drilldown_find_href(int $userId, string $email): string
+{
+  return 'index.php?q=' . rawurlencode($email) . '#admin-user-' . $userId;
 }
 
 /** Upload downgrade grace period in days. */
@@ -562,6 +652,59 @@ function imagekpr_upload_tier_grace_expired(?string $downgradedAt): bool
     return false;
   }
   return (time() - $ts) >= (imagekpr_upload_tier_grace_days() * 86400);
+}
+
+/** Unix timestamp when the grace window ends, or null if not in a downgrade grace period. */
+function imagekpr_upload_tier_grace_ends_at(?string $downgradedAt): ?int
+{
+  if ($downgradedAt === null || trim($downgradedAt) === '') {
+    return null;
+  }
+  $ts = strtotime($downgradedAt);
+  if ($ts === false) {
+    return null;
+  }
+  return $ts + (imagekpr_upload_tier_grace_days() * 86400);
+}
+
+/**
+ * Library images larger than each user's current upload limit (hidden after grace expires).
+ *
+ * @param int[] $userIds
+ * @return array<int, array{count:int, max_bytes:int}>
+ */
+function imagekpr_admin_oversized_image_stats_for_users(PDO $pdo, array $userIds): array
+{
+  $userIds = array_values(array_unique(array_filter(array_map('intval', $userIds), static function (int $id): bool {
+    return $id > 0;
+  })));
+  if ($userIds === []) {
+    return [];
+  }
+  $phs = [];
+  $params = [];
+  foreach ($userIds as $i => $id) {
+    $k = ':uid' . $i;
+    $phs[] = $k;
+    $params[$k] = $id;
+  }
+  $sql = 'SELECT i.user_id, COUNT(*) AS cnt, MAX(i.size_bytes) AS max_bytes
+    FROM images i
+    INNER JOIN users u ON u.id = i.user_id
+    WHERE i.user_id IN (' . implode(', ', $phs) . ')
+      AND i.size_bytes > (COALESCE(u.upload_size_mb, 3) * 1024 * 1024)
+    GROUP BY i.user_id';
+  $st = $pdo->prepare($sql);
+  $st->execute($params);
+  $out = [];
+  while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+    $uid = (int) $row['user_id'];
+    $out[$uid] = [
+      'count' => (int) $row['cnt'],
+      'max_bytes' => (int) $row['max_bytes'],
+    ];
+  }
+  return $out;
 }
 
 /**
